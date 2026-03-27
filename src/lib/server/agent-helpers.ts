@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { startChain } from '@/lib/server/dispatch'
 import { taskBoardInclude } from '@/lib/server/selects'
 
 type AgentRef = { id: string; name: string; emoji: string; projectId: string }
@@ -96,6 +97,14 @@ export async function claimOrStartTask(
     toRealtimeActivity({ action, agent, details: logDetails, taskId }),
   )
   await updateAgentHeartbeat(agent.id)
+
+  // If the task has chain steps, activate the first step
+  if (task && task.steps && task.steps.length > 0) {
+    const hasActiveStep = task.steps.some((s: { status: string }) => s.status === 'active')
+    if (!hasActiveStep) {
+      startChain(taskId, agent.projectId).catch(console.error)
+    }
+  }
 
   return { task }
 }

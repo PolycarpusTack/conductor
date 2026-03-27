@@ -69,33 +69,11 @@ export async function POST(request: Request) {
       }
     }
 
-    const task = await db.$transaction(async (tx) => {
-      const maxOrderTask = await tx.task.findFirst({
-        where: { projectId, status: status || 'BACKLOG' },
-        orderBy: { order: 'desc' },
-      })
+    const steps = parsed.data.steps
 
-      const order = (maxOrderTask?.order || 0) + 1
-
-      return tx.task.create({
-        data: {
-          title,
-          description,
-          status: status || 'BACKLOG',
-          priority: priority || 'MEDIUM',
-          tag,
-          projectId,
-          agentId,
-          notes,
-          order,
-        },
-        include: taskBoardInclude,
-      })
-    })
-
-    if (parsed.data.steps && parsed.data.steps.length > 0) {
-      // Verify all step agents belong to the same project
-      const stepAgentIds = parsed.data.steps
+    // Validate step agents before transaction
+    if (steps && steps.length > 0) {
+      const stepAgentIds = steps
         .map(s => s.agentId)
         .filter((id): id is string => !!id)
       if (stepAgentIds.length > 0) {
@@ -111,29 +89,53 @@ export async function POST(request: Request) {
           )
         }
       }
+    }
 
-      await db.taskStep.createMany({
-        data: parsed.data.steps.map((step, index) => ({
-          taskId: task.id,
-          order: index + 1,
-          agentId: step.agentId || null,
-          humanLabel: step.humanLabel || null,
-          mode: step.mode,
-          instructions: step.instructions || null,
-          autoContinue: step.autoContinue ?? (step.mode !== 'human'),
-        })),
+    // Create task and steps atomically
+    const task = await db.$transaction(async (tx) => {
+      const maxOrderTask = await tx.task.findFirst({
+        where: { projectId, status: status || 'BACKLOG' },
+        orderBy: { order: 'desc' },
       })
 
-      // Re-fetch task with steps included
-      const taskWithSteps = await db.task.findUnique({
-        where: { id: task.id },
+      const order = (maxOrderTask?.order || 0) + 1
+
+      const created = await tx.task.create({
+        data: {
+          title,
+          description,
+          status: status || 'BACKLOG',
+          priority: priority || 'MEDIUM',
+          tag,
+          projectId,
+          agentId,
+          notes,
+          order,
+        },
+      })
+
+      if (steps && steps.length > 0) {
+        await tx.taskStep.createMany({
+          data: steps.map((step, index) => ({
+            taskId: created.id,
+            order: index + 1,
+            agentId: step.agentId || null,
+            humanLabel: step.humanLabel || null,
+            mode: step.mode,
+            instructions: step.instructions || null,
+            autoContinue: step.autoContinue ?? (step.mode !== 'human'),
+            maxRetries: step.maxRetries ?? 2,
+            retryDelayMs: step.retryDelayMs ?? 5000,
+            timeoutMs: step.timeoutMs ?? 300000,
+          })),
+        })
+      }
+
+      return tx.task.findUniqueOrThrow({
+        where: { id: created.id },
         include: taskBoardInclude,
       })
-      if (taskWithSteps) {
-        await broadcastProjectEvent(projectId, 'task-created', taskWithSteps)
-        return NextResponse.json(taskWithSteps)
-      }
-    }
+    })
 
     await broadcastProjectEvent(projectId, 'task-created', task)
     return NextResponse.json(task)

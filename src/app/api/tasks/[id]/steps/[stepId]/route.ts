@@ -76,6 +76,53 @@ export async function PUT(
       return NextResponse.json({ success: true, action: 'rewound', targetStepId: previousAgentStep.id })
     }
 
+    // Handle reject → reassign (rewind to previous agent step with a different agent)
+    if (body.action === 'reject' && body.target === 'reassign') {
+      const note = typeof body.note === 'string' ? body.note : ''
+      if (!note) {
+        return NextResponse.json({ error: 'Rejection note is required' }, { status: 400 })
+      }
+      if (!body.reassignAgentId) {
+        return NextResponse.json({ error: 'reassignAgentId is required for reassign' }, { status: 400 })
+      }
+
+      const previousAgentStep = await db.taskStep.findFirst({
+        where: {
+          taskId: id,
+          order: { lt: existingStep.order },
+          mode: { not: 'human' },
+        },
+        orderBy: { order: 'desc' },
+      })
+
+      if (!previousAgentStep) {
+        return NextResponse.json({ error: 'No previous agent step to reassign' }, { status: 400 })
+      }
+
+      // Switch the agent on the target step
+      await db.taskStep.update({
+        where: { id: previousAgentStep.id },
+        data: {
+          agentId: body.reassignAgentId,
+          ...(body.reassignMode && { mode: body.reassignMode }),
+        },
+      })
+
+      // Reset current human step to pending
+      await db.taskStep.update({
+        where: { id: stepId },
+        data: { status: 'pending', output: null, completedAt: null },
+      })
+
+      await rewindChain(id, projectId, previousAgentStep.id, note)
+      return NextResponse.json({
+        success: true,
+        action: 'reassigned',
+        targetStepId: previousAgentStep.id,
+        reassignedTo: body.reassignAgentId,
+      })
+    }
+
     // Handle reject → close (kill the chain)
     if (body.action === 'reject' && body.target === 'close') {
       const note = typeof body.note === 'string' ? body.note : 'Rejected by human'

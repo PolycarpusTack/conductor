@@ -94,6 +94,9 @@ export async function POST(
         mode: parsed.data.mode,
         instructions: parsed.data.instructions || null,
         autoContinue: parsed.data.autoContinue ?? (parsed.data.mode !== 'human'),
+        maxRetries: parsed.data.maxRetries ?? 2,
+        retryDelayMs: parsed.data.retryDelayMs ?? 5000,
+        timeoutMs: parsed.data.timeoutMs ?? 300000,
       },
       include: {
         agent: { select: { id: true, name: true, emoji: true } },
