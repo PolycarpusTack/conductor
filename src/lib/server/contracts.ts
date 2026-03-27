@@ -33,7 +33,7 @@ export const updateProjectSchema = createProjectSchema.partial().refine(
 )
 
 export const agentRoleSchema = z.enum([
-  'developer', 'researcher', 'writer', 'support', 'qa', 'analyst', 'custom'
+  'developer', 'architect', 'security', 'reviewer', 'qa', 'analyst', 'writer', 'researcher', 'support', 'custom'
 ])
 
 export const createAgentSchema = z.object({

@@ -734,26 +734,7 @@ export default function Home() {
 
   // Create default agents for a new project
   const createDefaultAgents = async (projectId: string) => {
-    const defaultAgents = [
-      { name: 'Coder', emoji: '🤖', color: '#3b82f6', description: 'Backend & frontend development' },
-      { name: 'Research', emoji: '🔍', color: '#8b5cf6', description: 'Research & analysis' },
-      { name: 'Writer', emoji: '✏️', color: '#f59e0b', description: 'Content & documentation' },
-      { name: 'QA', emoji: '🧪', color: '#10b981', description: 'Testing & quality assurance' },
-    ]
-    
-    for (const agent of defaultAgents) {
-      const res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...agent, projectId }),
-      })
-
-      if (!res.ok) {
-        throw new Error(await readApiError(res, 'Failed to create default agents'))
-      }
-    }
-    
-    // Refresh project data
+    // Agents are seeded server-side during project creation — just fetch the project
     const updated = await fetchProject(projectId)
     setCurrentProject(updated)
     if (updated) {

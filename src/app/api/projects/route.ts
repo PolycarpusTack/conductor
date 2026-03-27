@@ -7,6 +7,7 @@ import { requireAdminSession } from '@/lib/server/admin-session'
 import { createProjectSchema } from '@/lib/server/contracts'
 import { seedChainTemplates } from '@/lib/server/chain-templates'
 import { seedProjectModes } from '@/lib/server/default-modes'
+import { seedProjectAgents } from '@/lib/server/default-agents'
 
 export async function GET() {
   try {
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
 
     await seedProjectModes(project.id)
     await seedChainTemplates(project.id)
+    await seedProjectAgents(project.id)
 
     return NextResponse.json({ ...project, apiKey: provisionedKey.rawKey })
   } catch (error) {

@@ -63,17 +63,20 @@ interface AgentCreationModalProps {
   onSave: (agent: Agent) => void
 }
 
-const ROLES = ['developer', 'researcher', 'writer', 'support', 'qa', 'analyst', 'custom'] as const
+const ROLES = ['developer', 'architect', 'security', 'reviewer', 'qa', 'analyst', 'writer', 'researcher', 'support', 'custom'] as const
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 const ROLE_TEMPLATES: Record<string, string> = {
   developer: 'You are a Developer Agent. Write clean, tested code that follows project conventions. Document changes and flag uncertainties.',
-  researcher: 'You are a Research Agent. Investigate topics thoroughly, gather evidence from multiple sources, and produce structured reports with confidence levels.',
-  writer: 'You are a Writer Agent. Draft clear, accurate content that matches the project tone and style. Note areas needing human review.',
-  support: 'You are a Support Analyst. Triage issues, reproduce bugs, identify root causes, and propose fixes with evidence.',
+  architect: 'You are an Architecture Agent. Design scalable systems, evaluate trade-offs, and produce technical specifications.',
+  security: 'You are a Security Agent. Analyze code and infrastructure for vulnerabilities, enforce zero-trust principles, and verify compliance.',
+  reviewer: 'You are a Code Review Agent. Review code for correctness, quality, patterns, and maintainability. Provide specific, actionable feedback.',
   qa: 'You are a QA Agent. Test systematically, design cases covering happy paths and edge cases, and document all findings.',
-  analyst: 'You are a Product Analyst. Evaluate features for feasibility, effort, and business value. Provide actionable recommendations.',
+  analyst: 'You are a Code Analyst. Analyze codebases for architecture patterns, dependencies, technical debt, and improvement opportunities.',
+  writer: 'You are a Writer Agent. Draft clear, accurate content that matches the project tone and style. Note areas needing human review.',
+  researcher: 'You are a Research Agent. Investigate topics thoroughly, gather evidence from multiple sources, and produce structured reports with confidence levels.',
+  support: 'You are a Support Analyst. Triage issues, reproduce bugs, identify root causes, and propose fixes with evidence.',
 }
 
 function parseJsonSafe<T>(value: string | null | undefined, fallback: T): T {
