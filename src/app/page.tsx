@@ -162,6 +162,7 @@ export default function Home() {
   const [seedingDemoData, setSeedingDemoData] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [chainDialogOpen, setChainDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
@@ -833,6 +834,42 @@ export default function Home() {
     }
   }
 
+  const handleCreateChain = async () => {
+    if (!currentProject || !taskTitle.trim() || taskSteps.length === 0) return
+
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskTitle,
+          description: taskDescription || undefined,
+          status: 'BACKLOG',
+          priority: taskPriority,
+          projectId: currentProject.id,
+          steps: taskSteps,
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error(await readApiError(res, 'Failed to create chain'))
+      }
+
+      const newTask = await res.json()
+
+      setCurrentProject(prev => prev ? {
+        ...prev,
+        tasks: [...prev.tasks, newTask],
+      } : null)
+
+      resetTaskForm()
+      setChainDialogOpen(false)
+    } catch (error) {
+      console.error('Error creating chain:', error)
+      setAuthError(error instanceof Error ? error.message : 'Failed to create chain')
+    }
+  }
+
   // Delete task
   const handleDeleteTask = async (taskId: string) => {
     setAuthError(null)
@@ -992,6 +1029,12 @@ export default function Home() {
     resetTaskForm()
     setTaskStatus(status)
     setTaskDialogOpen(true)
+  }
+
+  const openNewChainDialog = () => {
+    resetTaskForm()
+    setTaskStatus('BACKLOG')
+    setChainDialogOpen(true)
   }
 
   const resetTaskForm = () => {
@@ -1683,7 +1726,7 @@ export default function Home() {
             <Button
               variant="outline"
               className="w-full text-xs"
-              onClick={() => setSettingsTab('templates')}
+              onClick={openNewChainDialog}
             >
               <Plus className="h-3 w-3 mr-2" />
               Create Chain
@@ -2104,6 +2147,79 @@ export default function Home() {
             </Button>
             <Button onClick={handleSaveTask}>
               {editingTask ? 'Save Changes' : 'Create Task'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chain Creation Dialog */}
+      <Dialog open={chainDialogOpen} onOpenChange={(open) => { setChainDialogOpen(open); if (!open) resetTaskForm() }}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Chain Task</DialogTitle>
+            <DialogDescription>
+              Select a template or build a custom workflow chain, then create a task that runs through it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Task Title</label>
+              <Input
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                placeholder="What should this chain accomplish?"
+                autoFocus
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Textarea
+                value={taskDescription}
+                onChange={(e) => setTaskDescription(e.target.value)}
+                placeholder="Context and requirements for the chain..."
+                rows={2}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Priority</label>
+              <Select value={taskPriority} onValueChange={(v) => setTaskPriority(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="URGENT">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Workflow</label>
+              <ChainBuilder
+                projectId={currentProject?.id || ''}
+                agents={currentProject?.agents || []}
+                modes={projectModes}
+                templates={chainTemplates}
+                steps={taskSteps}
+                onStepsChange={setTaskSteps}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setChainDialogOpen(false); resetTaskForm() }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateChain}
+              disabled={!taskTitle.trim() || taskSteps.length === 0}
+            >
+              Create Chain Task
             </Button>
           </DialogFooter>
         </DialogContent>
