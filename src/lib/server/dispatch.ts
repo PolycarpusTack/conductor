@@ -1,0 +1,415 @@
+import { db } from '@/lib/db'
+import { getAdapter } from '@/lib/server/adapters/registry'
+import { resolvePrompt } from '@/lib/server/resolve-prompt'
+import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
+import { createExecution, succeedExecution, failExecution, timeoutExecution } from '@/lib/server/execution-log'
+import { randomBytes } from 'crypto'
+
+const WORKER_ID = `worker-${randomBytes(4).toString('hex')}`
+
+async function leaseStep(stepId: string): Promise<boolean> {
+  const result = await db.taskStep.updateMany({
+    where: {
+      id: stepId,
+      status: 'active',
+      OR: [
+        { leasedBy: null },
+        { leasedBy: WORKER_ID },
+      ],
+    },
+    data: {
+      leasedBy: WORKER_ID,
+      leasedAt: new Date(),
+    },
+  })
+  return result.count > 0
+}
+
+export async function dispatchStep(stepId: string) {
+  const step = await db.taskStep.findUnique({
+    where: { id: stepId },
+    include: {
+      task: true,
+      agent: true,
+    },
+  })
+
+  if (!step || !step.agent || step.status !== 'active') return
+
+  const agent = step.agent
+  if (agent.projectId !== step.task.projectId) {
+    await failStep(stepId, step.task.projectId, 'Agent does not belong to this project')
+    return
+  }
+  if (!agent.runtimeId) return
+
+  const runtime = await db.projectRuntime.findUnique({
+    where: { id: agent.runtimeId },
+  })
+
+  if (!runtime) {
+    await failStep(stepId, step.task.projectId, 'Runtime not found')
+    return
+  }
+
+  const adapter = getAdapter(runtime.adapter)
+  if (!adapter || !adapter.available) {
+    await failStep(stepId, step.task.projectId, `Adapter "${runtime.adapter}" not available`)
+    return
+  }
+
+  const activeCount = await db.taskStep.count({
+    where: { agentId: agent.id, status: 'active', id: { not: stepId } },
+  })
+  if (activeCount >= agent.maxConcurrent) {
+    await db.taskStep.update({ where: { id: stepId }, data: { status: 'pending' } })
+    return
+  }
+
+  const previousStep = await db.taskStep.findFirst({
+    where: { taskId: step.taskId, order: step.order - 1 },
+  })
+
+  const projectMode = await db.projectMode.findFirst({
+    where: { projectId: step.task.projectId, name: step.mode },
+  })
+
+  const agentModeInstructions = agent.modeInstructions
+    ? JSON.parse(agent.modeInstructions)[step.mode]
+    : null
+
+  const modeInstructions = agentModeInstructions || projectMode?.instructions || ''
+
+  const capabilities = agent.capabilities
+    ? JSON.parse(agent.capabilities).join(', ')
+    : ''
+
+  const systemPrompt = resolvePrompt(agent.systemPrompt || '', {
+    task: { title: step.task.title, description: step.task.description },
+    step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
+    mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
+    agent: { name: agent.name, role: agent.role, capabilities },
+  })
+
+  const taskContext = [
+    `Task: ${step.task.title}`,
+    step.task.description ? `Description: ${step.task.description}` : '',
+    step.instructions ? `Step Instructions: ${step.instructions}` : '',
+  ].filter(Boolean).join('\n\n')
+
+  const rejectionContext = step.rejectionNote
+    ? `\n\nHUMAN FEEDBACK (from previous attempt #${step.attempts}):\n${step.rejectionNote}\n\nPlease address this feedback in your revised response.`
+    : ''
+
+  const fullTaskContext = taskContext + rejectionContext
+
+  const mcpConnectionIds = agent.mcpConnectionIds
+    ? JSON.parse(agent.mcpConnectionIds)
+    : []
+
+  const tools = await resolveMcpTools(mcpConnectionIds, step.mode)
+
+  const runtimeConfig: Record<string, unknown> = {
+    ...(runtime.config ? JSON.parse(runtime.config) : {}),
+    apiKeyEnvVar: runtime.apiKeyEnvVar,
+    endpoint: runtime.endpoint,
+  }
+
+  // Lease the step for idempotent execution
+  const leased = await leaseStep(stepId)
+  if (!leased) return
+
+  // Determine attempt number
+  const previousExecutions = await db.stepExecution.count({ where: { stepId } })
+  const attemptNumber = previousExecutions + 1
+
+  const execution = await createExecution(stepId, attemptNumber)
+
+  if (attemptNumber === 1) {
+    await db.taskStep.updateMany({
+      where: { id: stepId, status: 'active' },
+      data: { startedAt: new Date() },
+    })
+  }
+
+  const timeoutMs = step.timeoutMs || 300000
+
+  try {
+    const result = await Promise.race([
+      adapter.dispatch({
+        systemPrompt,
+        taskContext: fullTaskContext,
+        previousOutput: previousStep?.output || undefined,
+        mode: step.mode,
+        model: agent.runtimeModel || 'default',
+        runtimeConfig,
+        tools: tools.length > 0 ? tools : undefined,
+        mcpConnectionIds: mcpConnectionIds.length > 0 ? mcpConnectionIds : undefined,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('STEP_TIMEOUT')), timeoutMs)
+      ),
+    ])
+
+    await succeedExecution(execution.id, result.output, result.tokensUsed)
+
+    await db.taskStep.update({
+      where: { id: stepId },
+      data: {
+        status: 'done',
+        output: result.output,
+        attempts: attemptNumber,
+        completedAt: new Date(),
+        leasedBy: null,
+        leasedAt: null,
+      },
+    })
+
+    await broadcastProjectEvent(step.task.projectId, 'step-completed', {
+      taskId: step.taskId,
+      stepId,
+      output: result.output,
+      attempt: attemptNumber,
+      tokensUsed: result.tokensUsed,
+    })
+
+    await advanceChain(step.taskId, step.task.projectId)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown dispatch error'
+    const isTimeout = message === 'STEP_TIMEOUT'
+
+    if (isTimeout) {
+      await timeoutExecution(execution.id)
+    } else {
+      await failExecution(execution.id, message)
+    }
+
+    const maxRetries = step.maxRetries ?? 2
+    const retryDelayMs = step.retryDelayMs ?? 5000
+
+    if (attemptNumber < maxRetries + 1) {
+      // Retry: keep step active, schedule for re-pickup
+      await db.taskStep.update({
+        where: { id: stepId },
+        data: {
+          attempts: attemptNumber,
+          leasedBy: null,
+          leasedAt: retryDelayMs > 0 ? new Date(Date.now() + retryDelayMs) : null,
+        },
+      })
+
+      await broadcastProjectEvent(step.task.projectId, 'step-retrying', {
+        taskId: step.taskId,
+        stepId,
+        attempt: attemptNumber,
+        maxRetries,
+        error: message,
+      })
+    } else {
+      // Exhausted retries — dead-letter
+      await db.taskStep.update({
+        where: { id: stepId },
+        data: {
+          status: 'failed',
+          error: `Failed after ${attemptNumber} attempts. Last error: ${message}`,
+          attempts: attemptNumber,
+          completedAt: new Date(),
+          leasedBy: null,
+          leasedAt: null,
+        },
+      })
+
+      await broadcastProjectEvent(step.task.projectId, 'step-failed', {
+        taskId: step.taskId,
+        stepId,
+        error: message,
+        attempt: attemptNumber,
+        exhaustedRetries: true,
+      })
+
+      await db.task.update({
+        where: { id: step.taskId },
+        data: { status: 'WAITING' },
+      })
+    }
+  }
+}
+
+async function failStep(stepId: string, projectId: string, error: string) {
+  const step = await db.taskStep.update({
+    where: { id: stepId },
+    data: { status: 'failed', error, completedAt: new Date(), leasedBy: null, leasedAt: null },
+  })
+
+  await db.task.update({
+    where: { id: step.taskId },
+    data: { status: 'WAITING' },
+  })
+
+  await broadcastProjectEvent(projectId, 'step-failed', {
+    taskId: step.taskId,
+    stepId,
+    error,
+  })
+}
+
+export async function advanceChain(taskId: string, projectId: string) {
+  const steps = await db.taskStep.findMany({
+    where: { taskId },
+    orderBy: { order: 'asc' },
+    include: { agent: true },
+  })
+
+  const lastDoneStep = [...steps].reverse().find((s) => s.status === 'done' || s.status === 'skipped')
+  if (!lastDoneStep) return
+
+  const nextStep = steps.find((s) => s.order === lastDoneStep.order + 1)
+
+  if (!nextStep) {
+    await db.task.update({
+      where: { id: taskId },
+      data: { status: 'DONE', completedAt: new Date() },
+    })
+    await broadcastProjectEvent(projectId, 'chain-completed', { taskId })
+    return
+  }
+
+  if (!lastDoneStep.autoContinue) {
+    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+    return
+  }
+
+  const activated = await db.taskStep.updateMany({
+    where: { id: nextStep.id, status: 'pending' },
+    data: { status: 'active' },
+  })
+  if (activated.count === 0) return  // another caller already activated it
+
+  await broadcastProjectEvent(projectId, 'step-activated', {
+    taskId,
+    stepId: nextStep.id,
+  })
+
+  await broadcastProjectEvent(projectId, 'chain-advanced', {
+    taskId,
+    fromStepId: lastDoneStep.id,
+    toStepId: nextStep.id,
+  })
+
+  if (nextStep.mode === 'human') {
+    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+    return
+  }
+
+  if (nextStep.agent?.runtimeId) {
+    await db.task.update({ where: { id: taskId }, data: { status: 'IN_PROGRESS' } })
+    // Step is active — the queue will pick it up on next poll
+  } else {
+    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+  }
+}
+
+export async function rewindChain(
+  taskId: string,
+  projectId: string,
+  targetStepId: string,
+  rejectionNote: string,
+) {
+  const targetStep = await db.taskStep.findUnique({
+    where: { id: targetStepId },
+    include: { agent: true },
+  })
+
+  if (!targetStep) throw new Error('Target step not found')
+
+  await db.taskStep.update({
+    where: { id: targetStepId },
+    data: {
+      status: 'active',
+      output: null,
+      error: null,
+      rejectionNote,
+      attempts: { increment: 1 },
+      startedAt: null,
+      completedAt: null,
+    },
+  })
+
+  await db.taskStep.updateMany({
+    where: {
+      taskId,
+      order: { gt: targetStep.order },
+    },
+    data: {
+      status: 'pending',
+      output: null,
+      error: null,
+      startedAt: null,
+      completedAt: null,
+    },
+  })
+
+  await db.task.update({
+    where: { id: taskId },
+    data: { status: 'IN_PROGRESS' },
+  })
+
+  await broadcastProjectEvent(projectId, 'chain-rewound', {
+    taskId,
+    targetStepId,
+    rejectionNote,
+  })
+
+  // Step is active — the queue will pick it up on next poll
+}
+
+export async function closeChain(taskId: string, projectId: string, note: string) {
+  await db.taskStep.updateMany({
+    where: {
+      taskId,
+      status: { in: ['pending', 'active'] },
+    },
+    data: { status: 'skipped' },
+  })
+
+  await db.task.update({
+    where: { id: taskId },
+    data: {
+      status: 'DONE',
+      completedAt: new Date(),
+      output: `Chain closed: ${note}`,
+    },
+  })
+
+  await broadcastProjectEvent(projectId, 'chain-completed', { taskId, closed: true, note })
+}
+
+export async function startChain(taskId: string, projectId: string) {
+  const firstStep = await db.taskStep.findFirst({
+    where: { taskId, order: 1 },
+    include: { agent: true },
+  })
+
+  if (!firstStep) return
+
+  const activated = await db.taskStep.updateMany({
+    where: { id: firstStep.id, status: 'pending' },
+    data: { status: 'active' },
+  })
+  if (activated.count === 0) return  // another caller already started it
+
+  await broadcastProjectEvent(projectId, 'step-activated', {
+    taskId,
+    stepId: firstStep.id,
+  })
+
+  if (firstStep.mode === 'human') {
+    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+    return
+  }
+
+  if (firstStep.agent?.runtimeId) {
+    // Step is active — the queue will pick it up on next poll
+  }
+}

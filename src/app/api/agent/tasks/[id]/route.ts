@@ -1,0 +1,313 @@
+import { NextResponse } from 'next/server'
+
+import { db } from '@/lib/db'
+import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
+import { updateAgentHeartbeat, toRealtimeActivity, claimOrStartTask } from '@/lib/server/agent-helpers'
+import { agentTaskActionSchema, taskStatusSchema } from '@/lib/server/contracts'
+import { advanceChain } from '@/lib/server/dispatch'
+import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { taskBoardInclude } from '@/lib/server/selects'
+
+async function getAgentFromRequest(request: Request, body?: Record<string, unknown>) {
+  const apiKey = extractAgentApiKey(request, body)
+
+  if (!apiKey) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'Missing agent API key',
+          hint: 'Use Authorization: Bearer <agent-key> or X-Agent-Key header',
+        },
+        { status: 401 },
+      ),
+    }
+  }
+
+  const agent = await resolveAgentByApiKey(apiKey)
+  if (!agent) {
+    return { error: NextResponse.json({ error: 'Invalid API key' }, { status: 401 }) }
+  }
+
+  return { agent }
+}
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const auth = await getAgentFromRequest(request)
+    if (auth.error) {
+      return auth.error
+    }
+
+    const agent = auth.agent!
+    const { id } = await params
+
+    const task = await db.task.findUnique({
+      where: { id },
+      include: taskBoardInclude,
+    })
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    if (task.projectId !== agent.projectId) {
+      return NextResponse.json({ error: 'Task not in your project' }, { status: 403 })
+    }
+
+    await updateAgentHeartbeat(agent.id)
+    return NextResponse.json(task)
+  } catch (error) {
+    console.error('Error fetching task:', error)
+    return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 })
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const body = await request.json()
+    const auth = await getAgentFromRequest(request, body)
+    if (auth.error) {
+      return auth.error
+    }
+
+    const agent = auth.agent!
+    const { id } = await params
+    const existingTask = await db.task.findUnique({
+      where: { id },
+      include: { steps: { select: { id: true, status: true, order: true, agentId: true } } }
+    })
+
+    if (!existingTask) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    if (existingTask.projectId !== agent.projectId) {
+      return NextResponse.json({ error: 'Task not in your project' }, { status: 403 })
+    }
+
+    const actionResult =
+      body.action === undefined ? { success: true, data: undefined } : agentTaskActionSchema.safeParse(body.action)
+    if (!actionResult.success) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    const MAX_FIELD_LENGTH = 5000
+    const notes = typeof body.notes === 'string' ? body.notes.slice(0, MAX_FIELD_LENGTH) : undefined
+    const output = typeof body.output === 'string' ? body.output.slice(0, MAX_FIELD_LENGTH) : undefined
+    const explicitStatus =
+      body.status === undefined ? { success: true, data: undefined } : taskStatusSchema.safeParse(body.status)
+
+    if (!explicitStatus.success) {
+      return NextResponse.json({ error: 'Invalid task status' }, { status: 400 })
+    }
+
+    let updateData: Record<string, unknown> = {}
+    let logAction = 'updated'
+    let logDetails = ''
+
+    switch (actionResult.data) {
+      case 'claim':
+      case 'start': {
+        const actionName = actionResult.data === 'claim' ? 'claimed' : 'started'
+        const result = await claimOrStartTask(id, agent, actionName)
+        if ('error' in result) {
+          return NextResponse.json({ error: result.error }, { status: result.status })
+        }
+        return NextResponse.json({ success: true, task: result.task, action: actionName })
+      }
+
+      case 'progress':
+        if (existingTask.agentId !== agent.id) {
+          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+        }
+        updateData = { notes: notes || existingTask.notes }
+        logAction = 'progress'
+        logDetails = notes || ''
+        break
+
+      case 'complete':
+        if (existingTask.agentId !== agent.id) {
+          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+        }
+        // For chained tasks, don't set DONE — let advanceChain handle it
+        updateData = {
+          output: output || existingTask.output,
+        }
+        // Only set DONE for non-chained tasks
+        if (!existingTask.steps || existingTask.steps.length === 0) {
+          updateData.status = 'DONE'
+          updateData.completedAt = new Date()
+        }
+        logAction = 'completed'
+        logDetails = output || ''
+        break
+
+      case 'review':
+        if (existingTask.agentId !== agent.id) {
+          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+        }
+        updateData = {
+          status: 'REVIEW',
+          output: output || existingTask.output,
+        }
+        logAction = 'moved_to_review'
+        logDetails = output || ''
+        break
+
+      case 'block':
+        if (existingTask.agentId !== agent.id) {
+          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+        }
+        updateData = {
+          notes: `BLOCKED: ${notes || existingTask.notes || ''}`.trim(),
+        }
+        logAction = 'blocked'
+        logDetails = notes || ''
+        break
+
+      default:
+        if (existingTask.agentId && existingTask.agentId !== agent.id) {
+          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+        }
+
+        // Agents can only update notes/output in the default branch — not status.
+        // Status changes must go through explicit actions (claim, start, complete, review, block).
+        if (explicitStatus.data !== undefined) {
+          return NextResponse.json(
+            { error: 'Use an explicit action (claim, start, complete, review, block) to change task status' },
+            { status: 400 },
+          )
+        }
+
+        updateData = {
+          ...(!existingTask.agentId && { agentId: agent.id }),
+          ...(notes !== undefined && { notes }),
+          ...(output !== undefined && { output }),
+        }
+    }
+
+    const task = await db.task.update({
+      where: { id },
+      data: updateData,
+      include: taskBoardInclude,
+    })
+
+    await db.activityLog.create({
+      data: {
+        action: logAction,
+        taskId: task.id,
+        agentId: agent.id,
+        projectId: agent.projectId,
+        details: logDetails,
+      },
+    })
+
+    const taskEvent =
+      task.status !== existingTask.status
+        ? ['task-moved', { taskId: task.id, task }] as const
+        : ['task-updated', task] as const
+
+    await broadcastProjectEvent(agent.projectId, taskEvent[0], taskEvent[1])
+    await broadcastProjectEvent(agent.projectId, 'agent-status', {
+      agentId: agent.id,
+      isActive: true,
+    })
+    await broadcastProjectEvent(
+      agent.projectId,
+      'agent-activity',
+      toRealtimeActivity({
+        action: logAction,
+        agent,
+        details: logDetails,
+        taskId: task.id,
+      }),
+    )
+    await updateAgentHeartbeat(agent.id)
+
+    if (task.steps && task.steps.length > 0 && (actionResult.data === 'complete' || actionResult.data === 'progress')) {
+      const activeStep = task.steps.find((s: any) => s.status === 'active')
+      if (activeStep && (!activeStep.agentId || activeStep.agentId === agent.id) && actionResult.data === 'complete') {
+        await db.taskStep.update({
+          where: { id: activeStep.id },
+          data: { status: 'done', output: output || logDetails || '', completedAt: new Date() },
+        })
+        advanceChain(id, agent.projectId).catch(console.error)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      task,
+      action: logAction,
+    })
+  } catch (error) {
+    console.error('Error updating task:', error)
+    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const auth = await getAgentFromRequest(request)
+    if (auth.error) {
+      return auth.error
+    }
+
+    const agent = auth.agent!
+    const { id } = await params
+    const task = await db.task.findUnique({ where: { id } })
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    if (task.projectId !== agent.projectId) {
+      return NextResponse.json({ error: 'Task not in your project' }, { status: 403 })
+    }
+
+    if (task.agentId !== agent.id) {
+      return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+    }
+
+    const updatedTask = await db.task.update({
+      where: { id },
+      data: { agentId: null, status: 'BACKLOG' },
+    })
+
+    await db.activityLog.create({
+      data: {
+        action: 'unassigned',
+        taskId: task.id,
+        agentId: agent.id,
+        projectId: agent.projectId,
+        details: `Unassigned by ${agent.name}`,
+      },
+    })
+
+    await broadcastProjectEvent(agent.projectId, 'task-moved', {
+      taskId: task.id,
+      task: updatedTask,
+    })
+    await broadcastProjectEvent(agent.projectId, 'agent-activity', toRealtimeActivity({
+      action: 'unassigned',
+      agent,
+      details: `Unassigned by ${agent.name}`,
+      taskId: task.id,
+    }))
+    await updateAgentHeartbeat(agent.id)
+
+    return NextResponse.json({ success: true, task: updatedTask })
+  } catch (error) {
+    console.error('Error unassigning task:', error)
+    return NextResponse.json({ error: 'Failed to unassign task' }, { status: 500 })
+  }
+}

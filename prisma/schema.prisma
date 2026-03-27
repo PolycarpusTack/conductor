@@ -1,0 +1,225 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String   @default("#3b82f6")
+  apiKey      String?  @unique
+  apiKeyHash  String?  @unique
+  apiKeyPreview String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+  agents      Agent[]
+  activities  ActivityLog[]
+  modes             ProjectMode[]
+  runtimes          ProjectRuntime[]
+  mcpConnections    ProjectMcpConnection[]
+  chainTemplates    ChainTemplate[]
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  emoji       String   @default("🤖")
+  color       String   @default("#3b82f6")
+  description String?
+  apiKey      String?  @unique
+  apiKeyHash  String?  @unique
+  apiKeyPreview String?
+  isActive    Boolean  @default(false)
+  lastSeen    DateTime?
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  activities  ActivityLog[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  role            String?
+  capabilities    String?
+  maxConcurrent   Int       @default(1)
+  supportedModes  String?
+  modeInstructions String?
+  runtimeId       String?
+  runtime         ProjectRuntime? @relation(fields: [runtimeId], references: [id], onDelete: SetNull)
+  runtimeModel    String?
+  systemPrompt    String?
+  mcpConnectionIds String?
+  taskSteps       TaskStep[] @relation("TaskStepAgent")
+}
+
+model Task {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(BACKLOG)
+  priority    TaskPriority @default(MEDIUM)
+  tag         String?
+  notes       String?
+  output      String?     // Agent output/result
+  projectId   String
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentId     String?
+  agent       Agent?      @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  startedAt   DateTime?   // When agent started working
+  completedAt DateTime?   // When task was completed
+  order       Int         @default(0)
+  activities  ActivityLog[]
+  steps       TaskStep[]
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  action    String   // created, started, updated, completed, moved
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  agentId   String?
+  agent     Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  details   String?  // JSON string for additional info
+  createdAt DateTime @default(now())
+}
+
+model ProjectMode {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String
+  label         String
+  color         String   @default("#60A5FA")
+  icon          String?
+  instructions  String?
+  createdAt     DateTime @default(now())
+
+  @@unique([projectId, name])
+}
+
+model ProjectRuntime {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  adapter       String
+  name          String
+  models        String
+  apiKeyEnvVar  String?
+  endpoint      String?
+  config        String?
+  available     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  agents        Agent[]
+
+  @@unique([projectId, adapter, name])
+}
+
+model ProjectMcpConnection {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String
+  type          String
+  icon          String?
+  endpoint      String?
+  config        String?
+  scopes        String?
+  createdAt     DateTime @default(now())
+}
+
+model ChainTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  icon        String   @default("🔗")
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  steps       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TaskStep {
+  id            String    @id @default(cuid())
+  taskId        String
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  order         Int
+  agentId       String?
+  agent         Agent?    @relation("TaskStepAgent", fields: [agentId], references: [id], onDelete: SetNull)
+  humanLabel    String?
+  mode          String
+  instructions  String?
+  autoContinue  Boolean   @default(true)
+  status        String    @default("pending")
+  output        String?
+  error         String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  rejectionNote  String?
+  attempts       Int       @default(0)
+  maxRetries     Int       @default(2)
+  retryDelayMs   Int       @default(5000)
+  timeoutMs      Int       @default(300000)
+  leasedAt       DateTime?
+  leasedBy       String?
+  requiredSignOffs  Int       @default(1)
+  createdAt     DateTime  @default(now())
+  executions    StepExecution[]
+  reviews       StepReview[]
+
+  @@unique([taskId, order])
+}
+
+model StepExecution {
+  id            String    @id @default(cuid())
+  stepId        String
+  step          TaskStep  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  attempt       Int
+  status        String    @default("running")
+  output        String?
+  error         String?
+  tokensUsed    Int?
+  cost          Float?
+  durationMs    Int?
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@unique([stepId, attempt])
+}
+
+model StepReview {
+  id            String    @id @default(cuid())
+  stepId        String
+  step          TaskStep  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  reviewer      String
+  decision      String    // approved, rejected, revision_requested
+  note          String?
+  createdAt     DateTime  @default(now())
+}
+
+enum TaskStatus {
+  BACKLOG
+  IN_PROGRESS
+  WAITING
+  REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
