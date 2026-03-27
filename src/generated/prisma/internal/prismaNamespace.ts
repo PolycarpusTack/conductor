@@ -1423,7 +1423,10 @@ export const ProjectScalarFieldEnum = {
   apiKeyHash: 'apiKeyHash',
   apiKeyPreview: 'apiKeyPreview',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  automationMode: 'automationMode',
+  automationSchedule: 'automationSchedule',
+  automationPollMs: 'automationPollMs'
 } as const
 
 export type ProjectScalarFieldEnum = (typeof ProjectScalarFieldEnum)[keyof typeof ProjectScalarFieldEnum]
@@ -1680,16 +1683,16 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
 
 
 /**
- * Reference to a field of type 'Boolean'
+ * Reference to a field of type 'Int'
  */
-export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
     
 
 
 /**
- * Reference to a field of type 'Int'
+ * Reference to a field of type 'Boolean'
  */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 

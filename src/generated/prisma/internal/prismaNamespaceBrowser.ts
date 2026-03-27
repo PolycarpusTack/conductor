@@ -88,7 +88,10 @@ export const ProjectScalarFieldEnum = {
   apiKeyHash: 'apiKeyHash',
   apiKeyPreview: 'apiKeyPreview',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  automationMode: 'automationMode',
+  automationSchedule: 'automationSchedule',
+  automationPollMs: 'automationPollMs'
 } as const
 
 export type ProjectScalarFieldEnum = (typeof ProjectScalarFieldEnum)[keyof typeof ProjectScalarFieldEnum]

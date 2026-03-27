@@ -27,6 +27,10 @@ model Project {
   runtimes          ProjectRuntime[]
   mcpConnections    ProjectMcpConnection[]
   chainTemplates    ChainTemplate[]
+  // Automation scheduler config
+  automationMode     String   @default("manual")  // manual, always, scheduled, startup
+  automationSchedule String?  // JSON: { startDay, startTime, endDay, endTime }
+  automationPollMs   Int      @default(10000)      // poll interval in ms
 }
 
 model Agent {

@@ -813,14 +813,6 @@ export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type AgentCreateNestedOneWithoutTasksInput = {
   create?: Prisma.XOR<Prisma.AgentCreateWithoutTasksInput, Prisma.AgentUncheckedCreateWithoutTasksInput>
   connectOrCreate?: Prisma.AgentCreateOrConnectWithoutTasksInput
