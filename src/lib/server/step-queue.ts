@@ -43,24 +43,40 @@ export async function pollAndDispatch() {
       agent: { runtimeId: { not: null } },
       mode: { not: 'human' },
       task: { status: 'IN_PROGRESS' },
-      // Only pick up steps whose predecessor is done (their turn has come)
-      // We detect this by checking order > 0 and the previous step is done/skipped,
-      // or order === 1 (first step that was throttled).
     },
-    select: { id: true, taskId: true, order: true },
+    select: { id: true, taskId: true, order: true, prevSteps: true },
     take: POLL_BATCH_SIZE,
     orderBy: { createdAt: 'asc' },
   })
 
-  // Re-activate throttled steps whose predecessor is complete
+  // Re-activate throttled steps whose predecessors are all complete
   for (const throttled of throttledSteps) {
-    if (throttled.order <= 1) {
-      // First step — should be active
+    const prevStepIds: string[] = throttled.prevSteps
+      ? JSON.parse(throttled.prevSteps)
+      : []
+
+    if (prevStepIds.length > 0) {
+      // DAG mode: check all prevSteps are done/skipped
+      const prevSteps = await db.taskStep.findMany({
+        where: { id: { in: prevStepIds } },
+        select: { status: true },
+      })
+      const allPrevDone = prevSteps.length === prevStepIds.length &&
+        prevSteps.every(s => s.status === 'done' || s.status === 'skipped')
+      if (allPrevDone) {
+        await db.taskStep.updateMany({
+          where: { id: throttled.id, status: 'pending' },
+          data: { status: 'active' },
+        })
+      }
+    } else if (throttled.order <= 1) {
+      // Linear mode: first step — should be active
       await db.taskStep.updateMany({
         where: { id: throttled.id, status: 'pending' },
         data: { status: 'active' },
       })
     } else {
+      // Linear mode: check predecessor by order
       const prevStep = await db.taskStep.findFirst({
         where: { taskId: throttled.taskId, order: throttled.order - 1 },
         select: { status: true },

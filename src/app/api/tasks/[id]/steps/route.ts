@@ -97,6 +97,11 @@ export async function POST(
         maxRetries: parsed.data.maxRetries ?? 2,
         retryDelayMs: parsed.data.retryDelayMs ?? 5000,
         timeoutMs: parsed.data.timeoutMs ?? 300000,
+        nextSteps: parsed.data.nextSteps ? JSON.stringify(parsed.data.nextSteps) : null,
+        prevSteps: parsed.data.prevSteps ? JSON.stringify(parsed.data.prevSteps) : null,
+        isParallelRoot: parsed.data.isParallelRoot ?? false,
+        isMergePoint: parsed.data.isMergePoint ?? false,
+        fallbackAgentId: parsed.data.fallbackAgentId || null,
       },
       include: {
         agent: { select: { id: true, name: true, emoji: true } },

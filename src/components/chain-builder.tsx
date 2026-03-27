@@ -14,6 +14,12 @@ import {
 import { X, Plus, Save, LayoutTemplate, GitBranch } from 'lucide-react'
 import { WorkflowEditor } from '@/components/workflow-editor'
 
+interface StepEdge {
+  targetStepId: string
+  condition?: { field: string; operator: string; value: string }
+  label?: string
+}
+
 interface StepDraft {
   agentId?: string | null
   humanLabel?: string
@@ -23,6 +29,12 @@ interface StepDraft {
   maxRetries?: number
   retryDelayMs?: number
   timeoutMs?: number
+  // DAG fields
+  nextSteps?: StepEdge[]
+  prevSteps?: string[]
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
 }
 
 interface Agent {
@@ -255,11 +267,11 @@ export function ChainBuilder({
             mode: s.mode,
             instructions: s.instructions,
             autoContinue: s.autoContinue,
-            nextSteps: [],
-            prevSteps: [],
-            isParallelRoot: false,
-            isMergePoint: false,
-            fallbackAgentId: null,
+            nextSteps: s.nextSteps || [],
+            prevSteps: s.prevSteps || [],
+            isParallelRoot: s.isParallelRoot || false,
+            isMergePoint: s.isMergePoint || false,
+            fallbackAgentId: s.fallbackAgentId || null,
             column: i,
             row: 0,
           }))}
@@ -270,9 +282,11 @@ export function ChainBuilder({
               mode: s.mode,
               instructions: s.instructions,
               autoContinue: s.autoContinue,
-              maxRetries: undefined,
-              retryDelayMs: undefined,
-              timeoutMs: undefined,
+              nextSteps: s.nextSteps.length > 0 ? s.nextSteps : undefined,
+              prevSteps: s.prevSteps.length > 0 ? s.prevSteps : undefined,
+              isParallelRoot: s.isParallelRoot || undefined,
+              isMergePoint: s.isMergePoint || undefined,
+              fallbackAgentId: s.fallbackAgentId,
             })))
           }}
         />

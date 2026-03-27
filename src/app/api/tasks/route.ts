@@ -127,6 +127,11 @@ export async function POST(request: Request) {
             maxRetries: step.maxRetries ?? 2,
             retryDelayMs: step.retryDelayMs ?? 5000,
             timeoutMs: step.timeoutMs ?? 300000,
+            nextSteps: step.nextSteps ? JSON.stringify(step.nextSteps) : null,
+            prevSteps: step.prevSteps ? JSON.stringify(step.prevSteps) : null,
+            isParallelRoot: step.isParallelRoot ?? false,
+            isMergePoint: step.isMergePoint ?? false,
+            fallbackAgentId: step.fallbackAgentId || null,
           })),
         })
       }

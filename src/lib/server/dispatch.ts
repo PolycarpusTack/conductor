@@ -147,6 +147,7 @@ export async function dispatchStep(stepId: string) {
         runtimeConfig,
         tools: tools.length > 0 ? tools : undefined,
         mcpConnectionIds: mcpConnectionIds.length > 0 ? mcpConnectionIds : undefined,
+        executionId: execution.id,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('STEP_TIMEOUT')), timeoutMs)
@@ -464,19 +465,52 @@ export async function rewindChain(
     },
   })
 
-  await db.taskStep.updateMany({
-    where: {
-      taskId,
-      order: { gt: targetStep.order },
-    },
-    data: {
-      status: 'pending',
-      output: null,
-      error: null,
-      startedAt: null,
-      completedAt: null,
-    },
+  // Reset downstream steps. In DAG mode, find all steps reachable from
+  // the target via nextSteps edges. In linear mode, use order > target.
+  const allSteps = await db.taskStep.findMany({
+    where: { taskId },
+    select: { id: true, order: true, nextSteps: true },
   })
+
+  const isDag = allSteps.some(s => s.nextSteps)
+
+  let downstreamIds: string[]
+  if (isDag) {
+    // BFS from target step to find all reachable downstream steps
+    downstreamIds = []
+    const visited = new Set<string>()
+    const queue = [targetStepId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      const step = allSteps.find(s => s.id === current)
+      if (!step?.nextSteps) continue
+      const edges: Array<{ targetStepId: string }> = JSON.parse(step.nextSteps)
+      for (const edge of edges) {
+        if (!visited.has(edge.targetStepId)) {
+          visited.add(edge.targetStepId)
+          downstreamIds.push(edge.targetStepId)
+          queue.push(edge.targetStepId)
+        }
+      }
+    }
+  } else {
+    downstreamIds = allSteps
+      .filter(s => s.order > targetStep.order)
+      .map(s => s.id)
+  }
+
+  if (downstreamIds.length > 0) {
+    await db.taskStep.updateMany({
+      where: { id: { in: downstreamIds } },
+      data: {
+        status: 'pending',
+        output: null,
+        error: null,
+        startedAt: null,
+        completedAt: null,
+      },
+    })
+  }
 
   await db.task.update({
     where: { id: taskId },
@@ -514,30 +548,43 @@ export async function closeChain(taskId: string, projectId: string, note: string
 }
 
 export async function startChain(taskId: string, projectId: string) {
-  const firstStep = await db.taskStep.findFirst({
-    where: { taskId, order: 1 },
+  const allSteps = await db.taskStep.findMany({
+    where: { taskId },
     include: { agent: true },
+    orderBy: { order: 'asc' },
   })
 
-  if (!firstStep) return
+  if (allSteps.length === 0) return
 
-  const activated = await db.taskStep.updateMany({
-    where: { id: firstStep.id, status: 'pending' },
-    data: { status: 'active' },
-  })
-  if (activated.count === 0) return  // another caller already started it
+  // Check if this is a DAG chain
+  const isDag = allSteps.some(s => s.nextSteps)
 
-  await broadcastProjectEvent(projectId, 'step-activated', {
-    taskId,
-    stepId: firstStep.id,
-  })
+  // Find root steps: in DAG mode = steps with no prevSteps; in linear mode = order 1
+  const rootSteps = isDag
+    ? allSteps.filter(s => {
+        const prev = s.prevSteps ? JSON.parse(s.prevSteps) as string[] : []
+        return prev.length === 0
+      })
+    : allSteps.filter(s => s.order === 1)
 
-  if (firstStep.mode === 'human') {
-    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
-    return
-  }
+  if (rootSteps.length === 0) return
 
-  if (firstStep.agent?.runtimeId) {
-    // Step is active — the queue will pick it up on next poll
+  for (const rootStep of rootSteps) {
+    const activated = await db.taskStep.updateMany({
+      where: { id: rootStep.id, status: 'pending' },
+      data: { status: 'active' },
+    })
+    if (activated.count === 0) continue
+
+    await broadcastProjectEvent(projectId, 'step-activated', {
+      taskId,
+      stepId: rootStep.id,
+    })
+
+    if (rootStep.mode === 'human') {
+      await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+    } else if (rootStep.agent?.runtimeId) {
+      await db.task.update({ where: { id: taskId }, data: { status: 'IN_PROGRESS' } })
+    }
   }
 }

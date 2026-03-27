@@ -1,5 +1,6 @@
 import type { RuntimeAdapter, DispatchParams, DispatchResult } from './types'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
+import { traceToolCall } from '@/lib/server/tool-trace'
 
 const MAX_TOOL_ROUNDS = 10
 
@@ -111,7 +112,14 @@ export const googleAdapter: RuntimeAdapter = {
       for (const part of functionCallParts) {
         const { name, args } = part.functionCall as { name: string; args: Record<string, unknown> }
         console.log(`[Dispatch] Executing tool: ${name}`, args)
+        const toolStart = Date.now()
         const mcpResult = await executeMcpTool(name, args, params.mcpConnectionIds!)
+        const toolDurationMs = Date.now() - toolStart
+
+        if (params.executionId) {
+          traceToolCall(params.executionId, name, args as Record<string, unknown>, mcpResult.text, toolDurationMs).catch(console.error)
+        }
+
         functionResponseParts.push({
           functionResponse: {
             name,

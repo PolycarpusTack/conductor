@@ -86,6 +86,18 @@ export async function PUT(
         return NextResponse.json({ error: 'reassignAgentId is required for reassign' }, { status: 400 })
       }
 
+      // Validate reassign agent belongs to same project
+      const reassignAgent = await db.agent.findUnique({
+        where: { id: body.reassignAgentId },
+        select: { projectId: true },
+      })
+      if (!reassignAgent || reassignAgent.projectId !== existingStep.task.projectId) {
+        return NextResponse.json(
+          { error: 'Reassign agent must belong to the same project' },
+          { status: 400 },
+        )
+      }
+
       const previousAgentStep = await db.taskStep.findFirst({
         where: {
           taskId: id,

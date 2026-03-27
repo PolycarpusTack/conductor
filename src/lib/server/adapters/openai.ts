@@ -1,5 +1,6 @@
 import type { RuntimeAdapter, DispatchParams, DispatchResult } from './types'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
+import { traceToolCall } from '@/lib/server/tool-trace'
 
 const MAX_TOOL_ROUNDS = 10
 
@@ -92,11 +93,17 @@ export const openaiAdapter: RuntimeAdapter = {
 
         console.log(`[Dispatch] Executing tool: ${toolCall.function.name}`, args)
 
+        const toolStart = Date.now()
         const mcpResult = await executeMcpTool(
           toolCall.function.name,
           args,
           params.mcpConnectionIds!,
         )
+        const toolDurationMs = Date.now() - toolStart
+
+        if (params.executionId) {
+          traceToolCall(params.executionId, toolCall.function.name, args, mcpResult.text, toolDurationMs).catch(console.error)
+        }
 
         messages.push({
           role: 'tool',

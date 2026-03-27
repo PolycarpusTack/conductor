@@ -1,5 +1,6 @@
 import type { RuntimeAdapter, DispatchParams, DispatchResult } from './types'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
+import { traceToolCall } from '@/lib/server/tool-trace'
 
 const MAX_TOOL_ROUNDS = 10
 
@@ -89,6 +90,8 @@ export const anthropicAdapter: RuntimeAdapter = {
       for (const toolBlock of toolUseBlocks) {
         console.log(`[Dispatch] Executing tool: ${toolBlock.name}`, toolBlock.input)
         let resultText: string
+        let toolError: string | undefined
+        const toolStart = Date.now()
         try {
           const mcpResult = await executeMcpTool(
             toolBlock.name,
@@ -97,8 +100,16 @@ export const anthropicAdapter: RuntimeAdapter = {
           )
           resultText = mcpResult.text
         } catch (err) {
-          resultText = `Error executing tool ${toolBlock.name}: ${err instanceof Error ? err.message : String(err)}`
+          toolError = err instanceof Error ? err.message : String(err)
+          resultText = `Error executing tool ${toolBlock.name}: ${toolError}`
         }
+        const toolDurationMs = Date.now() - toolStart
+
+        // Trace the tool call if we have an execution context
+        if (params.executionId) {
+          traceToolCall(params.executionId, toolBlock.name, toolBlock.input, resultText, toolDurationMs, toolError).catch(console.error)
+        }
+
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolBlock.id,
