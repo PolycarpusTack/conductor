@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { X, Plus, Save, LayoutTemplate, GitBranch } from 'lucide-react'
-import { WorkflowEditor, type StepEdge } from '@/components/workflow-editor'
+import { WorkflowEditor, type DagStep, type StepEdge } from '@/components/workflow-editor'
 
 interface StepDraft {
   agentId?: string | null
@@ -88,6 +88,24 @@ function parseSupportedModes(agent: Agent): string[] | null {
 
 function getStepCount(template: ChainTemplate): number {
   return parseSteps(template.steps).length
+}
+
+function toDagStep(step: StepDraft, index: number): DagStep {
+  return {
+    id: `step_${index}`,
+    agentId: step.agentId,
+    humanLabel: step.humanLabel,
+    mode: step.mode,
+    instructions: step.instructions,
+    autoContinue: step.autoContinue,
+    nextSteps: step.nextSteps || [],
+    prevSteps: step.prevSteps || [],
+    isParallelRoot: step.isParallelRoot || false,
+    isMergePoint: step.isMergePoint || false,
+    fallbackAgentId: step.fallbackAgentId || null,
+    column: index,
+    row: 0,
+  }
 }
 
 export function ChainBuilder({
@@ -180,6 +198,8 @@ export function ChainBuilder({
     setShowSaveInput(false)
   }
 
+  const visualSteps: DagStep[] = steps.map(toDagStep)
+
   return (
     <div className="space-y-6">
       {/* Template selector */}
@@ -254,30 +274,25 @@ export function ChainBuilder({
         <WorkflowEditor
           agents={agents}
           modes={modes}
-          steps={steps.map((s, i) => ({
-            id: `step_${i}`,
-            agentId: s.agentId,
-            humanLabel: s.humanLabel,
-            mode: s.mode,
-            instructions: s.instructions,
-            autoContinue: s.autoContinue,
-            nextSteps: s.nextSteps || [],
-            prevSteps: s.prevSteps || [],
-            isParallelRoot: s.isParallelRoot || false,
-            isMergePoint: s.isMergePoint || false,
-            fallbackAgentId: s.fallbackAgentId || null,
-            column: i,
-            row: 0,
-          }))}
+          steps={visualSteps}
           onStepsChange={(dagSteps) => {
+            // Build a mapping from visual editor IDs to stable positional IDs
+            // so the server can remap them to real DB IDs after creation
+            const idRemap = new Map<string, string>()
+            dagSteps.forEach((s, i) => idRemap.set(s.id, `step_${i}`))
+
             onStepsChange(dagSteps.map(s => ({
               agentId: s.agentId,
               humanLabel: s.humanLabel,
               mode: s.mode,
               instructions: s.instructions,
               autoContinue: s.autoContinue,
-              nextSteps: s.nextSteps.length > 0 ? s.nextSteps : undefined,
-              prevSteps: s.prevSteps.length > 0 ? s.prevSteps : undefined,
+              nextSteps: s.nextSteps.length > 0
+                ? s.nextSteps.map(e => ({ ...e, targetStepId: idRemap.get(e.targetStepId) || e.targetStepId }))
+                : undefined,
+              prevSteps: s.prevSteps.length > 0
+                ? s.prevSteps.map(id => idRemap.get(id) || id)
+                : undefined,
               isParallelRoot: s.isParallelRoot || undefined,
               isMergePoint: s.isMergePoint || undefined,
               fallbackAgentId: s.fallbackAgentId,
