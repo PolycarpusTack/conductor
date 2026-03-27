@@ -174,6 +174,12 @@ model TaskStep {
   leasedAt       DateTime?
   leasedBy       String?
   requiredSignOffs  Int       @default(1)
+  // DAG fields (coexist with linear 'order' for backward compatibility)
+  nextSteps       String?   // JSON: Array<{ targetStepId: string; condition?: { field, operator, value }; label?: string }>
+  prevSteps       String?   // JSON: Array<string> — for merge/join detection
+  isParallelRoot  Boolean   @default(false)
+  isMergePoint    Boolean   @default(false)
+  fallbackAgentId String?
   createdAt     DateTime  @default(now())
   executions    StepExecution[]
   reviews       StepReview[]

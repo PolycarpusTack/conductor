@@ -66,6 +66,11 @@ export type TaskStepMinAggregateOutputType = {
   leasedAt: Date | null
   leasedBy: string | null
   requiredSignOffs: number | null
+  nextSteps: string | null
+  prevSteps: string | null
+  isParallelRoot: boolean | null
+  isMergePoint: boolean | null
+  fallbackAgentId: string | null
   createdAt: Date | null
 }
 
@@ -91,6 +96,11 @@ export type TaskStepMaxAggregateOutputType = {
   leasedAt: Date | null
   leasedBy: string | null
   requiredSignOffs: number | null
+  nextSteps: string | null
+  prevSteps: string | null
+  isParallelRoot: boolean | null
+  isMergePoint: boolean | null
+  fallbackAgentId: string | null
   createdAt: Date | null
 }
 
@@ -116,6 +126,11 @@ export type TaskStepCountAggregateOutputType = {
   leasedAt: number
   leasedBy: number
   requiredSignOffs: number
+  nextSteps: number
+  prevSteps: number
+  isParallelRoot: number
+  isMergePoint: number
+  fallbackAgentId: number
   createdAt: number
   _all: number
 }
@@ -161,6 +176,11 @@ export type TaskStepMinAggregateInputType = {
   leasedAt?: true
   leasedBy?: true
   requiredSignOffs?: true
+  nextSteps?: true
+  prevSteps?: true
+  isParallelRoot?: true
+  isMergePoint?: true
+  fallbackAgentId?: true
   createdAt?: true
 }
 
@@ -186,6 +206,11 @@ export type TaskStepMaxAggregateInputType = {
   leasedAt?: true
   leasedBy?: true
   requiredSignOffs?: true
+  nextSteps?: true
+  prevSteps?: true
+  isParallelRoot?: true
+  isMergePoint?: true
+  fallbackAgentId?: true
   createdAt?: true
 }
 
@@ -211,6 +236,11 @@ export type TaskStepCountAggregateInputType = {
   leasedAt?: true
   leasedBy?: true
   requiredSignOffs?: true
+  nextSteps?: true
+  prevSteps?: true
+  isParallelRoot?: true
+  isMergePoint?: true
+  fallbackAgentId?: true
   createdAt?: true
   _all?: true
 }
@@ -323,6 +353,11 @@ export type TaskStepGroupByOutputType = {
   leasedAt: Date | null
   leasedBy: string | null
   requiredSignOffs: number
+  nextSteps: string | null
+  prevSteps: string | null
+  isParallelRoot: boolean
+  isMergePoint: boolean
+  fallbackAgentId: string | null
   createdAt: Date
   _count: TaskStepCountAggregateOutputType | null
   _avg: TaskStepAvgAggregateOutputType | null
@@ -371,6 +406,11 @@ export type TaskStepWhereInput = {
   leasedAt?: Prisma.DateTimeNullableFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableFilter<"TaskStep"> | string | null
   requiredSignOffs?: Prisma.IntFilter<"TaskStep"> | number
+  nextSteps?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  prevSteps?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  isParallelRoot?: Prisma.BoolFilter<"TaskStep"> | boolean
+  isMergePoint?: Prisma.BoolFilter<"TaskStep"> | boolean
+  fallbackAgentId?: Prisma.StringNullableFilter<"TaskStep"> | string | null
   createdAt?: Prisma.DateTimeFilter<"TaskStep"> | Date | string
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   agent?: Prisma.XOR<Prisma.AgentNullableScalarRelationFilter, Prisma.AgentWhereInput> | null
@@ -401,6 +441,11 @@ export type TaskStepOrderByWithRelationInput = {
   leasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   leasedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   requiredSignOffs?: Prisma.SortOrder
+  nextSteps?: Prisma.SortOrderInput | Prisma.SortOrder
+  prevSteps?: Prisma.SortOrderInput | Prisma.SortOrder
+  isParallelRoot?: Prisma.SortOrder
+  isMergePoint?: Prisma.SortOrder
+  fallbackAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   task?: Prisma.TaskOrderByWithRelationInput
   agent?: Prisma.AgentOrderByWithRelationInput
@@ -435,6 +480,11 @@ export type TaskStepWhereUniqueInput = Prisma.AtLeast<{
   leasedAt?: Prisma.DateTimeNullableFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableFilter<"TaskStep"> | string | null
   requiredSignOffs?: Prisma.IntFilter<"TaskStep"> | number
+  nextSteps?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  prevSteps?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  isParallelRoot?: Prisma.BoolFilter<"TaskStep"> | boolean
+  isMergePoint?: Prisma.BoolFilter<"TaskStep"> | boolean
+  fallbackAgentId?: Prisma.StringNullableFilter<"TaskStep"> | string | null
   createdAt?: Prisma.DateTimeFilter<"TaskStep"> | Date | string
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   agent?: Prisma.XOR<Prisma.AgentNullableScalarRelationFilter, Prisma.AgentWhereInput> | null
@@ -465,6 +515,11 @@ export type TaskStepOrderByWithAggregationInput = {
   leasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   leasedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   requiredSignOffs?: Prisma.SortOrder
+  nextSteps?: Prisma.SortOrderInput | Prisma.SortOrder
+  prevSteps?: Prisma.SortOrderInput | Prisma.SortOrder
+  isParallelRoot?: Prisma.SortOrder
+  isMergePoint?: Prisma.SortOrder
+  fallbackAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.TaskStepCountOrderByAggregateInput
   _avg?: Prisma.TaskStepAvgOrderByAggregateInput
@@ -498,6 +553,11 @@ export type TaskStepScalarWhereWithAggregatesInput = {
   leasedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableWithAggregatesFilter<"TaskStep"> | string | null
   requiredSignOffs?: Prisma.IntWithAggregatesFilter<"TaskStep"> | number
+  nextSteps?: Prisma.StringNullableWithAggregatesFilter<"TaskStep"> | string | null
+  prevSteps?: Prisma.StringNullableWithAggregatesFilter<"TaskStep"> | string | null
+  isParallelRoot?: Prisma.BoolWithAggregatesFilter<"TaskStep"> | boolean
+  isMergePoint?: Prisma.BoolWithAggregatesFilter<"TaskStep"> | boolean
+  fallbackAgentId?: Prisma.StringNullableWithAggregatesFilter<"TaskStep"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"TaskStep"> | Date | string
 }
 
@@ -521,6 +581,11 @@ export type TaskStepCreateInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
@@ -551,6 +616,11 @@ export type TaskStepUncheckedCreateInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
   reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
@@ -577,6 +647,11 @@ export type TaskStepUpdateInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
@@ -607,6 +682,11 @@ export type TaskStepUncheckedUpdateInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
   reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
@@ -635,6 +715,11 @@ export type TaskStepCreateManyInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
 }
 
@@ -658,6 +743,11 @@ export type TaskStepUpdateManyMutationInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -683,6 +773,11 @@ export type TaskStepUncheckedUpdateManyInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -723,6 +818,11 @@ export type TaskStepCountOrderByAggregateInput = {
   leasedAt?: Prisma.SortOrder
   leasedBy?: Prisma.SortOrder
   requiredSignOffs?: Prisma.SortOrder
+  nextSteps?: Prisma.SortOrder
+  prevSteps?: Prisma.SortOrder
+  isParallelRoot?: Prisma.SortOrder
+  isMergePoint?: Prisma.SortOrder
+  fallbackAgentId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -757,6 +857,11 @@ export type TaskStepMaxOrderByAggregateInput = {
   leasedAt?: Prisma.SortOrder
   leasedBy?: Prisma.SortOrder
   requiredSignOffs?: Prisma.SortOrder
+  nextSteps?: Prisma.SortOrder
+  prevSteps?: Prisma.SortOrder
+  isParallelRoot?: Prisma.SortOrder
+  isMergePoint?: Prisma.SortOrder
+  fallbackAgentId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -782,6 +887,11 @@ export type TaskStepMinOrderByAggregateInput = {
   leasedAt?: Prisma.SortOrder
   leasedBy?: Prisma.SortOrder
   requiredSignOffs?: Prisma.SortOrder
+  nextSteps?: Prisma.SortOrder
+  prevSteps?: Prisma.SortOrder
+  isParallelRoot?: Prisma.SortOrder
+  isMergePoint?: Prisma.SortOrder
+  fallbackAgentId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -945,6 +1055,11 @@ export type TaskStepCreateWithoutAgentInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   executions?: Prisma.StepExecutionCreateNestedManyWithoutStepInput
@@ -973,6 +1088,11 @@ export type TaskStepUncheckedCreateWithoutAgentInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
   reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
@@ -1029,6 +1149,11 @@ export type TaskStepScalarWhereInput = {
   leasedAt?: Prisma.DateTimeNullableFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableFilter<"TaskStep"> | string | null
   requiredSignOffs?: Prisma.IntFilter<"TaskStep"> | number
+  nextSteps?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  prevSteps?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  isParallelRoot?: Prisma.BoolFilter<"TaskStep"> | boolean
+  isMergePoint?: Prisma.BoolFilter<"TaskStep"> | boolean
+  fallbackAgentId?: Prisma.StringNullableFilter<"TaskStep"> | string | null
   createdAt?: Prisma.DateTimeFilter<"TaskStep"> | Date | string
 }
 
@@ -1052,6 +1177,11 @@ export type TaskStepCreateWithoutTaskInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
   executions?: Prisma.StepExecutionCreateNestedManyWithoutStepInput
@@ -1080,6 +1210,11 @@ export type TaskStepUncheckedCreateWithoutTaskInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
   reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
@@ -1131,6 +1266,11 @@ export type TaskStepCreateWithoutExecutionsInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
@@ -1160,6 +1300,11 @@ export type TaskStepUncheckedCreateWithoutExecutionsInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
   artifacts?: Prisma.StepArtifactUncheckedCreateNestedManyWithoutStepInput
@@ -1201,6 +1346,11 @@ export type TaskStepUpdateWithoutExecutionsInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
@@ -1230,6 +1380,11 @@ export type TaskStepUncheckedUpdateWithoutExecutionsInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
   artifacts?: Prisma.StepArtifactUncheckedUpdateManyWithoutStepNestedInput
@@ -1255,6 +1410,11 @@ export type TaskStepCreateWithoutArtifactsInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
@@ -1284,6 +1444,11 @@ export type TaskStepUncheckedCreateWithoutArtifactsInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
   reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
@@ -1325,6 +1490,11 @@ export type TaskStepUpdateWithoutArtifactsInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
@@ -1354,6 +1524,11 @@ export type TaskStepUncheckedUpdateWithoutArtifactsInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
   reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
@@ -1379,6 +1554,11 @@ export type TaskStepCreateWithoutReviewsInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
@@ -1408,6 +1588,11 @@ export type TaskStepUncheckedCreateWithoutReviewsInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
   artifacts?: Prisma.StepArtifactUncheckedCreateNestedManyWithoutStepInput
@@ -1449,6 +1634,11 @@ export type TaskStepUpdateWithoutReviewsInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
@@ -1478,6 +1668,11 @@ export type TaskStepUncheckedUpdateWithoutReviewsInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
   artifacts?: Prisma.StepArtifactUncheckedUpdateManyWithoutStepNestedInput
@@ -1504,6 +1699,11 @@ export type TaskStepCreateManyAgentInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
 }
 
@@ -1527,6 +1727,11 @@ export type TaskStepUpdateWithoutAgentInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   executions?: Prisma.StepExecutionUpdateManyWithoutStepNestedInput
@@ -1555,6 +1760,11 @@ export type TaskStepUncheckedUpdateWithoutAgentInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
   reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
@@ -1582,6 +1792,11 @@ export type TaskStepUncheckedUpdateManyWithoutAgentInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1606,6 +1821,11 @@ export type TaskStepCreateManyTaskInput = {
   leasedAt?: Date | string | null
   leasedBy?: string | null
   requiredSignOffs?: number
+  nextSteps?: string | null
+  prevSteps?: string | null
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: string | null
   createdAt?: Date | string
 }
 
@@ -1629,6 +1849,11 @@ export type TaskStepUpdateWithoutTaskInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
   executions?: Prisma.StepExecutionUpdateManyWithoutStepNestedInput
@@ -1657,6 +1882,11 @@ export type TaskStepUncheckedUpdateWithoutTaskInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
   reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
@@ -1684,6 +1914,11 @@ export type TaskStepUncheckedUpdateManyWithoutTaskInput = {
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  nextSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  prevSteps?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isParallelRoot?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isMergePoint?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  fallbackAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1758,6 +1993,11 @@ export type TaskStepSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   leasedAt?: boolean
   leasedBy?: boolean
   requiredSignOffs?: boolean
+  nextSteps?: boolean
+  prevSteps?: boolean
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: boolean
   createdAt?: boolean
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
@@ -1789,6 +2029,11 @@ export type TaskStepSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   leasedAt?: boolean
   leasedBy?: boolean
   requiredSignOffs?: boolean
+  nextSteps?: boolean
+  prevSteps?: boolean
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: boolean
   createdAt?: boolean
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
@@ -1816,6 +2061,11 @@ export type TaskStepSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   leasedAt?: boolean
   leasedBy?: boolean
   requiredSignOffs?: boolean
+  nextSteps?: boolean
+  prevSteps?: boolean
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: boolean
   createdAt?: boolean
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
@@ -1843,10 +2093,15 @@ export type TaskStepSelectScalar = {
   leasedAt?: boolean
   leasedBy?: boolean
   requiredSignOffs?: boolean
+  nextSteps?: boolean
+  prevSteps?: boolean
+  isParallelRoot?: boolean
+  isMergePoint?: boolean
+  fallbackAgentId?: boolean
   createdAt?: boolean
 }
 
-export type TaskStepOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "taskId" | "order" | "agentId" | "humanLabel" | "mode" | "instructions" | "autoContinue" | "status" | "output" | "error" | "startedAt" | "completedAt" | "rejectionNote" | "attempts" | "maxRetries" | "retryDelayMs" | "timeoutMs" | "leasedAt" | "leasedBy" | "requiredSignOffs" | "createdAt", ExtArgs["result"]["taskStep"]>
+export type TaskStepOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "taskId" | "order" | "agentId" | "humanLabel" | "mode" | "instructions" | "autoContinue" | "status" | "output" | "error" | "startedAt" | "completedAt" | "rejectionNote" | "attempts" | "maxRetries" | "retryDelayMs" | "timeoutMs" | "leasedAt" | "leasedBy" | "requiredSignOffs" | "nextSteps" | "prevSteps" | "isParallelRoot" | "isMergePoint" | "fallbackAgentId" | "createdAt", ExtArgs["result"]["taskStep"]>
 export type TaskStepInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
@@ -1895,6 +2150,11 @@ export type $TaskStepPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     leasedAt: Date | null
     leasedBy: string | null
     requiredSignOffs: number
+    nextSteps: string | null
+    prevSteps: string | null
+    isParallelRoot: boolean
+    isMergePoint: boolean
+    fallbackAgentId: string | null
     createdAt: Date
   }, ExtArgs["result"]["taskStep"]>
   composites: {}
@@ -2345,6 +2605,11 @@ export interface TaskStepFieldRefs {
   readonly leasedAt: Prisma.FieldRef<"TaskStep", 'DateTime'>
   readonly leasedBy: Prisma.FieldRef<"TaskStep", 'String'>
   readonly requiredSignOffs: Prisma.FieldRef<"TaskStep", 'Int'>
+  readonly nextSteps: Prisma.FieldRef<"TaskStep", 'String'>
+  readonly prevSteps: Prisma.FieldRef<"TaskStep", 'String'>
+  readonly isParallelRoot: Prisma.FieldRef<"TaskStep", 'Boolean'>
+  readonly isMergePoint: Prisma.FieldRef<"TaskStep", 'Boolean'>
+  readonly fallbackAgentId: Prisma.FieldRef<"TaskStep", 'String'>
   readonly createdAt: Prisma.FieldRef<"TaskStep", 'DateTime'>
 }
     

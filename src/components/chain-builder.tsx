@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X, Plus, Save, LayoutTemplate } from 'lucide-react'
+import { X, Plus, Save, LayoutTemplate, GitBranch } from 'lucide-react'
+import { WorkflowEditor } from '@/components/workflow-editor'
 
 interface StepDraft {
   agentId?: string | null
@@ -95,6 +96,7 @@ export function ChainBuilder({
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   const [saveTemplateName, setSaveTemplateName] = useState('')
   const [showSaveInput, setShowSaveInput] = useState(false)
+  const [viewMode, setViewMode] = useState<'linear' | 'visual'>('linear')
 
   const handleSelectTemplate = (template: ChainTemplate) => {
     setSelectedTemplate(template.id)
@@ -220,8 +222,64 @@ export function ChainBuilder({
         </div>
       </div>
 
-      {/* Step list */}
-      <div>
+      {/* View mode toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setViewMode('linear')}
+          className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+            viewMode === 'linear' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+          }`}
+        >
+          Linear
+        </button>
+        <button
+          onClick={() => setViewMode('visual')}
+          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md transition-colors ${
+            viewMode === 'visual' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+          }`}
+        >
+          <GitBranch className="h-3 w-3" />
+          Visual DAG
+        </button>
+      </div>
+
+      {/* Visual workflow editor */}
+      {viewMode === 'visual' && (
+        <WorkflowEditor
+          agents={agents}
+          modes={modes}
+          steps={steps.map((s, i) => ({
+            id: `step_${i}`,
+            agentId: s.agentId,
+            humanLabel: s.humanLabel,
+            mode: s.mode,
+            instructions: s.instructions,
+            autoContinue: s.autoContinue,
+            nextSteps: [],
+            prevSteps: [],
+            isParallelRoot: false,
+            isMergePoint: false,
+            fallbackAgentId: null,
+            column: i,
+            row: 0,
+          }))}
+          onStepsChange={(dagSteps) => {
+            onStepsChange(dagSteps.map(s => ({
+              agentId: s.agentId,
+              humanLabel: s.humanLabel,
+              mode: s.mode,
+              instructions: s.instructions,
+              autoContinue: s.autoContinue,
+              maxRetries: undefined,
+              retryDelayMs: undefined,
+              timeoutMs: undefined,
+            })))
+          }}
+        />
+      )}
+
+      {/* Step list (linear mode) */}
+      {viewMode === 'linear' && <div>
         <h3 className="text-sm font-medium text-muted-foreground mb-3">Steps</h3>
         <div className="space-y-0">
           {steps.map((step, index) => {
@@ -395,7 +453,7 @@ export function ChainBuilder({
           <Plus className="mr-1.5 h-3.5 w-3.5" />
           Add Step
         </Button>
-      </div>
+      </div>}
 
       {/* Save as template */}
       {onSaveAsTemplate && steps.length > 0 && (

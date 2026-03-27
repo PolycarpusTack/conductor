@@ -237,6 +237,11 @@ export const TaskStepScalarFieldEnum = {
   leasedAt: 'leasedAt',
   leasedBy: 'leasedBy',
   requiredSignOffs: 'requiredSignOffs',
+  nextSteps: 'nextSteps',
+  prevSteps: 'prevSteps',
+  isParallelRoot: 'isParallelRoot',
+  isMergePoint: 'isMergePoint',
+  fallbackAgentId: 'fallbackAgentId',
   createdAt: 'createdAt'
 } as const
 

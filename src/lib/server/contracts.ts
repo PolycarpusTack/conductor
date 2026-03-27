@@ -69,6 +69,18 @@ export const updateAgentSchema = z.object({
   mcpConnectionIds: z.array(z.string().trim().min(1)).max(10).optional().nullable(),
 }).refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
 
+export const stepConditionSchema = z.object({
+  field: z.enum(['output', 'status', 'tokensUsed', 'error']),
+  operator: z.enum(['contains', 'not_contains', 'equals', 'gt', 'lt', 'matches']),
+  value: z.string(),
+})
+
+export const stepEdgeSchema = z.object({
+  targetStepId: z.string(),
+  condition: stepConditionSchema.optional(),
+  label: z.string().max(60).optional(),
+})
+
 export const taskStepSchema = z.object({
   agentId: z.string().trim().min(1).optional().nullable(),
   humanLabel: z.string().trim().max(120).optional(),
@@ -78,6 +90,12 @@ export const taskStepSchema = z.object({
   maxRetries: z.number().int().min(0).max(10).optional(),
   retryDelayMs: z.number().int().min(0).max(300000).optional(),
   timeoutMs: z.number().int().min(5000).max(600000).optional(),
+  // DAG fields
+  nextSteps: z.array(stepEdgeSchema).max(10).optional(),
+  prevSteps: z.array(z.string()).max(10).optional(),
+  isParallelRoot: z.boolean().optional(),
+  isMergePoint: z.boolean().optional(),
+  fallbackAgentId: z.string().trim().min(1).optional().nullable(),
 })
 
 export const createTaskSchema = z.object({

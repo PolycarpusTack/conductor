@@ -4,6 +4,7 @@ import { resolvePrompt } from '@/lib/server/resolve-prompt'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
 import { createExecution, succeedExecution, failExecution, timeoutExecution } from '@/lib/server/execution-log'
+import { resolveNextSteps, type StepEdge } from '@/lib/server/condition-evaluator'
 import { randomBytes } from 'crypto'
 
 const WORKER_ID = `worker-${randomBytes(4).toString('hex')}`
@@ -207,31 +208,56 @@ export async function dispatchStep(stepId: string) {
         error: message,
       })
     } else {
-      // Exhausted retries — dead-letter
-      await db.taskStep.update({
-        where: { id: stepId },
-        data: {
-          status: 'failed',
-          error: `Failed after ${attemptNumber} attempts. Last error: ${message}`,
-          attempts: attemptNumber,
-          completedAt: new Date(),
-          leasedBy: null,
-          leasedAt: null,
-        },
-      })
+      // Exhausted retries — check for fallback agent before dead-lettering
+      if (step.fallbackAgentId && step.fallbackAgentId !== step.agentId) {
+        // Switch to fallback agent and reset for another attempt cycle
+        await db.taskStep.update({
+          where: { id: stepId },
+          data: {
+            agentId: step.fallbackAgentId,
+            status: 'active',
+            error: null,
+            attempts: 0,
+            leasedBy: null,
+            leasedAt: null,
+          },
+        })
 
-      await broadcastProjectEvent(step.task.projectId, 'step-failed', {
-        taskId: step.taskId,
-        stepId,
-        error: message,
-        attempt: attemptNumber,
-        exhaustedRetries: true,
-      })
+        await broadcastProjectEvent(step.task.projectId, 'step-fallback', {
+          taskId: step.taskId,
+          stepId,
+          fromAgentId: step.agentId,
+          toAgentId: step.fallbackAgentId,
+          reason: message,
+        })
+        // Step is active with new agent — the queue will pick it up
+      } else {
+        // No fallback — dead-letter
+        await db.taskStep.update({
+          where: { id: stepId },
+          data: {
+            status: 'failed',
+            error: `Failed after ${attemptNumber} attempts. Last error: ${message}`,
+            attempts: attemptNumber,
+            completedAt: new Date(),
+            leasedBy: null,
+            leasedAt: null,
+          },
+        })
 
-      await db.task.update({
-        where: { id: step.taskId },
-        data: { status: 'WAITING' },
-      })
+        await broadcastProjectEvent(step.task.projectId, 'step-failed', {
+          taskId: step.taskId,
+          stepId,
+          error: message,
+          attempt: attemptNumber,
+          exhaustedRetries: true,
+        })
+
+        await db.task.update({
+          where: { id: step.taskId },
+          data: { status: 'WAITING' },
+        })
+      }
     }
   }
 }
@@ -264,6 +290,24 @@ export async function advanceChain(taskId: string, projectId: string) {
   const lastDoneStep = [...steps].reverse().find((s) => s.status === 'done' || s.status === 'skipped')
   if (!lastDoneStep) return
 
+  // Check if this is a DAG chain (any step has nextSteps) or linear
+  const isDag = steps.some(s => s.nextSteps)
+
+  if (isDag) {
+    await advanceChainDag(taskId, projectId, steps, lastDoneStep)
+  } else {
+    await advanceChainLinear(taskId, projectId, steps, lastDoneStep)
+  }
+}
+
+type StepWithAgent = Awaited<ReturnType<typeof db.taskStep.findMany<{ include: { agent: true } }>>>[number]
+
+async function advanceChainLinear(
+  taskId: string,
+  projectId: string,
+  steps: StepWithAgent[],
+  lastDoneStep: StepWithAgent,
+) {
   const nextStep = steps.find((s) => s.order === lastDoneStep.order + 1)
 
   if (!nextStep) {
@@ -280,29 +324,113 @@ export async function advanceChain(taskId: string, projectId: string) {
     return
   }
 
-  const activated = await db.taskStep.updateMany({
-    where: { id: nextStep.id, status: 'pending' },
-    data: { status: 'active' },
-  })
-  if (activated.count === 0) return  // another caller already activated it
+  await activateStep(taskId, projectId, nextStep, lastDoneStep.id)
+}
 
-  await broadcastProjectEvent(projectId, 'step-activated', {
-    taskId,
-    stepId: nextStep.id,
-  })
+async function advanceChainDag(
+  taskId: string,
+  projectId: string,
+  steps: StepWithAgent[],
+  completedStep: StepWithAgent,
+) {
+  // Parse edges from the completed step
+  const edges: StepEdge[] = completedStep.nextSteps
+    ? JSON.parse(completedStep.nextSteps)
+    : []
 
-  await broadcastProjectEvent(projectId, 'chain-advanced', {
-    taskId,
-    fromStepId: lastDoneStep.id,
-    toStepId: nextStep.id,
-  })
+  if (edges.length === 0) {
+    // No outgoing edges — check if ALL steps are done/skipped (chain complete)
+    const allDone = steps.every(s => s.status === 'done' || s.status === 'skipped')
+    if (allDone) {
+      await db.task.update({
+        where: { id: taskId },
+        data: { status: 'DONE', completedAt: new Date() },
+      })
+      await broadcastProjectEvent(projectId, 'chain-completed', { taskId })
+    }
+    return
+  }
 
-  if (nextStep.mode === 'human') {
+  if (!completedStep.autoContinue) {
     await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
     return
   }
 
-  if (nextStep.agent?.runtimeId) {
+  // Get the latest execution for condition context
+  const latestExecution = await db.stepExecution.findFirst({
+    where: { stepId: completedStep.id },
+    orderBy: { attempt: 'desc' },
+  })
+
+  // Build context for condition evaluation
+  const context = {
+    output: completedStep.output,
+    status: completedStep.status,
+    tokensUsed: latestExecution?.tokensUsed ?? null,
+    error: completedStep.error,
+  }
+
+  // Resolve which next steps to activate
+  const targetStepIds = resolveNextSteps(edges, context)
+
+  if (targetStepIds.length === 0) {
+    // No conditions matched and no default path — chain is stuck
+    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+    return
+  }
+
+  // Activate each target step (parallel branching if multiple)
+  for (const targetStepId of targetStepIds) {
+    const targetStep = steps.find(s => s.id === targetStepId)
+    if (!targetStep) continue
+
+    // If target is a merge point, check that ALL its prevSteps are done
+    if (targetStep.isMergePoint && targetStep.prevSteps) {
+      const prevStepIds: string[] = JSON.parse(targetStep.prevSteps)
+      const allPrevDone = prevStepIds.every(prevId => {
+        const prevStep = steps.find(s => s.id === prevId)
+        return prevStep && (prevStep.status === 'done' || prevStep.status === 'skipped')
+      })
+
+      if (!allPrevDone) {
+        // Not all incoming branches are done yet — skip activation
+        continue
+      }
+    }
+
+    await activateStep(taskId, projectId, targetStep, completedStep.id)
+  }
+}
+
+async function activateStep(
+  taskId: string,
+  projectId: string,
+  step: StepWithAgent,
+  fromStepId: string,
+) {
+  const activated = await db.taskStep.updateMany({
+    where: { id: step.id, status: 'pending' },
+    data: { status: 'active' },
+  })
+  if (activated.count === 0) return // another caller already activated it
+
+  await broadcastProjectEvent(projectId, 'step-activated', {
+    taskId,
+    stepId: step.id,
+  })
+
+  await broadcastProjectEvent(projectId, 'chain-advanced', {
+    taskId,
+    fromStepId,
+    toStepId: step.id,
+  })
+
+  if (step.mode === 'human') {
+    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+    return
+  }
+
+  if (step.agent?.runtimeId) {
     await db.task.update({ where: { id: taskId }, data: { status: 'IN_PROGRESS' } })
     // Step is active — the queue will pick it up on next poll
   } else {
