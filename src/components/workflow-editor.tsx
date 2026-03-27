@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import type { StepCondition, StepEdge } from '@/lib/server/condition-evaluator'
 import {
   Select,
   SelectContent,
@@ -12,17 +13,7 @@ import {
 } from '@/components/ui/select'
 import { X, Plus, GitBranch, GitMerge, ArrowRight, Trash2, Zap } from 'lucide-react'
 
-export interface StepCondition {
-  field: string
-  operator: string
-  value: string
-}
-
-export interface StepEdge {
-  targetStepId: string
-  condition?: StepCondition
-  label?: string
-}
+export type { StepCondition, StepEdge }
 
 export interface DagStep {
   id: string
@@ -266,6 +257,28 @@ export function WorkflowEditor({ agents, modes, steps, onStepsChange }: Workflow
     if (!connectingFrom || connectingFrom === targetId) {
       setConnectingFrom(null)
       return
+    }
+
+    // Cycle detection: BFS from targetId to see if we can reach connectingFrom
+    const visited = new Set<string>()
+    const queue = [targetId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      if (current === connectingFrom) {
+        // Adding this edge would create a cycle — reject it
+        setConnectingFrom(null)
+        return
+      }
+      if (visited.has(current)) continue
+      visited.add(current)
+      const step = steps.find(s => s.id === current)
+      if (step) {
+        for (const edge of step.nextSteps) {
+          if (!visited.has(edge.targetStepId)) {
+            queue.push(edge.targetStepId)
+          }
+        }
+      }
     }
 
     // Add edge from connectingFrom to targetId

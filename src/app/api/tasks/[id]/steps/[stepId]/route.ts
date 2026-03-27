@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
-import { dispatchStep, advanceChain, rewindChain, closeChain } from '@/lib/server/dispatch'
+import { dispatchStep, advanceChain, rewindChain, closeChain, findPreviousAgentStep } from '@/lib/server/dispatch'
 import { submitReview } from '@/lib/server/review-logic'
 import { stepReviewSchema } from '@/lib/server/contracts'
 
@@ -54,14 +54,7 @@ export async function PUT(
         return NextResponse.json({ error: 'Rejection note is required' }, { status: 400 })
       }
 
-      const previousAgentStep = await db.taskStep.findFirst({
-        where: {
-          taskId: id,
-          order: { lt: existingStep.order },
-          mode: { not: 'human' },
-        },
-        orderBy: { order: 'desc' },
-      })
+      const previousAgentStep = await findPreviousAgentStep(id, stepId)
 
       if (!previousAgentStep) {
         return NextResponse.json({ error: 'No previous agent step to redo' }, { status: 400 })
@@ -98,14 +91,7 @@ export async function PUT(
         )
       }
 
-      const previousAgentStep = await db.taskStep.findFirst({
-        where: {
-          taskId: id,
-          order: { lt: existingStep.order },
-          mode: { not: 'human' },
-        },
-        orderBy: { order: 'desc' },
-      })
+      const previousAgentStep = await findPreviousAgentStep(id, stepId)
 
       if (!previousAgentStep) {
         return NextResponse.json({ error: 'No previous agent step to reassign' }, { status: 400 })

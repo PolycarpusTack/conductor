@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { advanceChain, rewindChain } from '@/lib/server/dispatch'
+import { advanceChain, rewindChain, findPreviousAgentStep } from '@/lib/server/dispatch'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
 interface ReviewDecision {
@@ -71,19 +71,7 @@ async function handleRejection(
   step: { id: string; taskId: string },
   input: ReviewDecision,
 ) {
-  const currentStep = await db.taskStep.findUnique({
-    where: { id: step.id },
-    select: { order: true },
-  })
-
-  const previousAgentStep = await db.taskStep.findFirst({
-    where: {
-      taskId: step.taskId,
-      order: { lt: currentStep!.order },
-      mode: { not: 'human' },
-    },
-    orderBy: { order: 'desc' },
-  })
+  const previousAgentStep = await findPreviousAgentStep(step.taskId, step.id)
 
   if (!previousAgentStep) {
     throw new Error('No previous agent step to reject to')
@@ -121,19 +109,7 @@ async function handleRevisionRequest(
   step: { id: string; taskId: string },
   input: ReviewDecision,
 ) {
-  const currentStep = await db.taskStep.findUnique({
-    where: { id: step.id },
-    select: { order: true },
-  })
-
-  const previousAgentStep = await db.taskStep.findFirst({
-    where: {
-      taskId: step.taskId,
-      order: { lt: currentStep!.order },
-      mode: { not: 'human' },
-    },
-    orderBy: { order: 'desc' },
-  })
+  const previousAgentStep = await findPreviousAgentStep(step.taskId, step.id)
 
   if (!previousAgentStep) {
     throw new Error('No previous agent step to request revision from')

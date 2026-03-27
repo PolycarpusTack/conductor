@@ -9,6 +9,62 @@ import { randomBytes } from 'crypto'
 
 const WORKER_ID = `worker-${randomBytes(4).toString('hex')}`
 
+/**
+ * Find the previous agent step for a given step, DAG-aware.
+ * In DAG mode: walks prevSteps edges to find the nearest non-human ancestor.
+ * In linear mode: finds the highest-order non-human step before this one.
+ */
+export async function findPreviousAgentStep(taskId: string, stepId: string) {
+  const allSteps = await db.taskStep.findMany({
+    where: { taskId },
+    select: { id: true, order: true, mode: true, prevSteps: true, nextSteps: true, agentId: true },
+    orderBy: { order: 'asc' },
+  })
+
+  const currentStep = allSteps.find(s => s.id === stepId)
+  if (!currentStep) return null
+
+  const isDag = hasDagEdges(allSteps)
+
+  if (isDag) {
+    // BFS backward through prevSteps to find the nearest agent step
+    const prevIds: string[] = currentStep.prevSteps ? JSON.parse(currentStep.prevSteps) : []
+    const visited = new Set<string>()
+    const queue = [...prevIds]
+
+    while (queue.length > 0) {
+      const candidateId = queue.shift()!
+      if (visited.has(candidateId)) continue
+      visited.add(candidateId)
+
+      const candidate = allSteps.find(s => s.id === candidateId)
+      if (!candidate) continue
+
+      if (candidate.mode !== 'human' && candidate.agentId) {
+        return candidate
+      }
+
+      // Keep walking backward
+      const ancestorIds: string[] = candidate.prevSteps ? JSON.parse(candidate.prevSteps) : []
+      for (const aid of ancestorIds) {
+        if (!visited.has(aid)) queue.push(aid)
+      }
+    }
+
+    return null
+  }
+
+  // Linear mode: find highest-order non-human step before this one
+  return allSteps
+    .filter(s => s.order < currentStep.order && s.mode !== 'human')
+    .sort((a, b) => b.order - a.order)[0] || null
+}
+
+/** Check if any step has DAG edges (nextSteps or prevSteps). */
+function hasDagEdges(steps: Array<{ nextSteps?: string | null; prevSteps?: string | null }>): boolean {
+  return steps.some(s => s.nextSteps || s.prevSteps)
+}
+
 async function leaseStep(stepId: string): Promise<boolean> {
   const result = await db.taskStep.updateMany({
     where: {
@@ -68,9 +124,33 @@ export async function dispatchStep(stepId: string) {
     return
   }
 
-  const previousStep = await db.taskStep.findFirst({
-    where: { taskId: step.taskId, order: step.order - 1 },
-  })
+  // Find predecessor step: use prevSteps edges for DAG, order-1 for linear
+  let previousStep: { output: string | null } | null = null
+  if (step.prevSteps) {
+    const prevIds: string[] = JSON.parse(step.prevSteps)
+    if (prevIds.length > 0) {
+      // Use the first predecessor's output (or concatenate all for multi-parent merge)
+      const prevSteps = await db.taskStep.findMany({
+        where: { id: { in: prevIds } },
+        select: { output: true },
+      })
+      if (prevSteps.length === 1) {
+        previousStep = prevSteps[0]
+      } else if (prevSteps.length > 1) {
+        // Merge point: combine outputs from all incoming branches
+        const combinedOutput = prevSteps
+          .filter(s => s.output)
+          .map(s => s.output)
+          .join('\n\n---\n\n')
+        previousStep = { output: combinedOutput || null }
+      }
+    }
+  } else {
+    previousStep = await db.taskStep.findFirst({
+      where: { taskId: step.taskId, order: step.order - 1 },
+      select: { output: true },
+    })
+  }
 
   const projectMode = await db.projectMode.findFirst({
     where: { projectId: step.task.projectId, name: step.mode },
@@ -309,7 +389,7 @@ export async function advanceChain(taskId: string, projectId: string) {
   if (!lastDoneStep) return
 
   // Check if this is a DAG chain (any step has nextSteps) or linear
-  const isDag = steps.some(s => s.nextSteps)
+  const isDag = hasDagEdges(steps)
 
   if (isDag) {
     await advanceChainDag(taskId, projectId, steps, lastDoneStep)
@@ -513,35 +593,67 @@ export async function rewindChain(
   // the target via nextSteps edges. In linear mode, use order > target.
   const allSteps = await db.taskStep.findMany({
     where: { taskId },
-    select: { id: true, order: true, nextSteps: true },
+    select: { id: true, order: true, nextSteps: true, prevSteps: true, isMergePoint: true },
   })
 
-  const isDag = allSteps.some(s => s.nextSteps)
+  const isDag = hasDagEdges(allSteps)
 
-  let downstreamIds: string[]
+  let resetIds: string[]
   if (isDag) {
-    // BFS from target step to find all reachable downstream steps
-    downstreamIds = []
     const visited = new Set<string>()
-    const queue = [targetStepId]
-    while (queue.length > 0) {
-      const current = queue.shift()!
+    visited.add(targetStepId) // seed with target to prevent cycles
+
+    // Forward BFS: find all downstream steps reachable via nextSteps
+    const forwardQueue = [targetStepId]
+    while (forwardQueue.length > 0) {
+      const current = forwardQueue.shift()!
       const step = allSteps.find(s => s.id === current)
       if (!step?.nextSteps) continue
       const edges: Array<{ targetStepId: string }> = JSON.parse(step.nextSteps)
       for (const edge of edges) {
         if (!visited.has(edge.targetStepId)) {
           visited.add(edge.targetStepId)
-          downstreamIds.push(edge.targetStepId)
-          queue.push(edge.targetStepId)
+          forwardQueue.push(edge.targetStepId)
         }
       }
     }
+
+    // If the target step is a merge point, also reset its sibling branches
+    // (steps that feed into it via prevSteps) so they re-execute
+    const target = allSteps.find(s => s.id === targetStepId)
+    if (target?.isMergePoint && target.prevSteps) {
+      const prevIds: string[] = JSON.parse(target.prevSteps)
+      // Reverse BFS: walk backward from each prevStep to find all ancestor steps
+      const reverseQueue = [...prevIds]
+      for (const pid of reverseQueue) {
+        if (!visited.has(pid)) visited.add(pid)
+      }
+      while (reverseQueue.length > 0) {
+        const current = reverseQueue.shift()!
+        const step = allSteps.find(s => s.id === current)
+        if (!step?.prevSteps) continue
+        const ancestors: string[] = JSON.parse(step.prevSteps)
+        for (const ancestorId of ancestors) {
+          if (!visited.has(ancestorId)) {
+            visited.add(ancestorId)
+            reverseQueue.push(ancestorId)
+          }
+        }
+      }
+    }
+
+    // Remove the target step itself from the reset list (it's handled separately above)
+    visited.delete(targetStepId)
+    resetIds = Array.from(visited)
   } else {
-    downstreamIds = allSteps
+    resetIds = allSteps
       .filter(s => s.order > targetStep.order)
       .map(s => s.id)
   }
+
+  if (resetIds.length > 0) {
+    await db.taskStep.updateMany({
+      where: { id: { in: resetIds } },
 
   if (downstreamIds.length > 0) {
     await db.taskStep.updateMany({
@@ -601,7 +713,7 @@ export async function startChain(taskId: string, projectId: string) {
   if (allSteps.length === 0) return
 
   // Check if this is a DAG chain
-  const isDag = allSteps.some(s => s.nextSteps)
+  const isDag = hasDagEdges(allSteps)
 
   // Find root steps: in DAG mode = steps with no prevSteps; in linear mode = order 1
   const rootSteps = isDag

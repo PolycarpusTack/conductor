@@ -137,9 +137,36 @@ export async function POST(request: Request) {
           })),
         })
 
-        // If any step has DAG edges, remap client IDs to real DB IDs
+        // Validate DAG edges for cycles before persisting
         const hasDagEdges = steps.some(s => s.nextSteps?.length || s.prevSteps?.length)
         if (hasDagEdges) {
+          // Build adjacency list from client-side edges and detect cycles via DFS
+          const adj = new Map<string, string[]>()
+          steps.forEach((step, i) => {
+            const clientId = `step_${i}`
+            adj.set(clientId, (step.nextSteps || []).map(e => e.targetStepId))
+          })
+          const WHITE = 0, GRAY = 1, BLACK = 2
+          const color = new Map<string, number>()
+          adj.forEach((_, k) => color.set(k, WHITE))
+          let hasCycle = false
+          function dfs(node: string) {
+            color.set(node, GRAY)
+            for (const neighbor of adj.get(node) || []) {
+              const c = color.get(neighbor)
+              if (c === GRAY) { hasCycle = true; return }
+              if (c === WHITE) dfs(neighbor)
+              if (hasCycle) return
+            }
+            color.set(node, BLACK)
+          }
+          for (const [node] of adj) {
+            if (color.get(node) === WHITE) dfs(node)
+            if (hasCycle) break
+          }
+          if (hasCycle) {
+            throw new Error('DAG edges contain a cycle — circular references are not allowed')
+          }
           const createdSteps = await tx.taskStep.findMany({
             where: { taskId: created.id },
             select: { id: true, order: true },

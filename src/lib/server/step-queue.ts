@@ -44,7 +44,7 @@ export async function pollAndDispatch() {
       mode: { not: 'human' },
       task: { status: 'IN_PROGRESS' },
     },
-    select: { id: true, taskId: true, order: true, prevSteps: true },
+    select: { id: true, taskId: true, order: true, prevSteps: true, isMergePoint: true },
     take: POLL_BATCH_SIZE,
     orderBy: { createdAt: 'asc' },
   })
@@ -69,6 +69,10 @@ export async function pollAndDispatch() {
           data: { status: 'active' },
         })
       }
+    } else if (throttled.isMergePoint) {
+      // Merge point with no prevSteps set — don't auto-activate,
+      // let advanceChainDag handle it when branches complete
+      continue
     } else if (throttled.order <= 1) {
       // Linear mode: first step — should be active
       await db.taskStep.updateMany({
