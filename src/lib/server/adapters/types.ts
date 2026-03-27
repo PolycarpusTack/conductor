@@ -21,10 +21,19 @@ export interface DispatchParams {
   executionId?: string  // For tool call tracing
 }
 
+export interface McpArtifact {
+  type: string
+  label: string
+  content?: string
+  url?: string
+  mimeType?: string
+}
+
 export interface DispatchResult {
   output: string
   tokensUsed?: number
   cost?: number
+  artifacts?: McpArtifact[]
 }
 
 export interface RuntimeAdapter {

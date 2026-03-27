@@ -1,4 +1,4 @@
-import type { RuntimeAdapter, DispatchParams, DispatchResult } from './types'
+import type { RuntimeAdapter, DispatchParams, DispatchResult, McpArtifact } from './types'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
 import { traceToolCall } from '@/lib/server/tool-trace'
 
@@ -49,6 +49,7 @@ export const googleAdapter: RuntimeAdapter = {
       : undefined
 
     let totalTokens = 0
+    const collectedArtifacts: McpArtifact[] = []
 
     for (let round = 0; round < maxRounds; round++) {
       const requestBody: Record<string, unknown> = {
@@ -97,6 +98,7 @@ export const googleAdapter: RuntimeAdapter = {
         return {
           output: text,
           tokensUsed: totalTokens || undefined,
+          artifacts: collectedArtifacts.length > 0 ? collectedArtifacts : undefined,
         }
       }
 
@@ -115,6 +117,10 @@ export const googleAdapter: RuntimeAdapter = {
         const toolStart = Date.now()
         const mcpResult = await executeMcpTool(name, args, params.mcpConnectionIds!)
         const toolDurationMs = Date.now() - toolStart
+
+        if (mcpResult.artifacts.length > 0) {
+          collectedArtifacts.push(...mcpResult.artifacts)
+        }
 
         if (params.executionId) {
           traceToolCall(params.executionId, name, args as Record<string, unknown>, mcpResult.text, toolDurationMs).catch(console.error)
@@ -146,6 +152,7 @@ export const googleAdapter: RuntimeAdapter = {
     return {
       output: fallbackText || '[Max tool rounds reached without a final text response]',
       tokensUsed: totalTokens || undefined,
+      artifacts: collectedArtifacts.length > 0 ? collectedArtifacts : undefined,
     }
   },
 }

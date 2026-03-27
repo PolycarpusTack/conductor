@@ -1,4 +1,4 @@
-import type { RuntimeAdapter, DispatchParams, DispatchResult } from './types'
+import type { RuntimeAdapter, DispatchParams, DispatchResult, McpArtifact } from './types'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
 import { traceToolCall } from '@/lib/server/tool-trace'
 
@@ -25,6 +25,7 @@ export const anthropicAdapter: RuntimeAdapter = {
     const maxRounds = params.maxToolRounds ?? MAX_TOOL_ROUNDS
 
     let totalTokens = 0
+    const collectedArtifacts: McpArtifact[] = []
 
     const messages: Array<{ role: string; content: unknown }> = [
       {
@@ -79,6 +80,7 @@ export const anthropicAdapter: RuntimeAdapter = {
         return {
           output: textBlock?.text || '',
           tokensUsed: totalTokens,
+          artifacts: collectedArtifacts.length > 0 ? collectedArtifacts : undefined,
         }
       }
 
@@ -99,6 +101,9 @@ export const anthropicAdapter: RuntimeAdapter = {
             params.mcpConnectionIds!,
           )
           resultText = mcpResult.text
+          if (mcpResult.artifacts.length > 0) {
+            collectedArtifacts.push(...mcpResult.artifacts)
+          }
         } catch (err) {
           toolError = err instanceof Error ? err.message : String(err)
           resultText = `Error executing tool ${toolBlock.name}: ${toolError}`
@@ -126,6 +131,7 @@ export const anthropicAdapter: RuntimeAdapter = {
     return {
       output: `[Tool execution reached ${maxRounds} round limit. The agent may not have completed its work.]`,
       tokensUsed: totalTokens,
+      artifacts: collectedArtifacts.length > 0 ? collectedArtifacts : undefined,
     }
   },
 }

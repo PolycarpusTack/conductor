@@ -1,4 +1,4 @@
-import type { RuntimeAdapter, DispatchParams, DispatchResult } from './types'
+import type { RuntimeAdapter, DispatchParams, DispatchResult, McpArtifact } from './types'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
 import { traceToolCall } from '@/lib/server/tool-trace'
 
@@ -21,6 +21,7 @@ export const zaiAdapter: RuntimeAdapter = {
     const maxRounds = params.maxToolRounds ?? MAX_TOOL_ROUNDS
     const hasTools = params.tools && params.tools.length > 0 && params.mcpConnectionIds && params.mcpConnectionIds.length > 0
     let totalTokens = 0
+    const collectedArtifacts: McpArtifact[] = []
 
     const messages: Array<Record<string, unknown>> = [
       { role: 'system', content: params.systemPrompt },
@@ -71,7 +72,7 @@ export const zaiAdapter: RuntimeAdapter = {
       const message = data.choices?.[0]?.message
 
       if (!message) {
-        return { output: '', tokensUsed: totalTokens }
+        return { output: '', tokensUsed: totalTokens, artifacts: collectedArtifacts.length > 0 ? collectedArtifacts : undefined }
       }
 
       // If no tool calls, return the text
@@ -79,6 +80,7 @@ export const zaiAdapter: RuntimeAdapter = {
         return {
           output: message.content || '',
           tokensUsed: totalTokens,
+          artifacts: collectedArtifacts.length > 0 ? collectedArtifacts : undefined,
         }
       }
 
@@ -101,6 +103,10 @@ export const zaiAdapter: RuntimeAdapter = {
         )
         const toolDurationMs = Date.now() - toolStart
 
+        if (mcpResult.artifacts.length > 0) {
+          collectedArtifacts.push(...mcpResult.artifacts)
+        }
+
         if (params.executionId) {
           traceToolCall(params.executionId, toolCall.function.name, args, mcpResult.text, toolDurationMs).catch(console.error)
         }
@@ -117,6 +123,7 @@ export const zaiAdapter: RuntimeAdapter = {
     return {
       output: `[Tool execution reached ${maxRounds} round limit.]`,
       tokensUsed: totalTokens,
+      artifacts: collectedArtifacts.length > 0 ? collectedArtifacts : undefined,
     }
   },
 }
