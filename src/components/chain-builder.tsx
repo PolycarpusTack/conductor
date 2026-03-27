@@ -12,13 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { X, Plus, Save, LayoutTemplate, GitBranch } from 'lucide-react'
-import { WorkflowEditor } from '@/components/workflow-editor'
-
-interface StepEdge {
-  targetStepId: string
-  condition?: { field: string; operator: string; value: string }
-  label?: string
-}
+import { WorkflowEditor, type StepEdge } from '@/components/workflow-editor'
 
 interface StepDraft {
   agentId?: string | null

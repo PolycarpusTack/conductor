@@ -70,9 +70,18 @@ interface Agent {
   name: string
   emoji: string
   color: string
-  description?: string
+  description?: string | null
   isActive: boolean
   lastSeen?: string | null
+  role?: string | null
+  capabilities?: string | null
+  maxConcurrent?: number
+  supportedModes?: string | null
+  modeInstructions?: string | null
+  runtimeId?: string | null
+  runtimeModel?: string | null
+  systemPrompt?: string | null
+  mcpConnectionIds?: string | null
 }
 
 interface Task {

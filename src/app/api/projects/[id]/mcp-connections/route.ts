@@ -42,16 +42,16 @@ export async function POST(
       )
     }
 
-    const data = { ...parsed.data } as Record<string, unknown>
-    if (parsed.data.config) {
-      data.config = JSON.stringify(parsed.data.config)
-    }
-    if (parsed.data.scopes) {
-      data.scopes = JSON.stringify(parsed.data.scopes)
-    }
-
     const connection = await db.projectMcpConnection.create({
-      data: { ...data, projectId: id },
+      data: {
+        projectId: id,
+        name: parsed.data.name,
+        type: parsed.data.type,
+        icon: parsed.data.icon || null,
+        endpoint: parsed.data.endpoint || null,
+        config: parsed.data.config ? JSON.stringify(parsed.data.config) : null,
+        scopes: parsed.data.scopes ? JSON.stringify(parsed.data.scopes) : null,
+      },
     })
 
     return NextResponse.json(connection)

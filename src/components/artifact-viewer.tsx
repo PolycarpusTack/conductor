@@ -104,35 +104,41 @@ function ArtifactContent({ artifact }: { artifact: StepArtifact }) {
 
     case 'json': {
       const content = artifact.content || ''
+      let formatted: string | null = null
       try {
-        const formatted = JSON.stringify(JSON.parse(content), null, 2)
-        const lines = formatted.split('\n')
-        const isLong = lines.length > 15
-
-        return (
-          <div className="mt-1">
-            <pre className={`text-[10px] font-mono leading-relaxed bg-card/50 border border-border/20 rounded p-2 overflow-x-auto ${
-              isLong && !expanded ? 'max-h-[160px] overflow-y-hidden' : ''
-            }`}>
-              {formatted}
-            </pre>
-            {isLong && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="text-[10px] font-mono text-muted-foreground/60 hover:text-muted-foreground mt-1"
-              >
-                {expanded ? 'Show less' : `Show all ${lines.length} lines`}
-              </button>
-            )}
-          </div>
-        )
+        formatted = JSON.stringify(JSON.parse(content), null, 2)
       } catch {
+        // invalid JSON — will render raw content below
+      }
+
+      if (formatted === null) {
         return (
           <pre className="text-[10px] font-mono leading-relaxed bg-card/50 border border-border/20 rounded p-2 overflow-x-auto mt-1 max-h-[200px] overflow-y-auto">
             {content}
           </pre>
         )
       }
+
+      const lines = formatted.split('\n')
+      const isLong = lines.length > 15
+
+      return (
+        <div className="mt-1">
+          <pre className={`text-[10px] font-mono leading-relaxed bg-card/50 border border-border/20 rounded p-2 overflow-x-auto ${
+            isLong && !expanded ? 'max-h-[160px] overflow-y-hidden' : ''
+          }`}>
+            {formatted}
+          </pre>
+          {isLong && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-[10px] font-mono text-muted-foreground/60 hover:text-muted-foreground mt-1"
+            >
+              {expanded ? 'Show less' : `Show all ${lines.length} lines`}
+            </button>
+          )}
+        </div>
+      )
     }
 
     case 'test_result': {

@@ -12,19 +12,19 @@ import {
 } from '@/components/ui/select'
 import { X, Plus, GitBranch, GitMerge, ArrowRight, Trash2, Zap } from 'lucide-react'
 
-interface StepCondition {
-  field: 'output' | 'status' | 'tokensUsed' | 'error'
-  operator: 'contains' | 'not_contains' | 'equals' | 'gt' | 'lt' | 'matches'
+export interface StepCondition {
+  field: string
+  operator: string
   value: string
 }
 
-interface StepEdge {
+export interface StepEdge {
   targetStepId: string
   condition?: StepCondition
   label?: string
 }
 
-interface DagStep {
+export interface DagStep {
   id: string
   agentId?: string | null
   humanLabel?: string

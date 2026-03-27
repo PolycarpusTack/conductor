@@ -122,7 +122,7 @@ export async function executeMcpTool(
   // Parse the connection name and actual tool name from the namespaced format
   const separatorIndex = toolName.indexOf('__')
   if (separatorIndex === -1) {
-    return JSON.stringify({ error: `Invalid tool name format: ${toolName}` })
+    return { text: JSON.stringify({ error: `Invalid tool name format: ${toolName}` }), artifacts: [] }
   }
 
   const connectionName = toolName.substring(0, separatorIndex)
