@@ -67,3 +67,18 @@ export type TaskStep = Prisma.TaskStepModel
  * 
  */
 export type StepExecution = Prisma.StepExecutionModel
+/**
+ * Model ToolCallTrace
+ * 
+ */
+export type ToolCallTrace = Prisma.ToolCallTraceModel
+/**
+ * Model StepArtifact
+ * 
+ */
+export type StepArtifact = Prisma.StepArtifactModel
+/**
+ * Model StepReview
+ * 
+ */
+export type StepReview = Prisma.StepReviewModel

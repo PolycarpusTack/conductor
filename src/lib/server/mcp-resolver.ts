@@ -102,11 +102,22 @@ async function fetchToolsFromMcp(connection: McpConnection): Promise<McpTool[]> 
   }
 }
 
+export interface McpToolResult {
+  text: string
+  artifacts: Array<{
+    type: string
+    label: string
+    content?: string
+    url?: string
+    mimeType?: string
+  }>
+}
+
 export async function executeMcpTool(
   toolName: string,
   args: Record<string, unknown>,
   mcpConnectionIds: string[],
-): Promise<string> {
+): Promise<McpToolResult> {
   console.log(`[MCP] Executing tool: ${toolName}`)
   // Parse the connection name and actual tool name from the namespaced format
   const separatorIndex = toolName.indexOf('__')
@@ -123,7 +134,7 @@ export async function executeMcpTool(
 
   const connection = connections.find(c => c.name === connectionName)
   if (!connection || !connection.endpoint) {
-    return JSON.stringify({ error: `MCP connection "${connectionName}" not found or has no endpoint` })
+    return { text: JSON.stringify({ error: `MCP connection "${connectionName}" not found or has no endpoint` }), artifacts: [] }
   }
 
   const endpoint = connection.endpoint.replace(/\/$/, '')
@@ -144,7 +155,7 @@ export async function executeMcpTool(
     })
 
     if (!res.ok) {
-      return JSON.stringify({ error: `MCP tool call failed: ${res.status}` })
+      return { text: JSON.stringify({ error: `MCP tool call failed: ${res.status}` }), artifacts: [] }
     }
 
     const data = await res.json()
@@ -155,9 +166,38 @@ export async function executeMcpTool(
       .filter((c: { type: string }) => c.type === 'text')
       .map((c: { text: string }) => c.text)
 
-    console.log(`[MCP] Tool ${toolName} returned ${textParts.length} text parts`)
-    return textParts.join('\n') || JSON.stringify(data.result || data)
+    // Extract non-text content as artifacts
+    const artifacts: McpToolResult['artifacts'] = []
+    for (const item of content) {
+      if (item.type === 'image') {
+        artifacts.push({
+          type: 'image',
+          label: `Image from ${actualToolName}`,
+          url: item.data ? `data:${item.mimeType || 'image/png'};base64,${item.data}` : undefined,
+          mimeType: item.mimeType || 'image/png',
+        })
+      } else if (item.type === 'resource') {
+        artifacts.push({
+          type: 'file',
+          label: item.resource?.name || `Resource from ${actualToolName}`,
+          url: item.resource?.uri,
+          content: item.resource?.text,
+          mimeType: item.resource?.mimeType,
+        })
+      } else if (item.type !== 'text') {
+        // Catch-all for other non-text types
+        artifacts.push({
+          type: 'json',
+          label: `${item.type} from ${actualToolName}`,
+          content: JSON.stringify(item),
+        })
+      }
+    }
+
+    console.log(`[MCP] Tool ${toolName} returned ${textParts.length} text parts, ${artifacts.length} artifacts`)
+    const text = textParts.join('\n') || JSON.stringify(data.result || data)
+    return { text, artifacts }
   } catch (error) {
-    return JSON.stringify({ error: `MCP tool execution error: ${error instanceof Error ? error.message : 'unknown'}` })
+    return { text: JSON.stringify({ error: `MCP tool execution error: ${error instanceof Error ? error.message : 'unknown'}` }), artifacts: [] }
   }
 }

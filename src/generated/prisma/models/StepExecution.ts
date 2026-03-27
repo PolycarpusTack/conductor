@@ -285,6 +285,7 @@ export type StepExecutionWhereInput = {
   completedAt?: Prisma.DateTimeNullableFilter<"StepExecution"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"StepExecution"> | Date | string
   step?: Prisma.XOR<Prisma.TaskStepScalarRelationFilter, Prisma.TaskStepWhereInput>
+  toolCalls?: Prisma.ToolCallTraceListRelationFilter
 }
 
 export type StepExecutionOrderByWithRelationInput = {
@@ -301,6 +302,7 @@ export type StepExecutionOrderByWithRelationInput = {
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   step?: Prisma.TaskStepOrderByWithRelationInput
+  toolCalls?: Prisma.ToolCallTraceOrderByRelationAggregateInput
 }
 
 export type StepExecutionWhereUniqueInput = Prisma.AtLeast<{
@@ -321,6 +323,7 @@ export type StepExecutionWhereUniqueInput = Prisma.AtLeast<{
   completedAt?: Prisma.DateTimeNullableFilter<"StepExecution"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"StepExecution"> | Date | string
   step?: Prisma.XOR<Prisma.TaskStepScalarRelationFilter, Prisma.TaskStepWhereInput>
+  toolCalls?: Prisma.ToolCallTraceListRelationFilter
 }, "id" | "stepId_attempt">
 
 export type StepExecutionOrderByWithAggregationInput = {
@@ -374,6 +377,7 @@ export type StepExecutionCreateInput = {
   completedAt?: Date | string | null
   createdAt?: Date | string
   step: Prisma.TaskStepCreateNestedOneWithoutExecutionsInput
+  toolCalls?: Prisma.ToolCallTraceCreateNestedManyWithoutExecutionInput
 }
 
 export type StepExecutionUncheckedCreateInput = {
@@ -389,6 +393,7 @@ export type StepExecutionUncheckedCreateInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   createdAt?: Date | string
+  toolCalls?: Prisma.ToolCallTraceUncheckedCreateNestedManyWithoutExecutionInput
 }
 
 export type StepExecutionUpdateInput = {
@@ -404,6 +409,7 @@ export type StepExecutionUpdateInput = {
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   step?: Prisma.TaskStepUpdateOneRequiredWithoutExecutionsNestedInput
+  toolCalls?: Prisma.ToolCallTraceUpdateManyWithoutExecutionNestedInput
 }
 
 export type StepExecutionUncheckedUpdateInput = {
@@ -419,6 +425,7 @@ export type StepExecutionUncheckedUpdateInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  toolCalls?: Prisma.ToolCallTraceUncheckedUpdateManyWithoutExecutionNestedInput
 }
 
 export type StepExecutionCreateManyInput = {
@@ -539,6 +546,11 @@ export type StepExecutionSumOrderByAggregateInput = {
   durationMs?: Prisma.SortOrder
 }
 
+export type StepExecutionScalarRelationFilter = {
+  is?: Prisma.StepExecutionWhereInput
+  isNot?: Prisma.StepExecutionWhereInput
+}
+
 export type StepExecutionCreateNestedManyWithoutStepInput = {
   create?: Prisma.XOR<Prisma.StepExecutionCreateWithoutStepInput, Prisma.StepExecutionUncheckedCreateWithoutStepInput> | Prisma.StepExecutionCreateWithoutStepInput[] | Prisma.StepExecutionUncheckedCreateWithoutStepInput[]
   connectOrCreate?: Prisma.StepExecutionCreateOrConnectWithoutStepInput | Prisma.StepExecutionCreateOrConnectWithoutStepInput[]
@@ -597,6 +609,20 @@ export type NullableFloatFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type StepExecutionCreateNestedOneWithoutToolCallsInput = {
+  create?: Prisma.XOR<Prisma.StepExecutionCreateWithoutToolCallsInput, Prisma.StepExecutionUncheckedCreateWithoutToolCallsInput>
+  connectOrCreate?: Prisma.StepExecutionCreateOrConnectWithoutToolCallsInput
+  connect?: Prisma.StepExecutionWhereUniqueInput
+}
+
+export type StepExecutionUpdateOneRequiredWithoutToolCallsNestedInput = {
+  create?: Prisma.XOR<Prisma.StepExecutionCreateWithoutToolCallsInput, Prisma.StepExecutionUncheckedCreateWithoutToolCallsInput>
+  connectOrCreate?: Prisma.StepExecutionCreateOrConnectWithoutToolCallsInput
+  upsert?: Prisma.StepExecutionUpsertWithoutToolCallsInput
+  connect?: Prisma.StepExecutionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.StepExecutionUpdateToOneWithWhereWithoutToolCallsInput, Prisma.StepExecutionUpdateWithoutToolCallsInput>, Prisma.StepExecutionUncheckedUpdateWithoutToolCallsInput>
+}
+
 export type StepExecutionCreateWithoutStepInput = {
   id?: string
   attempt: number
@@ -609,6 +635,7 @@ export type StepExecutionCreateWithoutStepInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   createdAt?: Date | string
+  toolCalls?: Prisma.ToolCallTraceCreateNestedManyWithoutExecutionInput
 }
 
 export type StepExecutionUncheckedCreateWithoutStepInput = {
@@ -623,6 +650,7 @@ export type StepExecutionUncheckedCreateWithoutStepInput = {
   startedAt?: Date | string
   completedAt?: Date | string | null
   createdAt?: Date | string
+  toolCalls?: Prisma.ToolCallTraceUncheckedCreateNestedManyWithoutExecutionInput
 }
 
 export type StepExecutionCreateOrConnectWithoutStepInput = {
@@ -668,6 +696,82 @@ export type StepExecutionScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"StepExecution"> | Date | string
 }
 
+export type StepExecutionCreateWithoutToolCallsInput = {
+  id?: string
+  attempt: number
+  status?: string
+  output?: string | null
+  error?: string | null
+  tokensUsed?: number | null
+  cost?: number | null
+  durationMs?: number | null
+  startedAt?: Date | string
+  completedAt?: Date | string | null
+  createdAt?: Date | string
+  step: Prisma.TaskStepCreateNestedOneWithoutExecutionsInput
+}
+
+export type StepExecutionUncheckedCreateWithoutToolCallsInput = {
+  id?: string
+  stepId: string
+  attempt: number
+  status?: string
+  output?: string | null
+  error?: string | null
+  tokensUsed?: number | null
+  cost?: number | null
+  durationMs?: number | null
+  startedAt?: Date | string
+  completedAt?: Date | string | null
+  createdAt?: Date | string
+}
+
+export type StepExecutionCreateOrConnectWithoutToolCallsInput = {
+  where: Prisma.StepExecutionWhereUniqueInput
+  create: Prisma.XOR<Prisma.StepExecutionCreateWithoutToolCallsInput, Prisma.StepExecutionUncheckedCreateWithoutToolCallsInput>
+}
+
+export type StepExecutionUpsertWithoutToolCallsInput = {
+  update: Prisma.XOR<Prisma.StepExecutionUpdateWithoutToolCallsInput, Prisma.StepExecutionUncheckedUpdateWithoutToolCallsInput>
+  create: Prisma.XOR<Prisma.StepExecutionCreateWithoutToolCallsInput, Prisma.StepExecutionUncheckedCreateWithoutToolCallsInput>
+  where?: Prisma.StepExecutionWhereInput
+}
+
+export type StepExecutionUpdateToOneWithWhereWithoutToolCallsInput = {
+  where?: Prisma.StepExecutionWhereInput
+  data: Prisma.XOR<Prisma.StepExecutionUpdateWithoutToolCallsInput, Prisma.StepExecutionUncheckedUpdateWithoutToolCallsInput>
+}
+
+export type StepExecutionUpdateWithoutToolCallsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  output?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tokensUsed?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cost?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  durationMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  step?: Prisma.TaskStepUpdateOneRequiredWithoutExecutionsNestedInput
+}
+
+export type StepExecutionUncheckedUpdateWithoutToolCallsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  stepId?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  output?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tokensUsed?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  cost?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  durationMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type StepExecutionCreateManyStepInput = {
   id?: string
   attempt: number
@@ -694,6 +798,7 @@ export type StepExecutionUpdateWithoutStepInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  toolCalls?: Prisma.ToolCallTraceUpdateManyWithoutExecutionNestedInput
 }
 
 export type StepExecutionUncheckedUpdateWithoutStepInput = {
@@ -708,6 +813,7 @@ export type StepExecutionUncheckedUpdateWithoutStepInput = {
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  toolCalls?: Prisma.ToolCallTraceUncheckedUpdateManyWithoutExecutionNestedInput
 }
 
 export type StepExecutionUncheckedUpdateManyWithoutStepInput = {
@@ -725,6 +831,35 @@ export type StepExecutionUncheckedUpdateManyWithoutStepInput = {
 }
 
 
+/**
+ * Count Type StepExecutionCountOutputType
+ */
+
+export type StepExecutionCountOutputType = {
+  toolCalls: number
+}
+
+export type StepExecutionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  toolCalls?: boolean | StepExecutionCountOutputTypeCountToolCallsArgs
+}
+
+/**
+ * StepExecutionCountOutputType without action
+ */
+export type StepExecutionCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the StepExecutionCountOutputType
+   */
+  select?: Prisma.StepExecutionCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * StepExecutionCountOutputType without action
+ */
+export type StepExecutionCountOutputTypeCountToolCallsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ToolCallTraceWhereInput
+}
+
 
 export type StepExecutionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -740,6 +875,8 @@ export type StepExecutionSelect<ExtArgs extends runtime.Types.Extensions.Interna
   completedAt?: boolean
   createdAt?: boolean
   step?: boolean | Prisma.TaskStepDefaultArgs<ExtArgs>
+  toolCalls?: boolean | Prisma.StepExecution$toolCallsArgs<ExtArgs>
+  _count?: boolean | Prisma.StepExecutionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["stepExecution"]>
 
 export type StepExecutionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -792,6 +929,8 @@ export type StepExecutionSelectScalar = {
 export type StepExecutionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "stepId" | "attempt" | "status" | "output" | "error" | "tokensUsed" | "cost" | "durationMs" | "startedAt" | "completedAt" | "createdAt", ExtArgs["result"]["stepExecution"]>
 export type StepExecutionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   step?: boolean | Prisma.TaskStepDefaultArgs<ExtArgs>
+  toolCalls?: boolean | Prisma.StepExecution$toolCallsArgs<ExtArgs>
+  _count?: boolean | Prisma.StepExecutionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type StepExecutionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   step?: boolean | Prisma.TaskStepDefaultArgs<ExtArgs>
@@ -804,6 +943,7 @@ export type $StepExecutionPayload<ExtArgs extends runtime.Types.Extensions.Inter
   name: "StepExecution"
   objects: {
     step: Prisma.$TaskStepPayload<ExtArgs>
+    toolCalls: Prisma.$ToolCallTracePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1213,6 +1353,7 @@ readonly fields: StepExecutionFieldRefs;
 export interface Prisma__StepExecutionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   step<T extends Prisma.TaskStepDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskStepDefaultArgs<ExtArgs>>): Prisma.Prisma__TaskStepClient<runtime.Types.Result.GetResult<Prisma.$TaskStepPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  toolCalls<T extends Prisma.StepExecution$toolCallsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.StepExecution$toolCallsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ToolCallTracePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1650,6 +1791,30 @@ export type StepExecutionDeleteManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many StepExecutions to delete.
    */
   limit?: number
+}
+
+/**
+ * StepExecution.toolCalls
+ */
+export type StepExecution$toolCallsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ToolCallTrace
+   */
+  select?: Prisma.ToolCallTraceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ToolCallTrace
+   */
+  omit?: Prisma.ToolCallTraceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ToolCallTraceInclude<ExtArgs> | null
+  where?: Prisma.ToolCallTraceWhereInput
+  orderBy?: Prisma.ToolCallTraceOrderByWithRelationInput | Prisma.ToolCallTraceOrderByWithRelationInput[]
+  cursor?: Prisma.ToolCallTraceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ToolCallTraceScalarFieldEnum | Prisma.ToolCallTraceScalarFieldEnum[]
 }
 
 /**

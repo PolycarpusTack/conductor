@@ -92,7 +92,7 @@ export const zaiAdapter: RuntimeAdapter = {
 
         console.log(`[Dispatch] Executing tool: ${toolCall.function.name}`, args)
 
-        const result = await executeMcpTool(
+        const mcpResult = await executeMcpTool(
           toolCall.function.name,
           args,
           params.mcpConnectionIds!,
@@ -101,7 +101,7 @@ export const zaiAdapter: RuntimeAdapter = {
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
-          content: result,
+          content: mcpResult.text,
         })
       }
     }

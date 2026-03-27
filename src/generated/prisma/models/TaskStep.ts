@@ -32,6 +32,7 @@ export type TaskStepAvgAggregateOutputType = {
   maxRetries: number | null
   retryDelayMs: number | null
   timeoutMs: number | null
+  requiredSignOffs: number | null
 }
 
 export type TaskStepSumAggregateOutputType = {
@@ -40,6 +41,7 @@ export type TaskStepSumAggregateOutputType = {
   maxRetries: number | null
   retryDelayMs: number | null
   timeoutMs: number | null
+  requiredSignOffs: number | null
 }
 
 export type TaskStepMinAggregateOutputType = {
@@ -63,6 +65,7 @@ export type TaskStepMinAggregateOutputType = {
   timeoutMs: number | null
   leasedAt: Date | null
   leasedBy: string | null
+  requiredSignOffs: number | null
   createdAt: Date | null
 }
 
@@ -87,6 +90,7 @@ export type TaskStepMaxAggregateOutputType = {
   timeoutMs: number | null
   leasedAt: Date | null
   leasedBy: string | null
+  requiredSignOffs: number | null
   createdAt: Date | null
 }
 
@@ -111,6 +115,7 @@ export type TaskStepCountAggregateOutputType = {
   timeoutMs: number
   leasedAt: number
   leasedBy: number
+  requiredSignOffs: number
   createdAt: number
   _all: number
 }
@@ -122,6 +127,7 @@ export type TaskStepAvgAggregateInputType = {
   maxRetries?: true
   retryDelayMs?: true
   timeoutMs?: true
+  requiredSignOffs?: true
 }
 
 export type TaskStepSumAggregateInputType = {
@@ -130,6 +136,7 @@ export type TaskStepSumAggregateInputType = {
   maxRetries?: true
   retryDelayMs?: true
   timeoutMs?: true
+  requiredSignOffs?: true
 }
 
 export type TaskStepMinAggregateInputType = {
@@ -153,6 +160,7 @@ export type TaskStepMinAggregateInputType = {
   timeoutMs?: true
   leasedAt?: true
   leasedBy?: true
+  requiredSignOffs?: true
   createdAt?: true
 }
 
@@ -177,6 +185,7 @@ export type TaskStepMaxAggregateInputType = {
   timeoutMs?: true
   leasedAt?: true
   leasedBy?: true
+  requiredSignOffs?: true
   createdAt?: true
 }
 
@@ -201,6 +210,7 @@ export type TaskStepCountAggregateInputType = {
   timeoutMs?: true
   leasedAt?: true
   leasedBy?: true
+  requiredSignOffs?: true
   createdAt?: true
   _all?: true
 }
@@ -312,6 +322,7 @@ export type TaskStepGroupByOutputType = {
   timeoutMs: number
   leasedAt: Date | null
   leasedBy: string | null
+  requiredSignOffs: number
   createdAt: Date
   _count: TaskStepCountAggregateOutputType | null
   _avg: TaskStepAvgAggregateOutputType | null
@@ -359,10 +370,13 @@ export type TaskStepWhereInput = {
   timeoutMs?: Prisma.IntFilter<"TaskStep"> | number
   leasedAt?: Prisma.DateTimeNullableFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  requiredSignOffs?: Prisma.IntFilter<"TaskStep"> | number
   createdAt?: Prisma.DateTimeFilter<"TaskStep"> | Date | string
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   agent?: Prisma.XOR<Prisma.AgentNullableScalarRelationFilter, Prisma.AgentWhereInput> | null
   executions?: Prisma.StepExecutionListRelationFilter
+  reviews?: Prisma.StepReviewListRelationFilter
+  artifacts?: Prisma.StepArtifactListRelationFilter
 }
 
 export type TaskStepOrderByWithRelationInput = {
@@ -386,10 +400,13 @@ export type TaskStepOrderByWithRelationInput = {
   timeoutMs?: Prisma.SortOrder
   leasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   leasedBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  requiredSignOffs?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   task?: Prisma.TaskOrderByWithRelationInput
   agent?: Prisma.AgentOrderByWithRelationInput
   executions?: Prisma.StepExecutionOrderByRelationAggregateInput
+  reviews?: Prisma.StepReviewOrderByRelationAggregateInput
+  artifacts?: Prisma.StepArtifactOrderByRelationAggregateInput
 }
 
 export type TaskStepWhereUniqueInput = Prisma.AtLeast<{
@@ -417,10 +434,13 @@ export type TaskStepWhereUniqueInput = Prisma.AtLeast<{
   timeoutMs?: Prisma.IntFilter<"TaskStep"> | number
   leasedAt?: Prisma.DateTimeNullableFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  requiredSignOffs?: Prisma.IntFilter<"TaskStep"> | number
   createdAt?: Prisma.DateTimeFilter<"TaskStep"> | Date | string
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   agent?: Prisma.XOR<Prisma.AgentNullableScalarRelationFilter, Prisma.AgentWhereInput> | null
   executions?: Prisma.StepExecutionListRelationFilter
+  reviews?: Prisma.StepReviewListRelationFilter
+  artifacts?: Prisma.StepArtifactListRelationFilter
 }, "id" | "taskId_order">
 
 export type TaskStepOrderByWithAggregationInput = {
@@ -444,6 +464,7 @@ export type TaskStepOrderByWithAggregationInput = {
   timeoutMs?: Prisma.SortOrder
   leasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   leasedBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  requiredSignOffs?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.TaskStepCountOrderByAggregateInput
   _avg?: Prisma.TaskStepAvgOrderByAggregateInput
@@ -476,6 +497,7 @@ export type TaskStepScalarWhereWithAggregatesInput = {
   timeoutMs?: Prisma.IntWithAggregatesFilter<"TaskStep"> | number
   leasedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableWithAggregatesFilter<"TaskStep"> | string | null
+  requiredSignOffs?: Prisma.IntWithAggregatesFilter<"TaskStep"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"TaskStep"> | Date | string
 }
 
@@ -498,10 +520,13 @@ export type TaskStepCreateInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
   executions?: Prisma.StepExecutionCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepUncheckedCreateInput = {
@@ -525,8 +550,11 @@ export type TaskStepUncheckedCreateInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactUncheckedCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepUpdateInput = {
@@ -548,10 +576,13 @@ export type TaskStepUpdateInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
   executions?: Prisma.StepExecutionUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepUncheckedUpdateInput = {
@@ -575,8 +606,11 @@ export type TaskStepUncheckedUpdateInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUncheckedUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepCreateManyInput = {
@@ -600,6 +634,7 @@ export type TaskStepCreateManyInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
 }
 
@@ -622,6 +657,7 @@ export type TaskStepUpdateManyMutationInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -646,6 +682,7 @@ export type TaskStepUncheckedUpdateManyInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -685,6 +722,7 @@ export type TaskStepCountOrderByAggregateInput = {
   timeoutMs?: Prisma.SortOrder
   leasedAt?: Prisma.SortOrder
   leasedBy?: Prisma.SortOrder
+  requiredSignOffs?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -694,6 +732,7 @@ export type TaskStepAvgOrderByAggregateInput = {
   maxRetries?: Prisma.SortOrder
   retryDelayMs?: Prisma.SortOrder
   timeoutMs?: Prisma.SortOrder
+  requiredSignOffs?: Prisma.SortOrder
 }
 
 export type TaskStepMaxOrderByAggregateInput = {
@@ -717,6 +756,7 @@ export type TaskStepMaxOrderByAggregateInput = {
   timeoutMs?: Prisma.SortOrder
   leasedAt?: Prisma.SortOrder
   leasedBy?: Prisma.SortOrder
+  requiredSignOffs?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -741,6 +781,7 @@ export type TaskStepMinOrderByAggregateInput = {
   timeoutMs?: Prisma.SortOrder
   leasedAt?: Prisma.SortOrder
   leasedBy?: Prisma.SortOrder
+  requiredSignOffs?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -750,6 +791,7 @@ export type TaskStepSumOrderByAggregateInput = {
   maxRetries?: Prisma.SortOrder
   retryDelayMs?: Prisma.SortOrder
   timeoutMs?: Prisma.SortOrder
+  requiredSignOffs?: Prisma.SortOrder
 }
 
 export type TaskStepScalarRelationFilter = {
@@ -855,6 +897,34 @@ export type TaskStepUpdateOneRequiredWithoutExecutionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskStepUpdateToOneWithWhereWithoutExecutionsInput, Prisma.TaskStepUpdateWithoutExecutionsInput>, Prisma.TaskStepUncheckedUpdateWithoutExecutionsInput>
 }
 
+export type TaskStepCreateNestedOneWithoutArtifactsInput = {
+  create?: Prisma.XOR<Prisma.TaskStepCreateWithoutArtifactsInput, Prisma.TaskStepUncheckedCreateWithoutArtifactsInput>
+  connectOrCreate?: Prisma.TaskStepCreateOrConnectWithoutArtifactsInput
+  connect?: Prisma.TaskStepWhereUniqueInput
+}
+
+export type TaskStepUpdateOneRequiredWithoutArtifactsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskStepCreateWithoutArtifactsInput, Prisma.TaskStepUncheckedCreateWithoutArtifactsInput>
+  connectOrCreate?: Prisma.TaskStepCreateOrConnectWithoutArtifactsInput
+  upsert?: Prisma.TaskStepUpsertWithoutArtifactsInput
+  connect?: Prisma.TaskStepWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskStepUpdateToOneWithWhereWithoutArtifactsInput, Prisma.TaskStepUpdateWithoutArtifactsInput>, Prisma.TaskStepUncheckedUpdateWithoutArtifactsInput>
+}
+
+export type TaskStepCreateNestedOneWithoutReviewsInput = {
+  create?: Prisma.XOR<Prisma.TaskStepCreateWithoutReviewsInput, Prisma.TaskStepUncheckedCreateWithoutReviewsInput>
+  connectOrCreate?: Prisma.TaskStepCreateOrConnectWithoutReviewsInput
+  connect?: Prisma.TaskStepWhereUniqueInput
+}
+
+export type TaskStepUpdateOneRequiredWithoutReviewsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskStepCreateWithoutReviewsInput, Prisma.TaskStepUncheckedCreateWithoutReviewsInput>
+  connectOrCreate?: Prisma.TaskStepCreateOrConnectWithoutReviewsInput
+  upsert?: Prisma.TaskStepUpsertWithoutReviewsInput
+  connect?: Prisma.TaskStepWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskStepUpdateToOneWithWhereWithoutReviewsInput, Prisma.TaskStepUpdateWithoutReviewsInput>, Prisma.TaskStepUncheckedUpdateWithoutReviewsInput>
+}
+
 export type TaskStepCreateWithoutAgentInput = {
   id?: string
   order: number
@@ -874,9 +944,12 @@ export type TaskStepCreateWithoutAgentInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   executions?: Prisma.StepExecutionCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepUncheckedCreateWithoutAgentInput = {
@@ -899,8 +972,11 @@ export type TaskStepUncheckedCreateWithoutAgentInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactUncheckedCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepCreateOrConnectWithoutAgentInput = {
@@ -952,6 +1028,7 @@ export type TaskStepScalarWhereInput = {
   timeoutMs?: Prisma.IntFilter<"TaskStep"> | number
   leasedAt?: Prisma.DateTimeNullableFilter<"TaskStep"> | Date | string | null
   leasedBy?: Prisma.StringNullableFilter<"TaskStep"> | string | null
+  requiredSignOffs?: Prisma.IntFilter<"TaskStep"> | number
   createdAt?: Prisma.DateTimeFilter<"TaskStep"> | Date | string
 }
 
@@ -974,9 +1051,12 @@ export type TaskStepCreateWithoutTaskInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
   executions?: Prisma.StepExecutionCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepUncheckedCreateWithoutTaskInput = {
@@ -999,8 +1079,11 @@ export type TaskStepUncheckedCreateWithoutTaskInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
   executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactUncheckedCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepCreateOrConnectWithoutTaskInput = {
@@ -1047,9 +1130,12 @@ export type TaskStepCreateWithoutExecutionsInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutStepsInput
   agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
+  reviews?: Prisma.StepReviewCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepUncheckedCreateWithoutExecutionsInput = {
@@ -1073,7 +1159,10 @@ export type TaskStepUncheckedCreateWithoutExecutionsInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
+  reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactUncheckedCreateNestedManyWithoutStepInput
 }
 
 export type TaskStepCreateOrConnectWithoutExecutionsInput = {
@@ -1111,9 +1200,12 @@ export type TaskStepUpdateWithoutExecutionsInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
+  reviews?: Prisma.StepReviewUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepUncheckedUpdateWithoutExecutionsInput = {
@@ -1137,7 +1229,258 @@ export type TaskStepUncheckedUpdateWithoutExecutionsInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUncheckedUpdateManyWithoutStepNestedInput
+}
+
+export type TaskStepCreateWithoutArtifactsInput = {
+  id?: string
+  order: number
+  humanLabel?: string | null
+  mode: string
+  instructions?: string | null
+  autoContinue?: boolean
+  status?: string
+  output?: string | null
+  error?: string | null
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  rejectionNote?: string | null
+  attempts?: number
+  maxRetries?: number
+  retryDelayMs?: number
+  timeoutMs?: number
+  leasedAt?: Date | string | null
+  leasedBy?: string | null
+  requiredSignOffs?: number
+  createdAt?: Date | string
+  task: Prisma.TaskCreateNestedOneWithoutStepsInput
+  agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
+  executions?: Prisma.StepExecutionCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewCreateNestedManyWithoutStepInput
+}
+
+export type TaskStepUncheckedCreateWithoutArtifactsInput = {
+  id?: string
+  taskId: string
+  order: number
+  agentId?: string | null
+  humanLabel?: string | null
+  mode: string
+  instructions?: string | null
+  autoContinue?: boolean
+  status?: string
+  output?: string | null
+  error?: string | null
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  rejectionNote?: string | null
+  attempts?: number
+  maxRetries?: number
+  retryDelayMs?: number
+  timeoutMs?: number
+  leasedAt?: Date | string | null
+  leasedBy?: string | null
+  requiredSignOffs?: number
+  createdAt?: Date | string
+  executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
+  reviews?: Prisma.StepReviewUncheckedCreateNestedManyWithoutStepInput
+}
+
+export type TaskStepCreateOrConnectWithoutArtifactsInput = {
+  where: Prisma.TaskStepWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskStepCreateWithoutArtifactsInput, Prisma.TaskStepUncheckedCreateWithoutArtifactsInput>
+}
+
+export type TaskStepUpsertWithoutArtifactsInput = {
+  update: Prisma.XOR<Prisma.TaskStepUpdateWithoutArtifactsInput, Prisma.TaskStepUncheckedUpdateWithoutArtifactsInput>
+  create: Prisma.XOR<Prisma.TaskStepCreateWithoutArtifactsInput, Prisma.TaskStepUncheckedCreateWithoutArtifactsInput>
+  where?: Prisma.TaskStepWhereInput
+}
+
+export type TaskStepUpdateToOneWithWhereWithoutArtifactsInput = {
+  where?: Prisma.TaskStepWhereInput
+  data: Prisma.XOR<Prisma.TaskStepUpdateWithoutArtifactsInput, Prisma.TaskStepUncheckedUpdateWithoutArtifactsInput>
+}
+
+export type TaskStepUpdateWithoutArtifactsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  order?: Prisma.IntFieldUpdateOperationsInput | number
+  humanLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoContinue?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  output?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  maxRetries?: Prisma.IntFieldUpdateOperationsInput | number
+  retryDelayMs?: Prisma.IntFieldUpdateOperationsInput | number
+  timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
+  leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
+  agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
+  executions?: Prisma.StepExecutionUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUpdateManyWithoutStepNestedInput
+}
+
+export type TaskStepUncheckedUpdateWithoutArtifactsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  order?: Prisma.IntFieldUpdateOperationsInput | number
+  agentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  humanLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoContinue?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  output?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  maxRetries?: Prisma.IntFieldUpdateOperationsInput | number
+  retryDelayMs?: Prisma.IntFieldUpdateOperationsInput | number
+  timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
+  leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
+}
+
+export type TaskStepCreateWithoutReviewsInput = {
+  id?: string
+  order: number
+  humanLabel?: string | null
+  mode: string
+  instructions?: string | null
+  autoContinue?: boolean
+  status?: string
+  output?: string | null
+  error?: string | null
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  rejectionNote?: string | null
+  attempts?: number
+  maxRetries?: number
+  retryDelayMs?: number
+  timeoutMs?: number
+  leasedAt?: Date | string | null
+  leasedBy?: string | null
+  requiredSignOffs?: number
+  createdAt?: Date | string
+  task: Prisma.TaskCreateNestedOneWithoutStepsInput
+  agent?: Prisma.AgentCreateNestedOneWithoutTaskStepsInput
+  executions?: Prisma.StepExecutionCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactCreateNestedManyWithoutStepInput
+}
+
+export type TaskStepUncheckedCreateWithoutReviewsInput = {
+  id?: string
+  taskId: string
+  order: number
+  agentId?: string | null
+  humanLabel?: string | null
+  mode: string
+  instructions?: string | null
+  autoContinue?: boolean
+  status?: string
+  output?: string | null
+  error?: string | null
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  rejectionNote?: string | null
+  attempts?: number
+  maxRetries?: number
+  retryDelayMs?: number
+  timeoutMs?: number
+  leasedAt?: Date | string | null
+  leasedBy?: string | null
+  requiredSignOffs?: number
+  createdAt?: Date | string
+  executions?: Prisma.StepExecutionUncheckedCreateNestedManyWithoutStepInput
+  artifacts?: Prisma.StepArtifactUncheckedCreateNestedManyWithoutStepInput
+}
+
+export type TaskStepCreateOrConnectWithoutReviewsInput = {
+  where: Prisma.TaskStepWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskStepCreateWithoutReviewsInput, Prisma.TaskStepUncheckedCreateWithoutReviewsInput>
+}
+
+export type TaskStepUpsertWithoutReviewsInput = {
+  update: Prisma.XOR<Prisma.TaskStepUpdateWithoutReviewsInput, Prisma.TaskStepUncheckedUpdateWithoutReviewsInput>
+  create: Prisma.XOR<Prisma.TaskStepCreateWithoutReviewsInput, Prisma.TaskStepUncheckedCreateWithoutReviewsInput>
+  where?: Prisma.TaskStepWhereInput
+}
+
+export type TaskStepUpdateToOneWithWhereWithoutReviewsInput = {
+  where?: Prisma.TaskStepWhereInput
+  data: Prisma.XOR<Prisma.TaskStepUpdateWithoutReviewsInput, Prisma.TaskStepUncheckedUpdateWithoutReviewsInput>
+}
+
+export type TaskStepUpdateWithoutReviewsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  order?: Prisma.IntFieldUpdateOperationsInput | number
+  humanLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoContinue?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  output?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  maxRetries?: Prisma.IntFieldUpdateOperationsInput | number
+  retryDelayMs?: Prisma.IntFieldUpdateOperationsInput | number
+  timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
+  leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
+  agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
+  executions?: Prisma.StepExecutionUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUpdateManyWithoutStepNestedInput
+}
+
+export type TaskStepUncheckedUpdateWithoutReviewsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  order?: Prisma.IntFieldUpdateOperationsInput | number
+  agentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  humanLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  autoContinue?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  output?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectionNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  maxRetries?: Prisma.IntFieldUpdateOperationsInput | number
+  retryDelayMs?: Prisma.IntFieldUpdateOperationsInput | number
+  timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
+  leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUncheckedUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepCreateManyAgentInput = {
@@ -1160,6 +1503,7 @@ export type TaskStepCreateManyAgentInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
 }
 
@@ -1182,9 +1526,12 @@ export type TaskStepUpdateWithoutAgentInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutStepsNestedInput
   executions?: Prisma.StepExecutionUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepUncheckedUpdateWithoutAgentInput = {
@@ -1207,8 +1554,11 @@ export type TaskStepUncheckedUpdateWithoutAgentInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUncheckedUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepUncheckedUpdateManyWithoutAgentInput = {
@@ -1231,6 +1581,7 @@ export type TaskStepUncheckedUpdateManyWithoutAgentInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1254,6 +1605,7 @@ export type TaskStepCreateManyTaskInput = {
   timeoutMs?: number
   leasedAt?: Date | string | null
   leasedBy?: string | null
+  requiredSignOffs?: number
   createdAt?: Date | string
 }
 
@@ -1276,9 +1628,12 @@ export type TaskStepUpdateWithoutTaskInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   agent?: Prisma.AgentUpdateOneWithoutTaskStepsNestedInput
   executions?: Prisma.StepExecutionUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepUncheckedUpdateWithoutTaskInput = {
@@ -1301,8 +1656,11 @@ export type TaskStepUncheckedUpdateWithoutTaskInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executions?: Prisma.StepExecutionUncheckedUpdateManyWithoutStepNestedInput
+  reviews?: Prisma.StepReviewUncheckedUpdateManyWithoutStepNestedInput
+  artifacts?: Prisma.StepArtifactUncheckedUpdateManyWithoutStepNestedInput
 }
 
 export type TaskStepUncheckedUpdateManyWithoutTaskInput = {
@@ -1325,6 +1683,7 @@ export type TaskStepUncheckedUpdateManyWithoutTaskInput = {
   timeoutMs?: Prisma.IntFieldUpdateOperationsInput | number
   leasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   leasedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSignOffs?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1335,10 +1694,14 @@ export type TaskStepUncheckedUpdateManyWithoutTaskInput = {
 
 export type TaskStepCountOutputType = {
   executions: number
+  reviews: number
+  artifacts: number
 }
 
 export type TaskStepCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   executions?: boolean | TaskStepCountOutputTypeCountExecutionsArgs
+  reviews?: boolean | TaskStepCountOutputTypeCountReviewsArgs
+  artifacts?: boolean | TaskStepCountOutputTypeCountArtifactsArgs
 }
 
 /**
@@ -1356,6 +1719,20 @@ export type TaskStepCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Ext
  */
 export type TaskStepCountOutputTypeCountExecutionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.StepExecutionWhereInput
+}
+
+/**
+ * TaskStepCountOutputType without action
+ */
+export type TaskStepCountOutputTypeCountReviewsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.StepReviewWhereInput
+}
+
+/**
+ * TaskStepCountOutputType without action
+ */
+export type TaskStepCountOutputTypeCountArtifactsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.StepArtifactWhereInput
 }
 
 
@@ -1380,10 +1757,13 @@ export type TaskStepSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   timeoutMs?: boolean
   leasedAt?: boolean
   leasedBy?: boolean
+  requiredSignOffs?: boolean
   createdAt?: boolean
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
   executions?: boolean | Prisma.TaskStep$executionsArgs<ExtArgs>
+  reviews?: boolean | Prisma.TaskStep$reviewsArgs<ExtArgs>
+  artifacts?: boolean | Prisma.TaskStep$artifactsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskStepCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["taskStep"]>
 
@@ -1408,6 +1788,7 @@ export type TaskStepSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   timeoutMs?: boolean
   leasedAt?: boolean
   leasedBy?: boolean
+  requiredSignOffs?: boolean
   createdAt?: boolean
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
@@ -1434,6 +1815,7 @@ export type TaskStepSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   timeoutMs?: boolean
   leasedAt?: boolean
   leasedBy?: boolean
+  requiredSignOffs?: boolean
   createdAt?: boolean
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
@@ -1460,14 +1842,17 @@ export type TaskStepSelectScalar = {
   timeoutMs?: boolean
   leasedAt?: boolean
   leasedBy?: boolean
+  requiredSignOffs?: boolean
   createdAt?: boolean
 }
 
-export type TaskStepOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "taskId" | "order" | "agentId" | "humanLabel" | "mode" | "instructions" | "autoContinue" | "status" | "output" | "error" | "startedAt" | "completedAt" | "rejectionNote" | "attempts" | "maxRetries" | "retryDelayMs" | "timeoutMs" | "leasedAt" | "leasedBy" | "createdAt", ExtArgs["result"]["taskStep"]>
+export type TaskStepOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "taskId" | "order" | "agentId" | "humanLabel" | "mode" | "instructions" | "autoContinue" | "status" | "output" | "error" | "startedAt" | "completedAt" | "rejectionNote" | "attempts" | "maxRetries" | "retryDelayMs" | "timeoutMs" | "leasedAt" | "leasedBy" | "requiredSignOffs" | "createdAt", ExtArgs["result"]["taskStep"]>
 export type TaskStepInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.TaskStep$agentArgs<ExtArgs>
   executions?: boolean | Prisma.TaskStep$executionsArgs<ExtArgs>
+  reviews?: boolean | Prisma.TaskStep$reviewsArgs<ExtArgs>
+  artifacts?: boolean | Prisma.TaskStep$artifactsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskStepCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TaskStepIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1485,6 +1870,8 @@ export type $TaskStepPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     task: Prisma.$TaskPayload<ExtArgs>
     agent: Prisma.$AgentPayload<ExtArgs> | null
     executions: Prisma.$StepExecutionPayload<ExtArgs>[]
+    reviews: Prisma.$StepReviewPayload<ExtArgs>[]
+    artifacts: Prisma.$StepArtifactPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1507,6 +1894,7 @@ export type $TaskStepPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     timeoutMs: number
     leasedAt: Date | null
     leasedBy: string | null
+    requiredSignOffs: number
     createdAt: Date
   }, ExtArgs["result"]["taskStep"]>
   composites: {}
@@ -1905,6 +2293,8 @@ export interface Prisma__TaskStepClient<T, Null = never, ExtArgs extends runtime
   task<T extends Prisma.TaskDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskDefaultArgs<ExtArgs>>): Prisma.Prisma__TaskClient<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   agent<T extends Prisma.TaskStep$agentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskStep$agentArgs<ExtArgs>>): Prisma.Prisma__AgentClient<runtime.Types.Result.GetResult<Prisma.$AgentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   executions<T extends Prisma.TaskStep$executionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskStep$executionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$StepExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reviews<T extends Prisma.TaskStep$reviewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskStep$reviewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$StepReviewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  artifacts<T extends Prisma.TaskStep$artifactsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskStep$artifactsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$StepArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1954,6 +2344,7 @@ export interface TaskStepFieldRefs {
   readonly timeoutMs: Prisma.FieldRef<"TaskStep", 'Int'>
   readonly leasedAt: Prisma.FieldRef<"TaskStep", 'DateTime'>
   readonly leasedBy: Prisma.FieldRef<"TaskStep", 'String'>
+  readonly requiredSignOffs: Prisma.FieldRef<"TaskStep", 'Int'>
   readonly createdAt: Prisma.FieldRef<"TaskStep", 'DateTime'>
 }
     
@@ -2394,6 +2785,54 @@ export type TaskStep$executionsArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.StepExecutionScalarFieldEnum | Prisma.StepExecutionScalarFieldEnum[]
+}
+
+/**
+ * TaskStep.reviews
+ */
+export type TaskStep$reviewsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the StepReview
+   */
+  select?: Prisma.StepReviewSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the StepReview
+   */
+  omit?: Prisma.StepReviewOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.StepReviewInclude<ExtArgs> | null
+  where?: Prisma.StepReviewWhereInput
+  orderBy?: Prisma.StepReviewOrderByWithRelationInput | Prisma.StepReviewOrderByWithRelationInput[]
+  cursor?: Prisma.StepReviewWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.StepReviewScalarFieldEnum | Prisma.StepReviewScalarFieldEnum[]
+}
+
+/**
+ * TaskStep.artifacts
+ */
+export type TaskStep$artifactsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the StepArtifact
+   */
+  select?: Prisma.StepArtifactSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the StepArtifact
+   */
+  omit?: Prisma.StepArtifactOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.StepArtifactInclude<ExtArgs> | null
+  where?: Prisma.StepArtifactWhereInput
+  orderBy?: Prisma.StepArtifactOrderByWithRelationInput | Prisma.StepArtifactOrderByWithRelationInput[]
+  cursor?: Prisma.StepArtifactWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.StepArtifactScalarFieldEnum | Prisma.StepArtifactScalarFieldEnum[]
 }
 
 /**

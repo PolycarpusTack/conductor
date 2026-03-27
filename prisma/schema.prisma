@@ -177,6 +177,7 @@ model TaskStep {
   createdAt     DateTime  @default(now())
   executions    StepExecution[]
   reviews       StepReview[]
+  artifacts     StepArtifact[]
 
   @@unique([taskId, order])
 }
@@ -196,7 +197,35 @@ model StepExecution {
   completedAt   DateTime?
   createdAt     DateTime  @default(now())
 
+  toolCalls     ToolCallTrace[]
+
   @@unique([stepId, attempt])
+}
+
+model ToolCallTrace {
+  id            String    @id @default(cuid())
+  executionId   String
+  execution     StepExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  toolName      String
+  args          String?   // JSON
+  result        String?   // truncated
+  durationMs    Int?
+  error         String?
+  createdAt     DateTime  @default(now())
+}
+
+model StepArtifact {
+  id            String    @id @default(cuid())
+  stepId        String
+  step          TaskStep  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  executionId   String?
+  type          String    // text, code, diff, url, image, file, json, log, test_result
+  label         String    // human-readable name
+  content       String?   // inline content (text, code, JSON, diff)
+  url           String?   // external URL (image, file download, screenshot)
+  mimeType      String?   // e.g., "application/json", "image/png"
+  metadata      String?   // JSON — extra info
+  createdAt     DateTime  @default(now())
 }
 
 model StepReview {

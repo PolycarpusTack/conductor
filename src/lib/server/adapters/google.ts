@@ -111,11 +111,11 @@ export const googleAdapter: RuntimeAdapter = {
       for (const part of functionCallParts) {
         const { name, args } = part.functionCall as { name: string; args: Record<string, unknown> }
         console.log(`[Dispatch] Executing tool: ${name}`, args)
-        const result = await executeMcpTool(name, args, params.mcpConnectionIds!)
+        const mcpResult = await executeMcpTool(name, args, params.mcpConnectionIds!)
         functionResponseParts.push({
           functionResponse: {
             name,
-            response: { content: result },
+            response: { content: mcpResult.text },
           },
         })
       }

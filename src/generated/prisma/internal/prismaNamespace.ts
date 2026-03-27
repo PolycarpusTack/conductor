@@ -393,7 +393,10 @@ export const ModelName = {
   ProjectMcpConnection: 'ProjectMcpConnection',
   ChainTemplate: 'ChainTemplate',
   TaskStep: 'TaskStep',
-  StepExecution: 'StepExecution'
+  StepExecution: 'StepExecution',
+  ToolCallTrace: 'ToolCallTrace',
+  StepArtifact: 'StepArtifact',
+  StepReview: 'StepReview'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -409,7 +412,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "agent" | "task" | "activityLog" | "projectMode" | "projectRuntime" | "projectMcpConnection" | "chainTemplate" | "taskStep" | "stepExecution"
+    modelProps: "project" | "agent" | "task" | "activityLog" | "projectMode" | "projectRuntime" | "projectMcpConnection" | "chainTemplate" | "taskStep" | "stepExecution" | "toolCallTrace" | "stepArtifact" | "stepReview"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1153,6 +1156,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ToolCallTrace: {
+      payload: Prisma.$ToolCallTracePayload<ExtArgs>
+      fields: Prisma.ToolCallTraceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ToolCallTraceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ToolCallTraceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>
+        }
+        findFirst: {
+          args: Prisma.ToolCallTraceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ToolCallTraceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>
+        }
+        findMany: {
+          args: Prisma.ToolCallTraceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>[]
+        }
+        create: {
+          args: Prisma.ToolCallTraceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>
+        }
+        createMany: {
+          args: Prisma.ToolCallTraceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ToolCallTraceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>[]
+        }
+        delete: {
+          args: Prisma.ToolCallTraceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>
+        }
+        update: {
+          args: Prisma.ToolCallTraceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>
+        }
+        deleteMany: {
+          args: Prisma.ToolCallTraceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ToolCallTraceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ToolCallTraceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>[]
+        }
+        upsert: {
+          args: Prisma.ToolCallTraceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallTracePayload>
+        }
+        aggregate: {
+          args: Prisma.ToolCallTraceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateToolCallTrace>
+        }
+        groupBy: {
+          args: Prisma.ToolCallTraceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ToolCallTraceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ToolCallTraceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ToolCallTraceCountAggregateOutputType> | number
+        }
+      }
+    }
+    StepArtifact: {
+      payload: Prisma.$StepArtifactPayload<ExtArgs>
+      fields: Prisma.StepArtifactFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.StepArtifactFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.StepArtifactFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>
+        }
+        findFirst: {
+          args: Prisma.StepArtifactFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.StepArtifactFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>
+        }
+        findMany: {
+          args: Prisma.StepArtifactFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>[]
+        }
+        create: {
+          args: Prisma.StepArtifactCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>
+        }
+        createMany: {
+          args: Prisma.StepArtifactCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.StepArtifactCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>[]
+        }
+        delete: {
+          args: Prisma.StepArtifactDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>
+        }
+        update: {
+          args: Prisma.StepArtifactUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>
+        }
+        deleteMany: {
+          args: Prisma.StepArtifactDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.StepArtifactUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.StepArtifactUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>[]
+        }
+        upsert: {
+          args: Prisma.StepArtifactUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepArtifactPayload>
+        }
+        aggregate: {
+          args: Prisma.StepArtifactAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateStepArtifact>
+        }
+        groupBy: {
+          args: Prisma.StepArtifactGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.StepArtifactGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.StepArtifactCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.StepArtifactCountAggregateOutputType> | number
+        }
+      }
+    }
+    StepReview: {
+      payload: Prisma.$StepReviewPayload<ExtArgs>
+      fields: Prisma.StepReviewFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.StepReviewFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.StepReviewFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>
+        }
+        findFirst: {
+          args: Prisma.StepReviewFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.StepReviewFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>
+        }
+        findMany: {
+          args: Prisma.StepReviewFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>[]
+        }
+        create: {
+          args: Prisma.StepReviewCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>
+        }
+        createMany: {
+          args: Prisma.StepReviewCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.StepReviewCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>[]
+        }
+        delete: {
+          args: Prisma.StepReviewDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>
+        }
+        update: {
+          args: Prisma.StepReviewUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>
+        }
+        deleteMany: {
+          args: Prisma.StepReviewDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.StepReviewUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.StepReviewUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>[]
+        }
+        upsert: {
+          args: Prisma.StepReviewUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StepReviewPayload>
+        }
+        aggregate: {
+          args: Prisma.StepReviewAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateStepReview>
+        }
+        groupBy: {
+          args: Prisma.StepReviewGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.StepReviewGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.StepReviewCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.StepReviewCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1346,6 +1571,7 @@ export const TaskStepScalarFieldEnum = {
   timeoutMs: 'timeoutMs',
   leasedAt: 'leasedAt',
   leasedBy: 'leasedBy',
+  requiredSignOffs: 'requiredSignOffs',
   createdAt: 'createdAt'
 } as const
 
@@ -1368,6 +1594,48 @@ export const StepExecutionScalarFieldEnum = {
 } as const
 
 export type StepExecutionScalarFieldEnum = (typeof StepExecutionScalarFieldEnum)[keyof typeof StepExecutionScalarFieldEnum]
+
+
+export const ToolCallTraceScalarFieldEnum = {
+  id: 'id',
+  executionId: 'executionId',
+  toolName: 'toolName',
+  args: 'args',
+  result: 'result',
+  durationMs: 'durationMs',
+  error: 'error',
+  createdAt: 'createdAt'
+} as const
+
+export type ToolCallTraceScalarFieldEnum = (typeof ToolCallTraceScalarFieldEnum)[keyof typeof ToolCallTraceScalarFieldEnum]
+
+
+export const StepArtifactScalarFieldEnum = {
+  id: 'id',
+  stepId: 'stepId',
+  executionId: 'executionId',
+  type: 'type',
+  label: 'label',
+  content: 'content',
+  url: 'url',
+  mimeType: 'mimeType',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+} as const
+
+export type StepArtifactScalarFieldEnum = (typeof StepArtifactScalarFieldEnum)[keyof typeof StepArtifactScalarFieldEnum]
+
+
+export const StepReviewScalarFieldEnum = {
+  id: 'id',
+  stepId: 'stepId',
+  reviewer: 'reviewer',
+  decision: 'decision',
+  note: 'note',
+  createdAt: 'createdAt'
+} as const
+
+export type StepReviewScalarFieldEnum = (typeof StepReviewScalarFieldEnum)[keyof typeof StepReviewScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1545,6 +1813,9 @@ export type GlobalOmitConfig = {
   chainTemplate?: Prisma.ChainTemplateOmit
   taskStep?: Prisma.TaskStepOmit
   stepExecution?: Prisma.StepExecutionOmit
+  toolCallTrace?: Prisma.ToolCallTraceOmit
+  stepArtifact?: Prisma.StepArtifactOmit
+  stepReview?: Prisma.StepReviewOmit
 }
 
 /* Types for Logging */

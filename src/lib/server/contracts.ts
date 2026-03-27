@@ -213,3 +213,12 @@ export const rejectStepSchema = z.object({
 export const updateChainTemplateSchema = createChainTemplateSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
+
+export const stepArtifactSchema = z.object({
+  type: z.enum(['text', 'code', 'diff', 'url', 'image', 'file', 'json', 'log', 'test_result']),
+  label: z.string().trim().min(1).max(240),
+  content: z.string().max(50000).optional(),
+  url: z.string().url().max(2000).optional(),
+  mimeType: z.string().max(120).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})

@@ -88,20 +88,21 @@ export const anthropicAdapter: RuntimeAdapter = {
       const toolResults: Array<{ type: string; tool_use_id: string; content: string }> = []
       for (const toolBlock of toolUseBlocks) {
         console.log(`[Dispatch] Executing tool: ${toolBlock.name}`, toolBlock.input)
-        let result: string
+        let resultText: string
         try {
-          result = await executeMcpTool(
+          const mcpResult = await executeMcpTool(
             toolBlock.name,
             toolBlock.input,
             params.mcpConnectionIds!,
           )
+          resultText = mcpResult.text
         } catch (err) {
-          result = `Error executing tool ${toolBlock.name}: ${err instanceof Error ? err.message : String(err)}`
+          resultText = `Error executing tool ${toolBlock.name}: ${err instanceof Error ? err.message : String(err)}`
         }
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolBlock.id,
-          content: result,
+          content: resultText,
         })
       }
 

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Clock, RotateCcw } from 'lucide-react'
+import { ArtifactViewer } from '@/components/artifact-viewer'
 
 interface TaskStep {
   id: string
@@ -57,6 +58,7 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
   const [actionLoading, setActionLoading] = useState(false)
   const [executionHistory, setExecutionHistory] = useState<Record<string, any[]>>({})
   const [expandedExecutions, setExpandedExecutions] = useState<Set<string>>(new Set())
+  const [stepArtifacts, setStepArtifacts] = useState<Record<string, any[]>>({})
 
   const fetchExecutions = useCallback(async (stepId: string) => {
     if (executionHistory[stepId]) {
@@ -98,6 +100,20 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
             }
           })
           setExpandedSteps(autoExpand)
+
+          // Fetch artifacts for all steps that have output (likely have artifacts)
+          for (const s of data) {
+            if (s.status === 'done' || s.output) {
+              fetch(`/api/tasks/${taskId}/steps/${s.id}/artifacts`, { cache: 'no-store' })
+                .then(r => r.ok ? r.json() : [])
+                .then(artifacts => {
+                  if (artifacts.length > 0) {
+                    setStepArtifacts(prev => ({ ...prev, [s.id]: artifacts }))
+                  }
+                })
+                .catch(() => {})
+            }
+          }
         }
       } catch (err) {
         console.error('Error fetching steps:', err)
@@ -273,6 +289,11 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
                             {step.output}
                           </div>
                         </div>
+                      )}
+
+                      {/* Artifacts */}
+                      {stepArtifacts[step.id] && stepArtifacts[step.id].length > 0 && (
+                        <ArtifactViewer artifacts={stepArtifacts[step.id]} />
                       )}
 
                       {/* Action buttons */}

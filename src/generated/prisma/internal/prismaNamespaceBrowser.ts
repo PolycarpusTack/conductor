@@ -60,7 +60,10 @@ export const ModelName = {
   ProjectMcpConnection: 'ProjectMcpConnection',
   ChainTemplate: 'ChainTemplate',
   TaskStep: 'TaskStep',
-  StepExecution: 'StepExecution'
+  StepExecution: 'StepExecution',
+  ToolCallTrace: 'ToolCallTrace',
+  StepArtifact: 'StepArtifact',
+  StepReview: 'StepReview'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -233,6 +236,7 @@ export const TaskStepScalarFieldEnum = {
   timeoutMs: 'timeoutMs',
   leasedAt: 'leasedAt',
   leasedBy: 'leasedBy',
+  requiredSignOffs: 'requiredSignOffs',
   createdAt: 'createdAt'
 } as const
 
@@ -255,6 +259,48 @@ export const StepExecutionScalarFieldEnum = {
 } as const
 
 export type StepExecutionScalarFieldEnum = (typeof StepExecutionScalarFieldEnum)[keyof typeof StepExecutionScalarFieldEnum]
+
+
+export const ToolCallTraceScalarFieldEnum = {
+  id: 'id',
+  executionId: 'executionId',
+  toolName: 'toolName',
+  args: 'args',
+  result: 'result',
+  durationMs: 'durationMs',
+  error: 'error',
+  createdAt: 'createdAt'
+} as const
+
+export type ToolCallTraceScalarFieldEnum = (typeof ToolCallTraceScalarFieldEnum)[keyof typeof ToolCallTraceScalarFieldEnum]
+
+
+export const StepArtifactScalarFieldEnum = {
+  id: 'id',
+  stepId: 'stepId',
+  executionId: 'executionId',
+  type: 'type',
+  label: 'label',
+  content: 'content',
+  url: 'url',
+  mimeType: 'mimeType',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+} as const
+
+export type StepArtifactScalarFieldEnum = (typeof StepArtifactScalarFieldEnum)[keyof typeof StepArtifactScalarFieldEnum]
+
+
+export const StepReviewScalarFieldEnum = {
+  id: 'id',
+  stepId: 'stepId',
+  reviewer: 'reviewer',
+  decision: 'decision',
+  note: 'note',
+  createdAt: 'createdAt'
+} as const
+
+export type StepReviewScalarFieldEnum = (typeof StepReviewScalarFieldEnum)[keyof typeof StepReviewScalarFieldEnum]
 
 
 export const SortOrder = {

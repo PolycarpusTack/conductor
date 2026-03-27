@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { updateAgentHeartbeat, toRealtimeActivity, claimOrStartTask } from '@/lib/server/agent-helpers'
-import { agentTaskActionSchema, taskStatusSchema } from '@/lib/server/contracts'
+import { agentTaskActionSchema, taskStatusSchema, stepArtifactSchema } from '@/lib/server/contracts'
 import { advanceChain } from '@/lib/server/dispatch'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
@@ -237,6 +237,27 @@ export async function PUT(
           where: { id: activeStep.id },
           data: { status: 'done', output: output || logDetails || '', completedAt: new Date() },
         })
+
+        // Save artifacts if provided
+        if (Array.isArray(body.artifacts)) {
+          for (const raw of body.artifacts) {
+            const parsed = stepArtifactSchema.safeParse(raw)
+            if (parsed.success) {
+              await db.stepArtifact.create({
+                data: {
+                  stepId: activeStep.id,
+                  type: parsed.data.type,
+                  label: parsed.data.label,
+                  content: parsed.data.content || null,
+                  url: parsed.data.url || null,
+                  mimeType: parsed.data.mimeType || null,
+                  metadata: parsed.data.metadata ? JSON.stringify(parsed.data.metadata) : null,
+                },
+              })
+            }
+          }
+        }
+
         advanceChain(id, agent.projectId).catch(console.error)
       }
     }

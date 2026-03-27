@@ -54,6 +54,7 @@ import { SettingsModes } from '@/components/settings-modes'
 import { SettingsRuntimes } from '@/components/settings-runtimes'
 import { SettingsMcp } from '@/components/settings-mcp'
 import { SettingsTemplates } from '@/components/settings-templates'
+import { ObservabilityDashboard } from '@/components/observability-dashboard'
 import { AgentCreationModal } from '@/components/agent-creation-modal'
 import { ChainBuilder } from '@/components/chain-builder'
 import { StepOutputViewer } from '@/components/step-output-viewer'
@@ -157,7 +158,7 @@ export default function Home() {
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
-  const [settingsTab, setSettingsTab] = useState<'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | null>(null)
+  const [settingsTab, setSettingsTab] = useState<'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | null>(null)
   const [expandedAgentStats, setExpandedAgentStats] = useState<string | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -2194,6 +2195,7 @@ export default function Home() {
               <TabsTrigger value="runtimes" className="text-xs">Runtimes</TabsTrigger>
               <TabsTrigger value="mcp" className="text-xs">MCP</TabsTrigger>
               <TabsTrigger value="templates" className="text-xs">Templates</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
             </TabsList>
             
             <div className="mt-4 overflow-y-auto max-h-[50vh]">
@@ -2450,6 +2452,12 @@ export default function Home() {
                     modes={projectModes}
                     onTemplatesChange={setChainTemplates}
                   />
+                )}
+              </TabsContent>
+
+              <TabsContent value="analytics" className="mt-0">
+                {currentProject && (
+                  <ObservabilityDashboard projectId={currentProject.id} />
                 )}
               </TabsContent>
             </div>

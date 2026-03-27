@@ -18,6 +18,7 @@ export interface DispatchParams {
   tools?: McpTool[]
   mcpConnectionIds?: string[]
   maxToolRounds?: number
+  executionId?: string  // For tool call tracing
 }
 
 export interface DispatchResult {
