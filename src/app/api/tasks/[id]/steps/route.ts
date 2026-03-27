@@ -67,19 +67,24 @@ export async function POST(
       select: { order: true },
     })
 
-    // Verify agent belongs to the same project as the task
-    if (parsed.data.agentId) {
+    // Verify agent and fallback agent belong to the same project as the task
+    const agentIdsToValidate = [parsed.data.agentId, parsed.data.fallbackAgentId].filter((id): id is string => !!id)
+    if (agentIdsToValidate.length > 0) {
       const taskWithProject = await db.task.findUnique({
         where: { id },
         select: { projectId: true },
       })
-      const stepAgent = await db.agent.findUnique({
-        where: { id: parsed.data.agentId },
-        select: { projectId: true },
+      if (!taskWithProject) {
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+      }
+      const agents = await db.agent.findMany({
+        where: { id: { in: agentIdsToValidate } },
+        select: { id: true, projectId: true },
       })
-      if (!stepAgent || !taskWithProject || stepAgent.projectId !== taskWithProject.projectId) {
+      const invalidAgent = agents.find(a => a.projectId !== taskWithProject.projectId)
+      if (invalidAgent || agents.length !== new Set(agentIdsToValidate).size) {
         return NextResponse.json(
-          { error: 'Step agent must belong to the same project as the task' },
+          { error: 'Step agents (including fallback) must belong to the same project as the task' },
           { status: 400 },
         )
       }
@@ -102,6 +107,7 @@ export async function POST(
         isParallelRoot: parsed.data.isParallelRoot ?? false,
         isMergePoint: parsed.data.isMergePoint ?? false,
         fallbackAgentId: parsed.data.fallbackAgentId || null,
+        requiredSignOffs: parsed.data.requiredSignOffs ?? 1,
       },
       include: {
         agent: { select: { id: true, name: true, emoji: true } },

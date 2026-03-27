@@ -71,20 +71,22 @@ export async function POST(request: Request) {
 
     const steps = parsed.data.steps
 
-    // Validate step agents before transaction
+    // Validate step agents (including fallback agents) before transaction
     if (steps && steps.length > 0) {
-      const stepAgentIds = steps
-        .map(s => s.agentId)
-        .filter((id): id is string => !!id)
+      const stepAgentIds = [
+        ...steps.map(s => s.agentId),
+        ...steps.map(s => s.fallbackAgentId),
+      ].filter((id): id is string => !!id)
       if (stepAgentIds.length > 0) {
+        const uniqueIds = [...new Set(stepAgentIds)]
         const agents = await db.agent.findMany({
-          where: { id: { in: stepAgentIds } },
+          where: { id: { in: uniqueIds } },
           select: { id: true, projectId: true },
         })
         const invalidAgent = agents.find(a => a.projectId !== projectId)
-        if (invalidAgent || agents.length !== new Set(stepAgentIds).size) {
+        if (invalidAgent || agents.length !== uniqueIds.length) {
           return NextResponse.json(
-            { error: 'All step agents must belong to the same project as the task' },
+            { error: 'All step agents (including fallback agents) must belong to the same project' },
             { status: 400 },
           )
         }
@@ -115,6 +117,7 @@ export async function POST(request: Request) {
       })
 
       if (steps && steps.length > 0) {
+        // Create steps without edge data first
         await tx.taskStep.createMany({
           data: steps.map((step, index) => ({
             taskId: created.id,
@@ -127,13 +130,55 @@ export async function POST(request: Request) {
             maxRetries: step.maxRetries ?? 2,
             retryDelayMs: step.retryDelayMs ?? 5000,
             timeoutMs: step.timeoutMs ?? 300000,
-            nextSteps: step.nextSteps ? JSON.stringify(step.nextSteps) : null,
-            prevSteps: step.prevSteps ? JSON.stringify(step.prevSteps) : null,
             isParallelRoot: step.isParallelRoot ?? false,
             isMergePoint: step.isMergePoint ?? false,
             fallbackAgentId: step.fallbackAgentId || null,
+            requiredSignOffs: step.requiredSignOffs ?? 1,
           })),
         })
+
+        // If any step has DAG edges, remap client IDs to real DB IDs
+        const hasDagEdges = steps.some(s => s.nextSteps?.length || s.prevSteps?.length)
+        if (hasDagEdges) {
+          const createdSteps = await tx.taskStep.findMany({
+            where: { taskId: created.id },
+            select: { id: true, order: true },
+            orderBy: { order: 'asc' },
+          })
+
+          // Build mapping: client ID (e.g. "step_0") → real DB ID
+          // Client IDs follow the pattern step_<index> where index is 0-based
+          const idMap = new Map<string, string>()
+          for (let i = 0; i < steps.length; i++) {
+            const clientId = `step_${i}`
+            if (createdSteps[i]) {
+              idMap.set(clientId, createdSteps[i].id)
+            }
+          }
+
+          // Update each step's edges with remapped IDs
+          for (let i = 0; i < steps.length; i++) {
+            const step = steps[i]
+            const dbStep = createdSteps[i]
+            if (!dbStep) continue
+
+            const remappedNext = step.nextSteps?.map(edge => ({
+              ...edge,
+              targetStepId: idMap.get(edge.targetStepId) || edge.targetStepId,
+            }))
+            const remappedPrev = step.prevSteps?.map(id => idMap.get(id) || id)
+
+            if (remappedNext?.length || remappedPrev?.length) {
+              await tx.taskStep.update({
+                where: { id: dbStep.id },
+                data: {
+                  nextSteps: remappedNext?.length ? JSON.stringify(remappedNext) : null,
+                  prevSteps: remappedPrev?.length ? JSON.stringify(remappedPrev) : null,
+                },
+              })
+            }
+          }
+        }
       }
 
       return tx.task.findUniqueOrThrow({

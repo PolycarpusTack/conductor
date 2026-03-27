@@ -159,7 +159,7 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
   }
 
   const handleApprove = (stepId: string) => {
-    handleStepAction(stepId, { status: 'done' })
+    handleStepAction(stepId, { action: 'review', decision: 'approved', reviewer: 'admin' })
   }
 
   const handleRetry = (stepId: string) => {

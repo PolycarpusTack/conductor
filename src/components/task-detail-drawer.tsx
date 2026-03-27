@@ -335,7 +335,7 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <Button size="sm" className="text-xs h-7 bg-[var(--op-teal)] text-background hover:bg-[var(--op-teal)]/90"
-                                    onClick={() => handleStepAction(step.id, { status: 'done' })} disabled={actionLoading}>
+                                    onClick={() => handleStepAction(step.id, { action: 'review', decision: 'approved', reviewer: 'admin' })} disabled={actionLoading}>
                                     <CheckCircle className="h-3 w-3 mr-1" /> Approve
                                   </Button>
                                   <Button size="sm" variant="outline" className="text-xs h-7 border-[var(--op-amber-dim)] text-[var(--op-amber)]"

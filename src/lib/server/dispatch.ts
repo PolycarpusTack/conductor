@@ -343,6 +343,7 @@ async function advanceChainLinear(
   }
 
   await activateStep(taskId, projectId, nextStep, lastDoneStep.id)
+  await resolveTaskStatus(taskId, projectId)
 }
 
 async function advanceChainDag(
@@ -418,6 +419,9 @@ async function advanceChainDag(
 
     await activateStep(taskId, projectId, targetStep, completedStep.id)
   }
+
+  // Resolve task status after all activations
+  await resolveTaskStatus(taskId, projectId)
 }
 
 async function activateStep(
@@ -443,14 +447,37 @@ async function activateStep(
     toStepId: step.id,
   })
 
-  if (step.mode === 'human') {
-    await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
+  // Don't set task status here — let the caller resolve it after all activations
+}
+
+/**
+ * Compute the correct task status from its steps.
+ * - Any active agent step with a runtime → IN_PROGRESS
+ * - Only human/no-runtime active steps → WAITING
+ * - All done/skipped → DONE
+ */
+async function resolveTaskStatus(taskId: string, projectId: string) {
+  const steps = await db.taskStep.findMany({
+    where: { taskId },
+    select: { status: true, mode: true, agent: { select: { runtimeId: true } } },
+  })
+
+  const allDone = steps.every(s => s.status === 'done' || s.status === 'skipped')
+  if (allDone) {
+    await db.task.update({
+      where: { id: taskId },
+      data: { status: 'DONE', completedAt: new Date() },
+    })
+    await broadcastProjectEvent(projectId, 'chain-completed', { taskId })
     return
   }
 
-  if (step.agent?.runtimeId) {
+  const hasActiveAgentStep = steps.some(
+    s => s.status === 'active' && s.mode !== 'human' && s.agent?.runtimeId
+  )
+
+  if (hasActiveAgentStep) {
     await db.task.update({ where: { id: taskId }, data: { status: 'IN_PROGRESS' } })
-    // Step is active — the queue will pick it up on next poll
   } else {
     await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
   }
@@ -597,11 +624,8 @@ export async function startChain(taskId: string, projectId: string) {
       taskId,
       stepId: rootStep.id,
     })
-
-    if (rootStep.mode === 'human') {
-      await db.task.update({ where: { id: taskId }, data: { status: 'WAITING' } })
-    } else if (rootStep.agent?.runtimeId) {
-      await db.task.update({ where: { id: taskId }, data: { status: 'IN_PROGRESS' } })
-    }
   }
+
+  // Resolve task status after all root activations
+  await resolveTaskStatus(taskId, projectId)
 }

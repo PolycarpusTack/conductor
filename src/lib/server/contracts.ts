@@ -96,6 +96,7 @@ export const taskStepSchema = z.object({
   isParallelRoot: z.boolean().optional(),
   isMergePoint: z.boolean().optional(),
   fallbackAgentId: z.string().trim().min(1).optional().nullable(),
+  requiredSignOffs: z.number().int().min(1).max(10).optional(),
 })
 
 export const createTaskSchema = z.object({

@@ -38,22 +38,39 @@ export async function getProjectStats(projectId: string) {
 }
 
 export async function getAgentScorecard(projectId: string) {
+  // Single query: fetch all executions for the project with their agent info
+  const executions = await db.stepExecution.findMany({
+    where: { step: { task: { projectId } } },
+    select: {
+      durationMs: true,
+      tokensUsed: true,
+      cost: true,
+      status: true,
+      step: { select: { agentId: true } },
+    },
+  })
+
   const agents = await db.agent.findMany({
     where: { projectId },
     select: { id: true, name: true, emoji: true },
   })
 
-  const scorecards = await Promise.all(agents.map(async (agent) => {
-    const executions = await db.stepExecution.findMany({
-      where: { step: { agent: { id: agent.id } } },
-      select: { durationMs: true, tokensUsed: true, cost: true, status: true },
-    })
+  // Group executions by agent
+  const agentMap = new Map<string, typeof executions>()
+  for (const exec of executions) {
+    if (!exec.step.agentId) continue
+    const list = agentMap.get(exec.step.agentId) || []
+    list.push(exec)
+    agentMap.set(exec.step.agentId, list)
+  }
 
-    const succeeded = executions.filter(e => e.status === 'succeeded').length
-    const failed = executions.filter(e => e.status === 'failed' || e.status === 'timed_out').length
-    const totalTokens = executions.reduce((sum, e) => sum + (e.tokensUsed || 0), 0)
-    const totalCost = executions.reduce((sum, e) => sum + (e.cost || 0), 0)
-    const durations = executions.filter(e => e.durationMs != null).map(e => e.durationMs!)
+  const scorecards = agents.map(agent => {
+    const agentExecs = agentMap.get(agent.id) || []
+    const succeeded = agentExecs.filter(e => e.status === 'succeeded').length
+    const failed = agentExecs.filter(e => e.status === 'failed' || e.status === 'timed_out').length
+    const totalTokens = agentExecs.reduce((sum, e) => sum + (e.tokensUsed || 0), 0)
+    const totalCost = agentExecs.reduce((sum, e) => sum + (e.cost || 0), 0)
+    const durations = agentExecs.filter(e => e.durationMs != null).map(e => e.durationMs!)
     const avgDurationMs = durations.length > 0
       ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
       : 0
@@ -62,58 +79,71 @@ export async function getAgentScorecard(projectId: string) {
       agentId: agent.id,
       agentName: agent.name,
       agentEmoji: agent.emoji,
-      totalExecutions: executions.length,
+      totalExecutions: agentExecs.length,
       succeeded,
       failed,
-      successRate: executions.length > 0 ? Math.round((succeeded / executions.length) * 100) / 100 : 0,
+      successRate: agentExecs.length > 0 ? Math.round((succeeded / agentExecs.length) * 100) / 100 : 0,
       totalTokens,
       totalCost: Math.round(totalCost * 10000) / 10000,
       avgDurationMs,
     }
-  }))
+  })
 
   return scorecards.sort((a, b) => b.totalExecutions - a.totalExecutions)
 }
 
 export async function getRuntimeStats(projectId: string) {
+  // Single query: fetch all executions with their agent's runtime info
+  const executions = await db.stepExecution.findMany({
+    where: { step: { task: { projectId } } },
+    select: {
+      durationMs: true,
+      tokensUsed: true,
+      cost: true,
+      status: true,
+      step: { select: { agent: { select: { runtimeId: true } } } },
+    },
+  })
+
   const runtimes = await db.projectRuntime.findMany({
     where: { projectId },
     select: { id: true, name: true, adapter: true },
   })
 
-  const stats = await Promise.all(runtimes.map(async (runtime) => {
-    const executions = await db.stepExecution.findMany({
-      where: {
-        step: {
-          agent: { runtimeId: runtime.id },
-          task: { projectId },
-        },
-      },
-      select: { durationMs: true, tokensUsed: true, cost: true, status: true },
-    })
+  // Group executions by runtime
+  const runtimeMap = new Map<string, typeof executions>()
+  for (const exec of executions) {
+    const runtimeId = exec.step.agent?.runtimeId
+    if (!runtimeId) continue
+    const list = runtimeMap.get(runtimeId) || []
+    list.push(exec)
+    runtimeMap.set(runtimeId, list)
+  }
 
-    const succeeded = executions.filter(e => e.status === 'succeeded').length
-    const failed = executions.filter(e => e.status === 'failed' || e.status === 'timed_out').length
-    const durations = executions.filter(e => e.durationMs != null).map(e => e.durationMs!)
+  const stats = runtimes.map(runtime => {
+    const rtExecs = runtimeMap.get(runtime.id) || []
+    const succeeded = rtExecs.filter(e => e.status === 'succeeded').length
+    const failed = rtExecs.filter(e => e.status === 'failed' || e.status === 'timed_out').length
+    const durations = rtExecs.filter(e => e.durationMs != null).map(e => e.durationMs!)
     const avgLatencyMs = durations.length > 0
       ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
       : 0
-    const totalTokens = executions.reduce((sum, e) => sum + (e.tokensUsed || 0), 0)
-    const totalCost = executions.reduce((sum, e) => sum + (e.cost || 0), 0)
+    const totalTokens = rtExecs.reduce((sum, e) => sum + (e.tokensUsed || 0), 0)
+    const totalCost = rtExecs.reduce((sum, e) => sum + (e.cost || 0), 0)
 
     return {
       runtimeId: runtime.id,
       runtimeName: runtime.name,
       adapter: runtime.adapter,
-      totalExecutions: executions.length,
+      totalExecutions: rtExecs.length,
       succeeded,
       failed,
-      errorRate: executions.length > 0 ? Math.round((failed / executions.length) * 100) / 100 : 0,
+      errorRate: rtExecs.length > 0 ? Math.round((failed / rtExecs.length) * 100) / 100 : 0,
       avgLatencyMs,
       totalTokens,
       totalCost: Math.round(totalCost * 10000) / 10000,
     }
-  }))
+  })
 
   return stats.sort((a, b) => b.totalExecutions - a.totalExecutions)
 }
