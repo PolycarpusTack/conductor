@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Creation & Task Chain Design</title>
+<style>
+:root {
+  --bg-deep: #0B0F19;
+  --bg-surface: #111827;
+  --bg-raised: #1C2333;
+  --bg-hover: #232E45;
+  --border: #1F2D45;
+  --border-mid: #2E3F5C;
+  --text-1: #F0F4FF;
+  --text-2: #9BAAC4;
+  --text-3: #5E6F8A;
+  --text-dim: #3D4F68;
+  --cobalt: #3805E3;
+  --cobalt-mid: #5B33F0;
+  --neon: #B3FC4F;
+  --amber: #F59E0B;
+  --teal: #2DD4BF;
+  --red: #F87171;
+  --blue: #60A5FA;
+  --purple: #A78BFA;
+  --green: #4ADE80;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-1);
+  padding: 32px;
+  line-height: 1.6;
+}
+
+h1 { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
+h2 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 4px; }
+h3 { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+
+.subtitle { color: var(--text-2); font-size: 14px; margin-bottom: 32px; }
+.section { margin-bottom: 40px; }
+.section-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--cobalt-mid); margin-bottom: 6px; font-weight: 500; }
+
+/* Panels */
+.panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px;
+}
+
+/* Board mockup */
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.col {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 120px;
+}
+
+.col-header {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.col-backlog .col-header { color: var(--text-3); background: rgba(94,111,138,0.1); }
+.col-progress .col-header { color: var(--blue); background: rgba(96,165,250,0.1); }
+.col-waiting .col-header { color: var(--amber); background: rgba(245,158,11,0.1); border: 1px dashed rgba(245,158,11,0.3); }
+.col-review .col-header { color: var(--purple); background: rgba(167,139,250,0.1); }
+.col-done .col-header { color: var(--teal); background: rgba(45,212,191,0.1); }
+
+.task-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.task-card .title { font-weight: 600; font-size: 11px; margin-bottom: 3px; }
+.task-card .meta { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-3); }
+.task-card .chain-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 9px; padding: 1px 6px; border-radius: 3px; margin-top: 4px; }
+.chain-step-1 { background: rgba(96,165,250,0.15); color: var(--blue); }
+.chain-step-2 { background: rgba(245,158,11,0.15); color: var(--amber); }
+.chain-step-3 { background: rgba(167,139,250,0.15); color: var(--purple); }
+.chain-step-4 { background: rgba(45,212,191,0.15); color: var(--teal); }
+
+/* Chain builder mockup */
+.chain-builder {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.chain-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.chain-step::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  bottom: -9px;
+  width: 2px;
+  height: 9px;
+  background: var(--border-mid);
+}
+
+.chain-step:last-child::before { display: none; }
+
+.step-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.step-1 .step-num { background: rgba(96,165,250,0.2); color: var(--blue); }
+.step-2 .step-num { background: rgba(245,158,11,0.2); color: var(--amber); }
+.step-3 .step-num { background: rgba(167,139,250,0.2); color: var(--purple); }
+.step-4 .step-num { background: rgba(45,212,191,0.2); color: var(--teal); }
+
+.step-content { flex: 1; }
+.step-content .step-title { font-size: 13px; font-weight: 600; }
+.step-content .step-detail { font-size: 11px; color: var(--text-3); font-family: 'JetBrains Mono', monospace; }
+
+.step-agent {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.step-mode {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.mode-analyze { background: rgba(96,165,250,0.15); color: var(--blue); }
+.mode-verify { background: rgba(245,158,11,0.15); color: var(--amber); }
+.mode-develop { background: rgba(74,222,128,0.15); color: var(--green); }
+.mode-human { background: rgba(167,139,250,0.15); color: var(--purple); }
+
+.arrow-down {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 16px;
+  margin: 4px 0;
+}
+
+/* Agent creation mockup */
+.agent-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-group { margin-bottom: 0; }
+.form-group.full { grid-column: 1 / -1; }
+
+.form-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-3);
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.form-input {
+  width: 100%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text-1);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.form-input::placeholder { color: var(--text-dim); }
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  color: var(--text-2);
+}
+
+.tag.active { border-color: var(--cobalt-mid); color: var(--cobalt-mid); background: rgba(91,51,240,0.1); }
+
+.mcp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: rgba(45,212,191,0.08);
+  border: 1px solid rgba(45,212,191,0.2);
+  color: var(--teal);
+}
+
+/* Highlight box */
+.highlight {
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+
+.highlight.info {
+  background: rgba(96,165,250,0.06);
+  border: 1px solid rgba(96,165,250,0.15);
+  border-left: 3px solid var(--blue);
+  color: var(--text-2);
+}
+
+.highlight.key {
+  background: rgba(179,252,79,0.04);
+  border: 1px solid rgba(179,252,79,0.12);
+  border-left: 3px solid var(--neon);
+  color: var(--text-2);
+}
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .two-col, .board, .agent-form { grid-template-columns: 1fr; } }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<h1>AgentBoard — Enhanced Agent Creation & Task Chains</h1>
+<p class="subtitle">Design proposal: Reusable agents + task-level workflow chains with handoffs</p>
+
+<!-- ============ PART 1: THE BIG IDEA ============ -->
+<div class="section">
+  <div class="section-label">Core Concept</div>
+  <h2>Two Separate Concerns, Connected at Task Time</h2>
+
+  <div class="two-col" style="margin-top:16px;">
+    <div class="panel">
+      <div class="panel-header">
+        <span style="font-size:18px;">🤖</span>
+        <div>
+          <h3>Agents = Reusable Identities</h3>
+          <div style="font-size:12px;color:var(--text-3);">Created once, used across many tasks</div>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--text-2);">
+        An agent has a <strong>name, role, MCP connections, and general capabilities</strong>. It's like hiring a team member — they exist in your project and can be assigned to any task.
+      </p>
+      <div class="tag-list" style="margin-top:12px;">
+        <span class="tag active">Support Analyst</span>
+        <span class="tag active">Developer</span>
+        <span class="tag active">Product Analyst</span>
+        <span class="tag active">Documentation Writer</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span style="font-size:18px;">🔗</span>
+        <div>
+          <h3>Tasks = Workflow Chains</h3>
+          <div style="font-size:12px;color:var(--text-3);">Permissions & handoffs defined per-step</div>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--text-2);">
+        Each task can have a <strong>chain of steps</strong>. Each step assigns an agent (or human) with a specific <strong>mode/permission</strong>. When one step finishes, the task moves to WAITING for the next assignee.
+      </p>
+      <div class="tag-list" style="margin-top:12px;">
+        <span class="tag" style="border-color:var(--blue);color:var(--blue);">analyze</span>
+        <span class="tag" style="border-color:var(--amber);color:var(--amber);">verify</span>
+        <span class="tag" style="border-color:var(--green);color:var(--green);">develop</span>
+        <span class="tag" style="border-color:var(--purple);color:var(--purple);">human-review</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PART 2: AGENT CREATION ============ -->
+<div class="section">
+  <div class="section-label">Part 1 — Enhanced Agent Creation</div>
+  <h2>Create Agent Dialog (Enriched)</h2>
+  <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">
+    Same single dialog, but with fields that make agents useful in workflows.
+    From your framework: <strong>Stage 1</strong> (Identity/Persona) + <strong>Stage 3</strong> (Capabilities/MCP).
+  </p>
+
+  <div class="panel">
+    <div class="agent-form">
+      <div class="form-group">
+        <span class="form-label">Name</span>
+        <div class="form-input" style="color:var(--text-1);">Developer Agent</div>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Emoji</span>
+        <div class="form-input" style="text-align:center;font-size:20px;">⚡</div>
+      </div>
+      <div class="form-group full">
+        <span class="form-label">Role</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <span class="tag">Coder</span>
+          <span class="tag active">Developer</span>
+          <span class="tag">Researcher</span>
+          <span class="tag">Writer</span>
+          <span class="tag">QA</span>
+          <span class="tag">Support</span>
+          <span class="tag">Analyst</span>
+          <span class="tag" style="border-style:dashed;">+ Custom</span>
+        </div>
+      </div>
+      <div class="form-group full">
+        <span class="form-label">Description / Mission</span>
+        <div class="form-input" style="min-height:40px;color:var(--text-2);">Implements code changes, reviews PRs, and verifies solutions against the codebase.</div>
+      </div>
+      <div class="form-group full">
+        <span class="form-label">Capabilities (tags)</span>
+        <div class="tag-list">
+          <span class="tag active">python</span>
+          <span class="tag active">typescript</span>
+          <span class="tag active">code-review</span>
+          <span class="tag active">testing</span>
+          <span class="tag" style="border-style:dashed;color:var(--text-dim);">+ add</span>
+        </div>
+      </div>
+      <div class="form-group full">
+        <span class="form-label">MCP Connections</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="mcp-badge">🔌 github/codebase</span>
+          <span class="mcp-badge">🔌 jira/tickets</span>
+          <span class="tag" style="border-style:dashed;color:var(--text-dim);">+ connect</span>
+        </div>
+        <div class="highlight info" style="margin-top:8px;font-size:11px;">
+          MCP connections define what the agent <em>can</em> access. The task chain step defines what it's <em>allowed</em> to do (read-only, write, etc.)
+        </div>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Max Concurrent Tasks</span>
+        <div class="form-input">3</div>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Color</span>
+        <div style="display:flex;gap:8px;padding:8px 0;">
+          <div style="width:24px;height:24px;border-radius:50%;background:#3b82f6;"></div>
+          <div style="width:24px;height:24px;border-radius:50%;background:#8b5cf6;"></div>
+          <div style="width:24px;height:24px;border-radius:50%;background:#f59e0b;"></div>
+          <div style="width:24px;height:24px;border-radius:50%;background:#10b981;border:2px solid var(--text-1);"></div>
+          <div style="width:24px;height:24px;border-radius:50%;background:#ef4444;"></div>
+          <div style="width:24px;height:24px;border-radius:50%;background:#ec4899;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PART 3: TASK CHAIN ============ -->
+<div class="section">
+  <div class="section-label">Part 2 — Task Creation with Chain Builder</div>
+  <h2>Support Ticket Example: 4-Step Chain</h2>
+  <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">
+    When creating a task, you define the workflow steps. Each step has an assignee and a permission mode.
+  </p>
+
+  <div class="panel">
+    <div style="margin-bottom:16px;">
+      <span class="form-label">Task Title</span>
+      <div class="form-input" style="font-weight:600;">Investigate login timeout on mobile — Ticket #4821</div>
+    </div>
+
+    <span class="form-label" style="margin-bottom:8px;display:block;">Workflow Chain</span>
+    <div class="chain-builder">
+      <div class="chain-step step-1">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Analyze the issue</div>
+          <div class="step-detail">Reproduce, gather logs, formulate solution</div>
+        </div>
+        <span class="step-mode mode-analyze">analyze</span>
+        <div class="step-agent">🔍 Support Analyst</div>
+      </div>
+
+      <div class="chain-step step-2">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Verify solution in codebase</div>
+          <div class="step-detail">Check if proposed fix is valid against actual code</div>
+        </div>
+        <span class="step-mode mode-verify">verify</span>
+        <div class="step-agent">⚡ Developer <span class="mcp-badge" style="font-size:8px;padding:1px 5px;">MCP:read</span></div>
+      </div>
+
+      <div class="chain-step step-3">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Human review & approval</div>
+          <div class="step-detail">Double-check before code changes</div>
+        </div>
+        <span class="step-mode mode-human">human</span>
+        <div class="step-agent">👤 Tech Lead</div>
+      </div>
+
+      <div class="chain-step step-4">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Implement the fix</div>
+          <div class="step-detail">Make code changes, run tests</div>
+        </div>
+        <span class="step-mode mode-develop">develop</span>
+        <div class="step-agent">⚡ Developer <span class="mcp-badge" style="font-size:8px;padding:1px 5px;">MCP:write</span></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:8px;">
+      <span class="tag" style="border-style:dashed;color:var(--text-dim);cursor:pointer;padding:6px 16px;">+ Add Step</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PART 4: BOARD VIEW ============ -->
+<div class="section">
+  <div class="section-label">Part 3 — The Board with WAITING Column</div>
+  <h2>How It Looks During Execution</h2>
+  <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">
+    The new WAITING column holds tasks between chain steps. The task card shows which step it's on.
+  </p>
+
+  <div class="board">
+    <div class="col col-backlog">
+      <div class="col-header">Backlog</div>
+      <div class="task-card">
+        <div class="title">Write API docs</div>
+        <div class="meta">📝 Writer · 1 step</div>
+      </div>
+    </div>
+
+    <div class="col col-progress">
+      <div class="col-header">In Progress</div>
+      <div class="task-card">
+        <div class="title">Login timeout #4821</div>
+        <div class="meta">🔍 Support Analyst</div>
+        <span class="chain-badge chain-step-1">Step 1/4 · analyze</span>
+      </div>
+    </div>
+
+    <div class="col col-waiting">
+      <div class="col-header">⏳ Waiting</div>
+      <div class="task-card" style="border-left:2px solid var(--amber);">
+        <div class="title">Refund logic bug #4799</div>
+        <div class="meta">→ 👤 Tech Lead</div>
+        <span class="chain-badge chain-step-3">Step 3/4 · human review</span>
+      </div>
+      <div class="task-card" style="border-left:2px solid var(--amber);">
+        <div class="title">Onboarding flow #4805</div>
+        <div class="meta">→ ⚡ Developer</div>
+        <span class="chain-badge chain-step-2">Step 2/3 · verify</span>
+      </div>
+    </div>
+
+    <div class="col col-review">
+      <div class="col-header">Review</div>
+      <div class="task-card">
+        <div class="title">Cache fix #4780</div>
+        <div class="meta">👤 Human verifying commit</div>
+        <span class="chain-badge chain-step-4">Step 4/4 · final check</span>
+      </div>
+    </div>
+
+    <div class="col col-done">
+      <div class="col-header">Done</div>
+      <div class="task-card" style="opacity:0.7;">
+        <div class="title">Rate limit #4712</div>
+        <div class="meta">✓ All 3 steps complete</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PART 5: WHAT CHANGES ============ -->
+<div class="section">
+  <div class="section-label">Implementation Summary</div>
+  <h2>What Changes in the Codebase</h2>
+
+  <div class="two-col">
+    <div class="panel">
+      <h3 style="color:var(--teal);margin-bottom:12px;">Schema Additions</h3>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-2);line-height:1.8;">
+        <div style="color:var(--text-dim);">// Agent model — new fields</div>
+        <div>role        <span style="color:var(--text-3);">String?</span></div>
+        <div>capabilities <span style="color:var(--text-3);">String?  // JSON array</span></div>
+        <div>mcpConnections <span style="color:var(--text-3);">String?  // JSON array</span></div>
+        <div>maxConcurrent <span style="color:var(--text-3);">Int  @default(1)</span></div>
+        <br>
+        <div style="color:var(--text-dim);">// New model</div>
+        <div style="color:var(--neon);">model TaskStep {</div>
+        <div>&nbsp;&nbsp;id        <span style="color:var(--text-3);">String</span></div>
+        <div>&nbsp;&nbsp;taskId    <span style="color:var(--text-3);">String</span></div>
+        <div>&nbsp;&nbsp;order     <span style="color:var(--text-3);">Int</span></div>
+        <div>&nbsp;&nbsp;agentId   <span style="color:var(--text-3);">String?</span></div>
+        <div>&nbsp;&nbsp;humanLabel <span style="color:var(--text-3);">String?</span></div>
+        <div>&nbsp;&nbsp;mode      <span style="color:var(--text-3);">String  // analyze|verify|develop|human</span></div>
+        <div>&nbsp;&nbsp;status    <span style="color:var(--text-3);">String  // pending|active|done</span></div>
+        <div>&nbsp;&nbsp;output    <span style="color:var(--text-3);">String?</span></div>
+        <div style="color:var(--neon);">}</div>
+        <br>
+        <div style="color:var(--text-dim);">// TaskStatus enum — add WAITING</div>
+        <div>BACKLOG | IN_PROGRESS | <span style="color:var(--amber);">WAITING</span> | REVIEW | DONE</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="color:var(--blue);margin-bottom:12px;">Your Framework Stages Mapped</h3>
+      <div style="font-size:12px;color:var(--text-2);line-height:2;">
+        <div><span style="color:var(--teal);">✓ Stage 1</span> — Identity fields on Agent (role, mission, capabilities)</div>
+        <div><span style="color:var(--teal);">✓ Stage 3</span> — MCP connections on Agent, mode/permissions on TaskStep</div>
+        <div><span style="color:var(--teal);">✓ Stage 4</span> — Orchestration = the chain itself (directed workflow)</div>
+        <div><span style="color:var(--blue);">◐ Stage 5</span> — Human review gates built into chain (manual CI)</div>
+        <div><span style="color:var(--text-dim);">○ Stage 2</span> — ETL/RAG (future — not in scope)</div>
+        <div><span style="color:var(--text-dim);">○ Stage 6</span> — Live observability (future — your dashboard design)</div>
+      </div>
+
+      <div class="highlight key" style="margin-top:16px;font-size:12px;">
+        <strong style="color:var(--neon);">Key insight:</strong> The chain builder IS your orchestration engine. Human review steps ARE your deployment gates. No separate CI/CD system needed — it's built into the task flow.
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
