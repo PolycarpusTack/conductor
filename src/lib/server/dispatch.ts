@@ -654,10 +654,6 @@ export async function rewindChain(
   if (resetIds.length > 0) {
     await db.taskStep.updateMany({
       where: { id: { in: resetIds } },
-
-  if (downstreamIds.length > 0) {
-    await db.taskStep.updateMany({
-      where: { id: { in: downstreamIds } },
       data: {
         status: 'pending',
         output: null,
