@@ -14,6 +14,11 @@ const MAX_LOGIN_ATTEMPTS = 10
 // NOTE: In-memory rate limiter. Resets on server restart and does not
 // persist across multiple worker processes. For production deployments
 // with multiple instances, replace with Redis-backed rate limiting.
+// NOTE: When no trusted proxy is configured (TRUSTED_PROXY env var not set),
+// all requests share a single rate-limit bucket ('global'). This prevents
+// bypass via X-Forwarded-For / X-Real-IP header rotation. If TRUSTED_PROXY=true,
+// the operator MUST configure their reverse proxy to strip and rewrite these
+// headers so clients cannot spoof them.
 const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
 
 function isRateLimited(ip: string): boolean {
@@ -40,10 +45,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
-      'unknown'
+    const trustProxy = process.env.TRUSTED_PROXY === 'true'
+    const ip = trustProxy
+      ? (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+         request.headers.get('x-real-ip') ||
+         'unknown')
+      : 'global' // single bucket when no trusted proxy — can't be bypassed by IP rotation
 
     if (isRateLimited(ip)) {
       return NextResponse.json(
@@ -79,6 +86,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
-  await clearAdminSession()
-  return NextResponse.json({ success: true })
+  try {
+    await clearAdminSession()
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error clearing admin session:', error)
+    return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 })
+  }
 }
