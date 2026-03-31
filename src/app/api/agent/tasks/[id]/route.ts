@@ -98,8 +98,12 @@ export async function PUT(
     }
 
     const MAX_FIELD_LENGTH = 5000
-    const notes = typeof body.notes === 'string' ? body.notes.slice(0, MAX_FIELD_LENGTH) : undefined
-    const output = typeof body.output === 'string' ? body.output.slice(0, MAX_FIELD_LENGTH) : undefined
+    const rawNotes = typeof body.notes === 'string' ? body.notes : undefined
+    const rawOutput = typeof body.output === 'string' ? body.output : undefined
+    const notesTruncated = rawNotes !== undefined && rawNotes.length > MAX_FIELD_LENGTH
+    const outputTruncated = rawOutput !== undefined && rawOutput.length > MAX_FIELD_LENGTH
+    const notes = rawNotes?.slice(0, MAX_FIELD_LENGTH)
+    const output = rawOutput?.slice(0, MAX_FIELD_LENGTH)
     const explicitStatus =
       body.status === undefined ? { success: true, data: undefined } : taskStatusSchema.safeParse(body.status)
 
@@ -231,34 +235,63 @@ export async function PUT(
     await updateAgentHeartbeat(agent.id)
 
     if (task.steps && task.steps.length > 0 && (actionResult.data === 'complete' || actionResult.data === 'progress')) {
-      const activeStep = task.steps.find((s: any) => s.status === 'active')
+      const requestedStepId = typeof body.step_id === 'string' ? body.step_id : null
+
+      // If step_id is provided, use it directly. Otherwise, find active steps
+      // for this agent — but reject if ambiguous (multiple active branches).
+      let activeStep: (typeof task.steps)[number] | null = null
+      if (requestedStepId) {
+        activeStep = task.steps.find((s: any) => s.id === requestedStepId && s.status === 'active') || null
+      } else {
+        const agentActiveSteps = task.steps.filter((s: any) => s.status === 'active' && s.agentId === agent.id)
+        if (agentActiveSteps.length > 1) {
+          return NextResponse.json({
+            error: 'Multiple active steps for this agent. Provide step_id to disambiguate.',
+            activeSteps: agentActiveSteps.map((s: any) => ({ id: s.id, order: s.order })),
+          }, { status: 409 })
+        }
+        activeStep = agentActiveSteps[0]
+          || task.steps.find((s: any) => s.status === 'active' && (!s.agentId || s.agentId === agent.id))
+          || null
+      }
       if (activeStep && (!activeStep.agentId || activeStep.agentId === agent.id) && actionResult.data === 'complete') {
-        await db.taskStep.update({
-          where: { id: activeStep.id },
+        // Atomically mark the step as done only if still active (prevents double-completion)
+        const completed = await db.taskStep.updateMany({
+          where: { id: activeStep.id, status: 'active' },
           data: { status: 'done', output: output || logDetails || '', completedAt: new Date() },
         })
 
-        // Save artifacts if provided
-        if (Array.isArray(body.artifacts)) {
-          for (const raw of body.artifacts) {
-            const parsed = stepArtifactSchema.safeParse(raw)
-            if (parsed.success) {
-              await db.stepArtifact.create({
-                data: {
-                  stepId: activeStep.id,
-                  type: parsed.data.type,
-                  label: parsed.data.label,
-                  content: parsed.data.content || null,
-                  url: parsed.data.url || null,
-                  mimeType: parsed.data.mimeType || null,
-                  metadata: parsed.data.metadata ? JSON.stringify(parsed.data.metadata) : null,
-                },
-              })
+        if (completed.count > 0) {
+          // Save artifacts if provided
+          if (Array.isArray(body.artifacts)) {
+            for (const raw of body.artifacts) {
+              const parsed = stepArtifactSchema.safeParse(raw)
+              if (parsed.success) {
+                await db.stepArtifact.create({
+                  data: {
+                    stepId: activeStep.id,
+                    type: parsed.data.type,
+                    label: parsed.data.label,
+                    content: parsed.data.content || null,
+                    url: parsed.data.url || null,
+                    mimeType: parsed.data.mimeType || null,
+                    metadata: parsed.data.metadata ? JSON.stringify(parsed.data.metadata) : null,
+                  },
+                })
+              }
             }
           }
-        }
 
-        advanceChain(id, agent.projectId).catch(console.error)
+          try {
+            await advanceChain(id, agent.projectId, activeStep.id)
+          } catch (chainErr) {
+            console.error('advanceChain failed after step completion:', chainErr)
+            await db.task.update({
+              where: { id },
+              data: { status: 'WAITING' },
+            }).catch(console.error)
+          }
+        }
       }
     }
 
@@ -266,6 +299,8 @@ export async function PUT(
       success: true,
       task,
       action: logAction,
+      ...(notesTruncated && { notesTruncated: true }),
+      ...(outputTruncated && { outputTruncated: true }),
     })
   } catch (error) {
     console.error('Error updating task:', error)

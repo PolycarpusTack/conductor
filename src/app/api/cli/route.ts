@@ -83,8 +83,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let body: Record<string, unknown>
   try {
-    const body = await request.json()
+    body = await request.json()
+  } catch {
+    return new Response('ERROR: Invalid JSON body', { status: 400 })
+  }
+
+  try {
     const apiKey = extractAgentApiKey(request, body)
     const action = cliActionSchema.safeParse(body.action)
 
@@ -103,8 +109,12 @@ export async function POST(request: Request) {
 
     const MAX_FIELD_LENGTH = 5000
     const taskId = typeof body.task_id === 'string' ? body.task_id : null
-    const notes = typeof body.notes === 'string' ? body.notes.slice(0, MAX_FIELD_LENGTH) : null
-    const output = typeof body.output === 'string' ? body.output.slice(0, MAX_FIELD_LENGTH) : null
+    const rawNotes = typeof body.notes === 'string' ? body.notes : null
+    const rawOutput = typeof body.output === 'string' ? body.output : null
+    const notesTruncated = rawNotes !== null && rawNotes.length > MAX_FIELD_LENGTH
+    const outputTruncated = rawOutput !== null && rawOutput.length > MAX_FIELD_LENGTH
+    const notes = rawNotes !== null ? rawNotes.slice(0, MAX_FIELD_LENGTH) : null
+    const output = rawOutput !== null ? rawOutput.slice(0, MAX_FIELD_LENGTH) : null
 
     const agent = await resolveAgentByApiKey(apiKey)
 
@@ -149,7 +159,7 @@ export async function POST(request: Request) {
 
         const task = await db.task.findUnique({
           where: { id: taskId },
-          include: { steps: { select: { id: true, status: true, order: true } } }
+          include: { steps: { select: { id: true, status: true, order: true, agentId: true } } }
         })
         if (!task || task.projectId !== agent.projectId) {
           return new Response('ERROR: Task not found', { status: 404 })
@@ -161,14 +171,37 @@ export async function POST(request: Request) {
 
         // Handle chain steps
         const hasSteps = task.steps && task.steps.length > 0
-        const activeStep = hasSteps ? task.steps.find(s => s.status === 'active') : null
+        const stepId = typeof body.step_id === 'string' ? body.step_id : null
+
+        // If step_id is provided, use it directly. Otherwise, find active steps
+        // for this agent — but reject if ambiguous (multiple active branches).
+        let activeStep: typeof task.steps[number] | null = null
+        if (hasSteps) {
+          if (stepId) {
+            activeStep = task.steps.find(s => s.id === stepId && s.status === 'active') || null
+          } else {
+            const agentActiveSteps = task.steps.filter(s => s.status === 'active' && s.agentId === agent.id)
+            if (agentActiveSteps.length > 1) {
+              return new Response(
+                'ERROR: Multiple active steps for this agent. Provide step_id to disambiguate.\n' +
+                  agentActiveSteps.map(s => `  STEP_ID: ${s.id} (order ${s.order})`).join('\n') + '\n',
+                { status: 409 },
+              )
+            }
+            activeStep = agentActiveSteps[0] || task.steps.find(s => s.status === 'active') || null
+          }
+        }
 
         if (hasSteps && activeStep) {
-          // Mark the active step as done
-          await db.taskStep.update({
-            where: { id: activeStep.id },
+          // Atomically mark the step as done only if still active (prevents double-completion)
+          const completed = await db.taskStep.updateMany({
+            where: { id: activeStep.id, status: 'active' },
             data: { status: 'done', output: output || '', completedAt: new Date() },
           })
+
+          if (completed.count === 0) {
+            return new Response('ERROR: Step already completed or no longer active', { status: 409 })
+          }
 
           // Save output on task but don't change status — let advanceChain handle it
           await db.task.update({
@@ -187,14 +220,23 @@ export async function POST(request: Request) {
             },
           })
 
-          advanceChain(taskId, agent.projectId).catch(console.error)
+          try {
+            await advanceChain(taskId, agent.projectId, activeStep.id)
+          } catch (chainErr) {
+            console.error('advanceChain failed after step completion:', chainErr)
+            // Chain is stuck — set task to WAITING so the admin can intervene
+            await db.task.update({
+              where: { id: taskId },
+              data: { status: 'WAITING' },
+            }).catch(console.error)
+          }
 
           await broadcastProjectEvent(agent.projectId, 'task-updated', {
             ...task,
             output: output || null,
           })
 
-          return new Response(`OK: Step completed for task "${task.title}"\n`)
+          return new Response(`OK: Step completed for task "${task.title}"\n${outputTruncated ? 'WARNING: Output was truncated to 5000 characters\n' : ''}`)
         }
 
         // Non-chained task — original behavior
@@ -233,7 +275,7 @@ export async function POST(request: Request) {
           }),
         )
 
-        return new Response(`OK: Completed task "${updatedTask.title}"\n`)
+        return new Response(`OK: Completed task "${updatedTask.title}"\n${outputTruncated ? 'WARNING: Output was truncated to 5000 characters\n' : ''}`)
       }
 
       case 'note': {
@@ -278,7 +320,7 @@ export async function POST(request: Request) {
           }),
         )
 
-        return new Response(`OK: Updated notes for task "${task.title}"\n`)
+        return new Response(`OK: Updated notes for task "${task.title}"\n${notesTruncated ? 'WARNING: Notes were truncated to 5000 characters\n' : ''}`)
       }
 
       case 'review': {
@@ -329,7 +371,7 @@ export async function POST(request: Request) {
           }),
         )
 
-        return new Response(`OK: Task "${task.title}" moved to review\n`)
+        return new Response(`OK: Task "${task.title}" moved to review\n${outputTruncated ? 'WARNING: Output was truncated to 5000 characters\n' : ''}`)
       }
     }
   } catch (error) {
