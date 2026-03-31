@@ -44,7 +44,7 @@ function timeToMinutes(time: string): number {
 
 async function pollProject(projectId: string) {
   try {
-    await pollAndDispatch()
+    await pollAndDispatch(projectId)
   } catch (error) {
     console.error(`[Scheduler] Poll error for project ${projectId}:`, error)
   }
@@ -107,7 +107,13 @@ export async function startProjectAutomation(projectId: string) {
 
     case 'scheduled': {
       if (!project.automationSchedule) break
-      const schedule: ScheduleWindow = JSON.parse(project.automationSchedule)
+      let schedule: ScheduleWindow
+      try {
+        schedule = JSON.parse(project.automationSchedule)
+      } catch (error) {
+        console.error(`[Scheduler] Invalid automationSchedule JSON for project ${projectId}:`, error)
+        return
+      }
       if (isWithinSchedule(schedule)) {
         startPolling(projectId, pollMs)
       } else {
@@ -149,7 +155,13 @@ async function checkScheduledProjects() {
 
   for (const project of scheduledProjects) {
     if (!project.automationSchedule) continue
-    const schedule: ScheduleWindow = JSON.parse(project.automationSchedule)
+    let schedule: ScheduleWindow
+    try {
+      schedule = JSON.parse(project.automationSchedule)
+    } catch (error) {
+      console.error(`[Scheduler] Invalid automationSchedule JSON for project ${project.id}:`, error)
+      continue
+    }
     const shouldRun = isWithinSchedule(schedule)
     const isRunning = isProjectRunning(project.id)
 
