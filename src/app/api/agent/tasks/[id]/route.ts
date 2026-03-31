@@ -217,12 +217,12 @@ export async function PUT(
         ? ['task-moved', { taskId: task.id, task }] as const
         : ['task-updated', task] as const
 
-    await broadcastProjectEvent(agent.projectId, taskEvent[0], taskEvent[1])
-    await broadcastProjectEvent(agent.projectId, 'agent-status', {
+    broadcastProjectEvent(agent.projectId, taskEvent[0], taskEvent[1])
+    broadcastProjectEvent(agent.projectId, 'agent-status', {
       agentId: agent.id,
       isActive: true,
     })
-    await broadcastProjectEvent(
+    broadcastProjectEvent(
       agent.projectId,
       'agent-activity',
       toRealtimeActivity({
@@ -250,9 +250,7 @@ export async function PUT(
             activeSteps: agentActiveSteps.map((s: any) => ({ id: s.id, order: s.order })),
           }, { status: 409 })
         }
-        activeStep = agentActiveSteps[0]
-          || task.steps.find((s: any) => s.status === 'active' && (!s.agentId || s.agentId === agent.id))
-          || null
+        activeStep = agentActiveSteps[0] || null
       }
       if (activeStep && (!activeStep.agentId || activeStep.agentId === agent.id) && actionResult.data === 'complete') {
         // Atomically mark the step as done only if still active (prevents double-completion)
@@ -349,11 +347,11 @@ export async function DELETE(
       },
     })
 
-    await broadcastProjectEvent(agent.projectId, 'task-moved', {
+    broadcastProjectEvent(agent.projectId, 'task-moved', {
       taskId: task.id,
       task: updatedTask,
     })
-    await broadcastProjectEvent(agent.projectId, 'agent-activity', toRealtimeActivity({
+    broadcastProjectEvent(agent.projectId, 'agent-activity', toRealtimeActivity({
       action: 'unassigned',
       agent,
       details: `Unassigned by ${agent.name}`,

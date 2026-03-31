@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     }
 
     await updateAgentHeartbeat(agent.id)
-    await broadcastProjectEvent(agent.projectId, 'agent-status', {
+    broadcastProjectEvent(agent.projectId, 'agent-status', {
       agentId: agent.id,
       isActive: true,
     })
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
                 { status: 409 },
               )
             }
-            activeStep = agentActiveSteps[0] || task.steps.find(s => s.status === 'active') || null
+            activeStep = agentActiveSteps[0] || null
           }
         }
 
@@ -231,7 +231,7 @@ export async function POST(request: Request) {
             }).catch(console.error)
           }
 
-          await broadcastProjectEvent(agent.projectId, 'task-updated', {
+          broadcastProjectEvent(agent.projectId, 'task-updated', {
             ...task,
             output: output || null,
           })
@@ -260,11 +260,11 @@ export async function POST(request: Request) {
           },
         })
 
-        await broadcastProjectEvent(agent.projectId, 'task-moved', {
+        broadcastProjectEvent(agent.projectId, 'task-moved', {
           taskId,
           task: updatedTask,
         })
-        await broadcastProjectEvent(
+        broadcastProjectEvent(
           agent.projectId,
           'agent-activity',
           toRealtimeActivity({
@@ -308,8 +308,8 @@ export async function POST(request: Request) {
           },
         })
 
-        await broadcastProjectEvent(agent.projectId, 'task-updated', updatedTask)
-        await broadcastProjectEvent(
+        broadcastProjectEvent(agent.projectId, 'task-updated', updatedTask)
+        broadcastProjectEvent(
           agent.projectId,
           'agent-activity',
           toRealtimeActivity({
@@ -356,11 +356,11 @@ export async function POST(request: Request) {
           },
         })
 
-        await broadcastProjectEvent(agent.projectId, 'task-moved', {
+        broadcastProjectEvent(agent.projectId, 'task-moved', {
           taskId,
           task: updatedTask,
         })
-        await broadcastProjectEvent(
+        broadcastProjectEvent(
           agent.projectId,
           'agent-activity',
           toRealtimeActivity({
