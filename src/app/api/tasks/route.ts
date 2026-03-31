@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { createTaskSchema } from '@/lib/server/contracts'
+import { normalizeDagEdges } from '@/lib/server/dispatch'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
 
@@ -146,6 +147,17 @@ export async function POST(request: Request) {
             const clientId = `step_${i}`
             adj.set(clientId, (step.nextSteps || []).map(e => e.targetStepId))
           })
+          // Add reverse edges from prevSteps so cycles expressed purely through
+          // prevSteps are also detected before normalizeDagEdges bakes them in.
+          steps.forEach((step, i) => {
+            const prevIds = step.prevSteps || []
+            for (const prevId of prevIds) {
+              const existing = adj.get(prevId) || []
+              if (!existing.includes(`step_${i}`)) {
+                adj.set(prevId, [...existing, `step_${i}`])
+              }
+            }
+          })
           const WHITE = 0, GRAY = 1, BLACK = 2
           const color = new Map<string, number>()
           adj.forEach((_, k) => color.set(k, WHITE))
@@ -213,6 +225,9 @@ export async function POST(request: Request) {
         include: taskBoardInclude,
       })
     })
+
+    // Normalize DAG edge symmetry (synthesize missing nextSteps from prevSteps and vice versa)
+    await normalizeDagEdges(task.id)
 
     await broadcastProjectEvent(projectId, 'task-created', task)
     return NextResponse.json(task)
