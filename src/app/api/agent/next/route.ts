@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { updateAgentHeartbeat } from '@/lib/server/agent-helpers'
 
 /**
  * Agent HTTP API - Get next available task
@@ -35,16 +36,14 @@ export async function GET(request: Request) {
       }, { status: 401 })
     }
 
-    // Update agent last seen
-    await db.agent.update({
-      where: { id: agent.id },
-      data: { lastSeen: new Date(), isActive: true },
-    })
-
-    await broadcastProjectEvent(agent.projectId, 'agent-status', {
-      agentId: agent.id,
-      isActive: true,
-    })
+    // Update agent last seen (debounced — at most one DB write per 30s per agent)
+    const didWrite = await updateAgentHeartbeat(agent.id)
+    if (didWrite) {
+      await broadcastProjectEvent(agent.projectId, 'agent-status', {
+        agentId: agent.id,
+        isActive: true,
+      })
+    }
 
     // Find next task:
     // 1. First, look for tasks already assigned to this agent in IN_PROGRESS

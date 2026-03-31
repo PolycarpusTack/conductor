@@ -5,11 +5,29 @@ import { taskBoardInclude } from '@/lib/server/selects'
 
 type AgentRef = { id: string; name: string; emoji: string; projectId: string }
 
-export async function updateAgentHeartbeat(agentId: string) {
+const HEARTBEAT_DEBOUNCE_MS = 30_000
+const heartbeatCache = new Map<string, number>()
+
+/**
+ * Updates agent lastSeen/isActive in DB, debounced to at most once per 30s per agent.
+ * Returns true if a DB write was performed, false if skipped due to debounce.
+ */
+export async function updateAgentHeartbeat(agentId: string): Promise<boolean> {
+  const now = Date.now()
+  const lastWrite = heartbeatCache.get(agentId) ?? 0
+
+  if (now - lastWrite < HEARTBEAT_DEBOUNCE_MS) {
+    return false // skip — recently written
+  }
+
+  heartbeatCache.set(agentId, now)
+
   await db.agent.update({
     where: { id: agentId },
     data: { lastSeen: new Date(), isActive: true },
   })
+
+  return true
 }
 
 export function toRealtimeActivity(args: {
