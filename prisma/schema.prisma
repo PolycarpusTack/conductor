@@ -83,6 +83,8 @@ model Task {
   order       Int         @default(0)
   activities  ActivityLog[]
   steps       TaskStep[]
+
+  @@index([projectId, status])
 }
 
 model ActivityLog {
@@ -96,6 +98,8 @@ model ActivityLog {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   details   String?  // JSON string for additional info
   createdAt DateTime @default(now())
+
+  @@index([projectId])
 }
 
 model ProjectMode {
@@ -190,6 +194,8 @@ model TaskStep {
   artifacts     StepArtifact[]
 
   @@unique([taskId, order])
+  @@index([taskId, status])
+  @@index([agentId, status])
 }
 
 model StepExecution {
@@ -210,6 +216,7 @@ model StepExecution {
   toolCalls     ToolCallTrace[]
 
   @@unique([stepId, attempt])
+  @@index([stepId])
 }
 
 model ToolCallTrace {
