@@ -9,6 +9,15 @@ import { randomBytes } from 'crypto'
 
 const WORKER_ID = `worker-${randomBytes(4).toString('hex')}`
 
+function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return fallback
+  }
+}
+
 /**
  * Find the previous agent step for a given step, DAG-aware.
  * In DAG mode: walks prevSteps edges to find the nearest non-human ancestor.
@@ -28,7 +37,7 @@ export async function findPreviousAgentStep(taskId: string, stepId: string) {
 
   if (isDag) {
     // BFS backward through prevSteps to find the nearest agent step
-    const prevIds: string[] = currentStep.prevSteps ? JSON.parse(currentStep.prevSteps) : []
+    const prevIds: string[] = safeJsonParse(currentStep.prevSteps, [])
     const visited = new Set<string>()
     const queue = [...prevIds]
 
@@ -45,7 +54,7 @@ export async function findPreviousAgentStep(taskId: string, stepId: string) {
       }
 
       // Keep walking backward
-      const ancestorIds: string[] = candidate.prevSteps ? JSON.parse(candidate.prevSteps) : []
+      const ancestorIds: string[] = safeJsonParse(candidate.prevSteps, [])
       for (const aid of ancestorIds) {
         if (!visited.has(aid)) queue.push(aid)
       }
@@ -58,6 +67,83 @@ export async function findPreviousAgentStep(taskId: string, stepId: string) {
   return allSteps
     .filter(s => s.order < currentStep.order && s.mode !== 'human')
     .sort((a, b) => b.order - a.order)[0] || null
+}
+
+/**
+ * Normalize DAG edge symmetry for a task's steps.
+ * Ensures that for every prevSteps entry there's a corresponding nextSteps entry
+ * (and vice versa), so runtime advancement can walk the graph in either direction.
+ */
+export async function normalizeDagEdges(taskId: string) {
+  const steps = await db.taskStep.findMany({
+    where: { taskId },
+    select: { id: true, nextSteps: true, prevSteps: true },
+  })
+
+  if (!hasDagEdges(steps)) return
+
+  // Build current edge maps
+  const nextMap = new Map<string, Map<string, StepEdge>>() // stepId -> targetId -> edge
+  const prevMap = new Map<string, Set<string>>()            // stepId -> set of prevIds
+  const stepIds = new Set(steps.map(s => s.id))
+
+  for (const step of steps) {
+    const nexts: StepEdge[] = safeJsonParse(step.nextSteps, [])
+    const prevs: string[] = safeJsonParse(step.prevSteps, [])
+
+    const edgeMap = new Map<string, StepEdge>()
+    for (const edge of nexts) {
+      if (stepIds.has(edge.targetStepId)) {
+        edgeMap.set(edge.targetStepId, edge)
+      }
+    }
+    nextMap.set(step.id, edgeMap)
+    prevMap.set(step.id, new Set(prevs.filter(id => stepIds.has(id))))
+  }
+
+  // Synthesize missing edges
+  let dirty = false
+
+  // For every prevSteps[B] = A, ensure nextSteps[A] contains B
+  for (const step of steps) {
+    const prevs = prevMap.get(step.id)!
+    for (const prevId of prevs) {
+      const prevNexts = nextMap.get(prevId)!
+      if (!prevNexts.has(step.id)) {
+        prevNexts.set(step.id, { targetStepId: step.id })
+        dirty = true
+      }
+    }
+  }
+
+  // For every nextSteps[A] -> B, ensure prevSteps[B] contains A
+  for (const step of steps) {
+    const nexts = nextMap.get(step.id)!
+    for (const [targetId] of nexts) {
+      const targetPrevs = prevMap.get(targetId)
+      if (targetPrevs && !targetPrevs.has(step.id)) {
+        targetPrevs.add(step.id)
+        dirty = true
+      }
+    }
+  }
+
+  if (!dirty) return
+
+  // Write back all modified edges
+  for (const step of steps) {
+    const nexts = Array.from(nextMap.get(step.id)!.values())
+    const prevs = Array.from(prevMap.get(step.id)!)
+    const newNextSteps = nexts.length > 0 ? JSON.stringify(nexts) : null
+    const newPrevSteps = prevs.length > 0 ? JSON.stringify(prevs) : null
+
+    if (newNextSteps !== step.nextSteps || newPrevSteps !== step.prevSteps) {
+      await db.taskStep.update({
+        where: { id: step.id },
+        data: { nextSteps: newNextSteps, prevSteps: newPrevSteps },
+      })
+    }
+  }
 }
 
 /** Check if any step has DAG edges (nextSteps or prevSteps). */
@@ -127,7 +213,7 @@ export async function dispatchStep(stepId: string) {
   // Find predecessor step: use prevSteps edges for DAG, order-1 for linear
   let previousStep: { output: string | null } | null = null
   if (step.prevSteps) {
-    const prevIds: string[] = JSON.parse(step.prevSteps)
+    const prevIds: string[] = safeJsonParse(step.prevSteps, [])
     if (prevIds.length > 0) {
       // Use the first predecessor's output (or concatenate all for multi-parent merge)
       const prevSteps = await db.taskStep.findMany({
@@ -157,13 +243,13 @@ export async function dispatchStep(stepId: string) {
   })
 
   const agentModeInstructions = agent.modeInstructions
-    ? JSON.parse(agent.modeInstructions)[step.mode]
+    ? safeJsonParse<Record<string, string>>(agent.modeInstructions, {})[step.mode] ?? null
     : null
 
   const modeInstructions = agentModeInstructions || projectMode?.instructions || ''
 
   const capabilities = agent.capabilities
-    ? JSON.parse(agent.capabilities).join(', ')
+    ? safeJsonParse<string[]>(agent.capabilities, []).join(', ')
     : ''
 
   const systemPrompt = resolvePrompt(agent.systemPrompt || '', {
@@ -186,13 +272,13 @@ export async function dispatchStep(stepId: string) {
   const fullTaskContext = taskContext + rejectionContext
 
   const mcpConnectionIds = agent.mcpConnectionIds
-    ? JSON.parse(agent.mcpConnectionIds)
+    ? safeJsonParse<string[]>(agent.mcpConnectionIds, [])
     : []
 
   const tools = await resolveMcpTools(mcpConnectionIds, step.mode)
 
   const runtimeConfig: Record<string, unknown> = {
-    ...(runtime.config ? JSON.parse(runtime.config) : {}),
+    ...safeJsonParse<Record<string, unknown>>(runtime.config, {}),
     apiKeyEnvVar: runtime.apiKeyEnvVar,
     endpoint: runtime.endpoint,
   }
@@ -265,7 +351,7 @@ export async function dispatchStep(stepId: string) {
       }
     }
 
-    await broadcastProjectEvent(step.task.projectId, 'step-completed', {
+    broadcastProjectEvent(step.task.projectId, 'step-completed', {
       taskId: step.taskId,
       stepId,
       output: result.output,
@@ -273,7 +359,7 @@ export async function dispatchStep(stepId: string) {
       tokensUsed: result.tokensUsed,
     })
 
-    await advanceChain(step.taskId, step.task.projectId)
+    await advanceChain(step.taskId, step.task.projectId, stepId)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown dispatch error'
     const isTimeout = message === 'STEP_TIMEOUT'
@@ -298,7 +384,7 @@ export async function dispatchStep(stepId: string) {
         },
       })
 
-      await broadcastProjectEvent(step.task.projectId, 'step-retrying', {
+      broadcastProjectEvent(step.task.projectId, 'step-retrying', {
         taskId: step.taskId,
         stepId,
         attempt: attemptNumber,
@@ -321,7 +407,7 @@ export async function dispatchStep(stepId: string) {
           },
         })
 
-        await broadcastProjectEvent(step.task.projectId, 'step-fallback', {
+        broadcastProjectEvent(step.task.projectId, 'step-fallback', {
           taskId: step.taskId,
           stepId,
           fromAgentId: step.agentId,
@@ -343,7 +429,7 @@ export async function dispatchStep(stepId: string) {
           },
         })
 
-        await broadcastProjectEvent(step.task.projectId, 'step-failed', {
+        broadcastProjectEvent(step.task.projectId, 'step-failed', {
           taskId: step.taskId,
           stepId,
           error: message,
@@ -351,10 +437,9 @@ export async function dispatchStep(stepId: string) {
           exhaustedRetries: true,
         })
 
-        await db.task.update({
-          where: { id: step.taskId },
-          data: { status: 'WAITING' },
-        })
+        // Use resolveTaskStatus instead of hardcoding WAITING — other parallel
+        // branches may still be active and the task should stay IN_PROGRESS.
+        await resolveTaskStatus(step.taskId, step.task.projectId)
       }
     }
   }
@@ -366,34 +451,42 @@ async function failStep(stepId: string, projectId: string, error: string) {
     data: { status: 'failed', error, completedAt: new Date(), leasedBy: null, leasedAt: null },
   })
 
-  await db.task.update({
-    where: { id: step.taskId },
-    data: { status: 'WAITING' },
-  })
+  // Use resolveTaskStatus instead of hardcoding WAITING — other parallel
+  // branches may still be active.
+  await resolveTaskStatus(step.taskId, projectId)
 
-  await broadcastProjectEvent(projectId, 'step-failed', {
+  broadcastProjectEvent(projectId, 'step-failed', {
     taskId: step.taskId,
     stepId,
     error,
   })
 }
 
-export async function advanceChain(taskId: string, projectId: string) {
+export async function advanceChain(taskId: string, projectId: string, completedStepId?: string) {
   const steps = await db.taskStep.findMany({
     where: { taskId },
     orderBy: { order: 'asc' },
     include: { agent: true },
   })
 
-  const lastDoneStep = [...steps].reverse().find((s) => s.status === 'done' || s.status === 'skipped')
-  if (!lastDoneStep) return
-
   // Check if this is a DAG chain (any step has nextSteps) or linear
   const isDag = hasDagEdges(steps)
 
   if (isDag) {
-    await advanceChainDag(taskId, projectId, steps, lastDoneStep)
+    // In DAG mode, advance from the specific step that just completed.
+    // If no completedStepId provided, advance from ALL recently completed steps
+    // to handle any that may have been missed.
+    const completedSteps = completedStepId
+      ? steps.filter(s => s.id === completedStepId && (s.status === 'done' || s.status === 'skipped'))
+      : steps.filter(s => s.status === 'done' || s.status === 'skipped')
+
+    for (const completedStep of completedSteps) {
+      await advanceChainDag(taskId, projectId, steps, completedStep)
+    }
   } else {
+    // Linear mode: find the last completed step by order
+    const lastDoneStep = [...steps].reverse().find((s) => s.status === 'done' || s.status === 'skipped')
+    if (!lastDoneStep) return
     await advanceChainLinear(taskId, projectId, steps, lastDoneStep)
   }
 }
@@ -413,7 +506,7 @@ async function advanceChainLinear(
       where: { id: taskId },
       data: { status: 'DONE', completedAt: new Date() },
     })
-    await broadcastProjectEvent(projectId, 'chain-completed', { taskId })
+    broadcastProjectEvent(projectId, 'chain-completed', { taskId })
     return
   }
 
@@ -433,9 +526,7 @@ async function advanceChainDag(
   completedStep: StepWithAgent,
 ) {
   // Parse edges from the completed step
-  const edges: StepEdge[] = completedStep.nextSteps
-    ? JSON.parse(completedStep.nextSteps)
-    : []
+  const edges: StepEdge[] = safeJsonParse(completedStep.nextSteps, [])
 
   if (edges.length === 0) {
     // No outgoing edges — check if ALL steps are done/skipped (chain complete)
@@ -445,7 +536,7 @@ async function advanceChainDag(
         where: { id: taskId },
         data: { status: 'DONE', completedAt: new Date() },
       })
-      await broadcastProjectEvent(projectId, 'chain-completed', { taskId })
+      broadcastProjectEvent(projectId, 'chain-completed', { taskId })
     }
     return
   }
@@ -485,7 +576,7 @@ async function advanceChainDag(
 
     // If target is a merge point, check that ALL its prevSteps are done
     if (targetStep.isMergePoint && targetStep.prevSteps) {
-      const prevStepIds: string[] = JSON.parse(targetStep.prevSteps)
+      const prevStepIds: string[] = safeJsonParse(targetStep.prevSteps, [])
       const allPrevDone = prevStepIds.every(prevId => {
         const prevStep = steps.find(s => s.id === prevId)
         return prevStep && (prevStep.status === 'done' || prevStep.status === 'skipped')
@@ -516,12 +607,12 @@ async function activateStep(
   })
   if (activated.count === 0) return // another caller already activated it
 
-  await broadcastProjectEvent(projectId, 'step-activated', {
+  broadcastProjectEvent(projectId, 'step-activated', {
     taskId,
     stepId: step.id,
   })
 
-  await broadcastProjectEvent(projectId, 'chain-advanced', {
+  broadcastProjectEvent(projectId, 'chain-advanced', {
     taskId,
     fromStepId,
     toStepId: step.id,
@@ -548,7 +639,7 @@ async function resolveTaskStatus(taskId: string, projectId: string) {
       where: { id: taskId },
       data: { status: 'DONE', completedAt: new Date() },
     })
-    await broadcastProjectEvent(projectId, 'chain-completed', { taskId })
+    broadcastProjectEvent(projectId, 'chain-completed', { taskId })
     return
   }
 
@@ -609,7 +700,7 @@ export async function rewindChain(
       const current = forwardQueue.shift()!
       const step = allSteps.find(s => s.id === current)
       if (!step?.nextSteps) continue
-      const edges: Array<{ targetStepId: string }> = JSON.parse(step.nextSteps)
+      const edges: Array<{ targetStepId: string }> = safeJsonParse(step.nextSteps, [])
       for (const edge of edges) {
         if (!visited.has(edge.targetStepId)) {
           visited.add(edge.targetStepId)
@@ -622,7 +713,7 @@ export async function rewindChain(
     // (steps that feed into it via prevSteps) so they re-execute
     const target = allSteps.find(s => s.id === targetStepId)
     if (target?.isMergePoint && target.prevSteps) {
-      const prevIds: string[] = JSON.parse(target.prevSteps)
+      const prevIds: string[] = safeJsonParse(target.prevSteps, [])
       // Reverse BFS: walk backward from each prevStep to find all ancestor steps
       const reverseQueue = [...prevIds]
       for (const pid of reverseQueue) {
@@ -632,7 +723,7 @@ export async function rewindChain(
         const current = reverseQueue.shift()!
         const step = allSteps.find(s => s.id === current)
         if (!step?.prevSteps) continue
-        const ancestors: string[] = JSON.parse(step.prevSteps)
+        const ancestors: string[] = safeJsonParse(step.prevSteps, [])
         for (const ancestorId of ancestors) {
           if (!visited.has(ancestorId)) {
             visited.add(ancestorId)
@@ -669,7 +760,7 @@ export async function rewindChain(
     data: { status: 'IN_PROGRESS' },
   })
 
-  await broadcastProjectEvent(projectId, 'chain-rewound', {
+  broadcastProjectEvent(projectId, 'chain-rewound', {
     taskId,
     targetStepId,
     rejectionNote,
@@ -696,7 +787,7 @@ export async function closeChain(taskId: string, projectId: string, note: string
     },
   })
 
-  await broadcastProjectEvent(projectId, 'chain-completed', { taskId, closed: true, note })
+  broadcastProjectEvent(projectId, 'chain-completed', { taskId, closed: true, note })
 }
 
 export async function startChain(taskId: string, projectId: string) {
@@ -714,12 +805,26 @@ export async function startChain(taskId: string, projectId: string) {
   // Find root steps: in DAG mode = steps with no prevSteps; in linear mode = order 1
   const rootSteps = isDag
     ? allSteps.filter(s => {
-        const prev = s.prevSteps ? JSON.parse(s.prevSteps) as string[] : []
+        const prev = safeJsonParse<string[]>(s.prevSteps, [])
         return prev.length === 0
       })
     : allSteps.filter(s => s.order === 1)
 
-  if (rootSteps.length === 0) return
+  if (rootSteps.length === 0) {
+    console.error(`[Chain] startChain: no root steps found for task ${taskId} — possible cyclic DAG or edge normalization issue`)
+    await db.task.update({
+      where: { id: taskId },
+      data: {
+        status: 'WAITING',
+        notes: 'Chain could not start: no root steps found. This may indicate a cyclic workflow or edge configuration issue. Please review the task steps.',
+      },
+    })
+    broadcastProjectEvent(projectId, 'chain-error', {
+      taskId,
+      error: 'No root steps found — possible cyclic DAG',
+    })
+    return
+  }
 
   for (const rootStep of rootSteps) {
     const activated = await db.taskStep.updateMany({
@@ -728,7 +833,7 @@ export async function startChain(taskId: string, projectId: string) {
     })
     if (activated.count === 0) continue
 
-    await broadcastProjectEvent(projectId, 'step-activated', {
+    broadcastProjectEvent(projectId, 'step-activated', {
       taskId,
       stepId: rootStep.id,
     })
