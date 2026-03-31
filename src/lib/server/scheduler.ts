@@ -17,6 +17,7 @@ interface ProjectScheduler {
 // Global scheduler state (per-process singleton)
 const schedulers = new Map<string, ProjectScheduler>()
 let globalInitialized = false
+let checkInProgress = false
 
 function isWithinSchedule(schedule: ScheduleWindow): boolean {
   const now = new Date()
@@ -148,28 +149,34 @@ export function manualStartAutomation(projectId: string, pollMs?: number) {
  * Called periodically by the schedule checker.
  */
 async function checkScheduledProjects() {
-  const scheduledProjects = await db.project.findMany({
-    where: { automationMode: 'scheduled' },
-    select: { id: true, automationSchedule: true, automationPollMs: true },
-  })
+  if (checkInProgress) return
+  checkInProgress = true
+  try {
+    const scheduledProjects = await db.project.findMany({
+      where: { automationMode: 'scheduled' },
+      select: { id: true, automationSchedule: true, automationPollMs: true },
+    })
 
-  for (const project of scheduledProjects) {
-    if (!project.automationSchedule) continue
-    let schedule: ScheduleWindow
-    try {
-      schedule = JSON.parse(project.automationSchedule)
-    } catch (error) {
-      console.error(`[Scheduler] Invalid automationSchedule JSON for project ${project.id}:`, error)
-      continue
-    }
-    const shouldRun = isWithinSchedule(schedule)
-    const isRunning = isProjectRunning(project.id)
+    for (const project of scheduledProjects) {
+      if (!project.automationSchedule) continue
+      let schedule: ScheduleWindow
+      try {
+        schedule = JSON.parse(project.automationSchedule)
+      } catch (error) {
+        console.error(`[Scheduler] Invalid automationSchedule JSON for project ${project.id}:`, error)
+        continue
+      }
+      const shouldRun = isWithinSchedule(schedule)
+      const isRunning = isProjectRunning(project.id)
 
-    if (shouldRun && !isRunning) {
-      startPolling(project.id, project.automationPollMs || 10000)
-    } else if (!shouldRun && isRunning) {
-      stopPolling(project.id)
+      if (shouldRun && !isRunning) {
+        startPolling(project.id, project.automationPollMs || 10000)
+      } else if (!shouldRun && isRunning) {
+        stopPolling(project.id)
+      }
     }
+  } finally {
+    checkInProgress = false
   }
 }
 
