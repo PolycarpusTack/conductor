@@ -85,12 +85,12 @@ export async function PUT(
     })
 
     if (parsed.data.status && parsed.data.status !== previousStatus) {
-      await broadcastProjectEvent(task.projectId, 'task-moved', {
+      broadcastProjectEvent(task.projectId, 'task-moved', {
         taskId: task.id,
         task,
       })
     } else {
-      await broadcastProjectEvent(task.projectId, 'task-updated', task)
+      broadcastProjectEvent(task.projectId, 'task-updated', task)
     }
 
     if (parsed.data.status === 'IN_PROGRESS' && task.steps && task.steps.length > 0) {
@@ -98,7 +98,11 @@ export async function PUT(
       const hasCompletedSteps = task.steps.some((s: any) => s.status === 'done' || s.status === 'skipped')
       if (!hasActiveStep && !hasCompletedSteps) {
         // Only start chain if no steps have been touched yet
-        startChain(task.id, task.projectId).catch(console.error)
+        try {
+          await startChain(task.id, task.projectId)
+        } catch (chainErr) {
+          console.error('startChain failed:', chainErr)
+        }
       }
     }
 
@@ -133,7 +137,7 @@ export async function DELETE(
       where: { id },
     })
 
-    await broadcastProjectEvent(task.projectId, 'task-deleted', task.id)
+    broadcastProjectEvent(task.projectId, 'task-deleted', task.id)
 
     return NextResponse.json({ success: true })
   } catch (error) {

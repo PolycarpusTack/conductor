@@ -104,12 +104,12 @@ export async function claimOrStartTask(
     },
   })
 
-  await broadcastProjectEvent(agent.projectId, 'task-moved', { taskId, task })
-  await broadcastProjectEvent(agent.projectId, 'agent-status', {
+  broadcastProjectEvent(agent.projectId, 'task-moved', { taskId, task })
+  broadcastProjectEvent(agent.projectId, 'agent-status', {
     agentId: agent.id,
     isActive: true,
   })
-  await broadcastProjectEvent(
+  broadcastProjectEvent(
     agent.projectId,
     'agent-activity',
     toRealtimeActivity({ action, agent, details: logDetails, taskId }),

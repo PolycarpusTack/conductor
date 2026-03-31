@@ -229,7 +229,7 @@ export async function POST(request: Request) {
     // Normalize DAG edge symmetry (synthesize missing nextSteps from prevSteps and vice versa)
     await normalizeDagEdges(task.id)
 
-    await broadcastProjectEvent(projectId, 'task-created', task)
+    broadcastProjectEvent(projectId, 'task-created', task)
     return NextResponse.json(task)
   } catch (error) {
     console.error('Error creating task:', error)

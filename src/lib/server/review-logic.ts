@@ -21,6 +21,16 @@ export async function submitReview(input: ReviewDecision) {
 
   if (!step) throw new Error('Step not found')
 
+  // Prevent the same reviewer from approving a step multiple times
+  if (input.decision === 'approved') {
+    const existingApproval = step.reviews.find(
+      r => r.reviewer === input.reviewer && r.decision === 'approved'
+    )
+    if (existingApproval) {
+      throw new Error('This reviewer has already approved this step')
+    }
+  }
+
   const review = await db.stepReview.create({
     data: {
       stepId: input.stepId,
@@ -30,7 +40,7 @@ export async function submitReview(input: ReviewDecision) {
     },
   })
 
-  await broadcastProjectEvent(input.projectId, 'step-reviewed', {
+  broadcastProjectEvent(input.projectId, 'step-reviewed', {
     taskId: input.taskId,
     stepId: input.stepId,
     review,
@@ -46,17 +56,20 @@ export async function submitReview(input: ReviewDecision) {
 }
 
 async function handleApproval(
-  step: { id: string; taskId: string; requiredSignOffs: number; reviews: { decision: string }[] },
+  step: { id: string; taskId: string; requiredSignOffs: number; reviews: { decision: string; reviewer: string }[] },
   input: ReviewDecision,
 ) {
-  const approvalCount = step.reviews.filter(r => r.decision === 'approved').length + 1
+  // Count unique approved reviewers (the new approval from input.reviewer is +1)
+  const uniqueApprovers = new Set(step.reviews.filter(r => r.decision === 'approved').map(r => r.reviewer))
+  uniqueApprovers.add(input.reviewer)
+  const approvalCount = uniqueApprovers.size
 
   if (approvalCount >= step.requiredSignOffs) {
     await db.taskStep.update({
       where: { id: step.id },
       data: { status: 'done', completedAt: new Date() },
     })
-    await advanceChain(step.taskId, input.projectId)
+    await advanceChain(step.taskId, input.projectId, step.id)
     return { action: 'approved_and_advanced', approvalCount }
   }
 

@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     // Update agent last seen (debounced — at most one DB write per 30s per agent)
     const didWrite = await updateAgentHeartbeat(agent.id)
     if (didWrite) {
-      await broadcastProjectEvent(agent.projectId, 'agent-status', {
+      broadcastProjectEvent(agent.projectId, 'agent-status', {
         agentId: agent.id,
         isActive: true,
       })

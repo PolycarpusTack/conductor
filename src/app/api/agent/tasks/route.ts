@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       data: { lastSeen: new Date(), isActive: true },
     })
 
-    await broadcastProjectEvent(agent.projectId, 'agent-status', {
+    broadcastProjectEvent(agent.projectId, 'agent-status', {
       agentId: agent.id,
       isActive: true,
     })
