@@ -26,9 +26,17 @@ export function evaluateCondition(condition: StepCondition, context: StepContext
       return Number(fieldValue) > Number(condition.value)
     case 'lt':
       return Number(fieldValue) < Number(condition.value)
-    case 'matches':
-      try { return new RegExp(condition.value, 'i').test(strValue) }
+    case 'matches': {
+      const pattern = condition.value
+      // Guard 1: reject patterns longer than 200 characters
+      if (pattern.length > 200) return false
+      // Guard 2: reject patterns containing nested quantifiers (ReDoS heuristic)
+      if (/(\+|\*|\{[^}]*,\s*\})\s*[+*{]/.test(pattern)) return false
+      // Guard 3: truncate input to at most 1000 characters
+      const safeInput = strValue.length > 1000 ? strValue.slice(0, 1000) : strValue
+      try { return new RegExp(pattern, 'i').test(safeInput) }
       catch { return false }
+    }
     default:
       return false
   }
