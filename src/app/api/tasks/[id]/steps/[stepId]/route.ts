@@ -43,7 +43,7 @@ export async function PUT(
         where: { id: stepId },
         data: { status: 'skipped', completedAt: new Date() },
       })
-      await advanceChain(existingStep.taskId, projectId)
+      await advanceChain(existingStep.taskId, projectId, stepId)
       return NextResponse.json({ success: true, action: 'skipped' })
     }
 
@@ -183,9 +183,20 @@ export async function PUT(
       updateData.completedAt = new Date()
     }
 
-    const step = await db.taskStep.update({
-      where: { id: stepId },
+    // Compare-and-set: only update if the step is still in the expected status,
+    // preventing double advanceChain from concurrent PUT requests.
+    const updated = await db.taskStep.updateMany({
+      where: { id: stepId, status: existingStep.status },
       data: updateData,
+    })
+
+    if (updated.count === 0) {
+      return NextResponse.json({ error: 'Step already updated (concurrent request)' }, { status: 409 })
+    }
+
+    // updateMany doesn't support include, so fetch the updated step separately.
+    const step = await db.taskStep.findUnique({
+      where: { id: stepId },
       include: {
         agent: { select: { id: true, name: true, emoji: true } },
       },
@@ -193,7 +204,15 @@ export async function PUT(
 
     // If step was just marked done, advance the chain
     if (updateData.status === 'done') {
-      advanceChain(id, projectId).catch(console.error)
+      try {
+        await advanceChain(id, projectId, stepId)
+      } catch (chainErr) {
+        console.error('advanceChain failed after step completion:', chainErr)
+        await db.task.update({
+          where: { id },
+          data: { status: 'WAITING' },
+        }).catch(console.error)
+      }
     }
 
     return NextResponse.json(step)
