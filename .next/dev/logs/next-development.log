@@ -1,3 +1,0 @@
-[00:00:15.425] Server  WARN    ⚠ Turbopack's filesystem cache has been deleted because we previously detected an internal error in Turbopack. Builds or page loads may be slower as a result.
-[00:00:18.064] Server  LOG     ✓ Ready in 12.4s
-[00:02:03.892] Server  LOG     ○ Compiling / ...
