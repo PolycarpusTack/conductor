@@ -90,18 +90,23 @@ export function ObservabilityDashboard({ projectId }: ObservabilityDashboardProp
     const fetchAll = async () => {
       setLoading(true)
       try {
-        const [ov, ag, rt, fl, bn] = await Promise.all([
-          fetch(`/api/projects/${projectId}/analytics?view=overview`).then(r => r.json()),
-          fetch(`/api/projects/${projectId}/analytics?view=agents`).then(r => r.json()),
-          fetch(`/api/projects/${projectId}/analytics?view=runtimes`).then(r => r.json()),
-          fetch(`/api/projects/${projectId}/analytics?view=failures`).then(r => r.json()),
-          fetch(`/api/projects/${projectId}/analytics?view=bottlenecks`).then(r => r.json()),
+        const safeFetch = async (view: string) => {
+          const r = await fetch(`/api/projects/${projectId}/analytics?view=${view}`)
+          if (!r.ok) return null
+          return r.json()
+        }
+        const [ov, ag, rt, fl, bn] = await Promise.allSettled([
+          safeFetch('overview'),
+          safeFetch('agents'),
+          safeFetch('runtimes'),
+          safeFetch('failures'),
+          safeFetch('bottlenecks'),
         ])
-        setOverview(ov)
-        setAgents(ag)
-        setRuntimes(rt)
-        setFailures(fl)
-        setBottlenecks(bn)
+        if (ov.status === 'fulfilled' && ov.value) setOverview(ov.value)
+        if (ag.status === 'fulfilled' && ag.value) setAgents(ag.value)
+        if (rt.status === 'fulfilled' && rt.value) setRuntimes(rt.value)
+        if (fl.status === 'fulfilled' && fl.value) setFailures(fl.value)
+        if (bn.status === 'fulfilled' && bn.value) setBottlenecks(bn.value)
       } catch (err) {
         console.error('Failed to fetch analytics:', err)
       } finally {

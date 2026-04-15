@@ -4,12 +4,12 @@ import { describe, test, expect, mock, beforeEach } from 'bun:test'
 // Mock heavy dependencies before importing the module under test
 // ---------------------------------------------------------------------------
 
-const mockTaskStepFindMany = mock(() => Promise.resolve([]))
-const mockTaskStepFindFirst = mock(() => Promise.resolve(null))
-const mockTaskStepFindUnique = mock(() => Promise.resolve(null))
-const mockTaskStepUpdate = mock(() => Promise.resolve({}))
-const mockTaskStepUpdateMany = mock(() => Promise.resolve({ count: 1 }))
-const mockTaskUpdate = mock(() => Promise.resolve({}))
+const mockTaskStepFindMany = mock(() => Promise.resolve([])) as any
+const mockTaskStepFindFirst = mock(() => Promise.resolve(null)) as any
+const mockTaskStepFindUnique = mock(() => Promise.resolve(null)) as any
+const mockTaskStepUpdate = mock(() => Promise.resolve({})) as any
+const mockTaskStepUpdateMany = mock(() => Promise.resolve({ count: 1 })) as any
+const mockTaskUpdate = mock(() => Promise.resolve({})) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -26,7 +26,7 @@ mock.module('@/lib/db', () => ({
   },
 }))
 
-const mockBroadcastProjectEvent = mock(() => Promise.resolve())
+const mockBroadcastProjectEvent = mock(() => Promise.resolve()) as any
 
 mock.module('@/lib/server/realtime', () => ({
   broadcastProjectEvent: mockBroadcastProjectEvent,

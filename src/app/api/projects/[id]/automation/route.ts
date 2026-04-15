@@ -34,7 +34,7 @@ export async function GET(
     return NextResponse.json({
       ...project,
       automationSchedule: project.automationSchedule
-        ? JSON.parse(project.automationSchedule)
+        ? (() => { try { return JSON.parse(project.automationSchedule!) } catch { return null } })()
         : null,
       running: isProjectRunning(id),
     })
@@ -115,11 +115,21 @@ export async function POST(
         where: { id },
         select: { automationPollMs: true },
       })
-      manualStartAutomation(id, project?.automationPollMs || 10000)
+      if (!project) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      }
+      manualStartAutomation(id, project.automationPollMs || 10000)
       return NextResponse.json({ success: true, running: true })
     }
 
     if (body.action === 'stop') {
+      const project = await db.project.findUnique({
+        where: { id },
+        select: { id: true },
+      })
+      if (!project) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      }
       stopProjectAutomation(id)
       return NextResponse.json({ success: true, running: false })
     }

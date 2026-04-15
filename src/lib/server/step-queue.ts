@@ -1,12 +1,25 @@
 import { db } from '@/lib/db'
 import { dispatchStep } from '@/lib/server/dispatch'
 
+function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return fallback
+  }
+}
+
 const LEASE_TIMEOUT_MS = 600000 // 10 min — if a worker hasn't finished, assume it died
 const POLL_BATCH_SIZE = 5
 
-export async function pollAndDispatch() {
+export async function pollAndDispatch(projectId?: string) {
   const now = new Date()
   const leaseExpiry = new Date(now.getTime() - LEASE_TIMEOUT_MS)
+
+  // Optional project scope — when called from a project-specific scheduler,
+  // only dispatch steps belonging to that project.
+  const projectFilter = projectId ? { task: { projectId } } : {}
 
   // Find steps that are active and either:
   // 1. Not leased and not delayed (leasedAt is null or in the past)
@@ -16,6 +29,7 @@ export async function pollAndDispatch() {
       status: 'active',
       agent: { runtimeId: { not: null } },
       mode: { not: 'human' },
+      ...projectFilter,
       OR: [
         {
           leasedBy: null,
@@ -42,7 +56,7 @@ export async function pollAndDispatch() {
       status: 'pending',
       agent: { runtimeId: { not: null } },
       mode: { not: 'human' },
-      task: { status: 'IN_PROGRESS' },
+      task: { status: 'IN_PROGRESS', ...(projectId ? { projectId } : {}) },
     },
     select: { id: true, taskId: true, order: true, prevSteps: true, isMergePoint: true },
     take: POLL_BATCH_SIZE,
@@ -51,9 +65,7 @@ export async function pollAndDispatch() {
 
   // Re-activate throttled steps whose predecessors are all complete
   for (const throttled of throttledSteps) {
-    const prevStepIds: string[] = throttled.prevSteps
-      ? JSON.parse(throttled.prevSteps)
-      : []
+    const prevStepIds: string[] = safeJsonParse(throttled.prevSteps, [])
 
     if (prevStepIds.length > 0) {
       // DAG mode: check all prevSteps are done/skipped

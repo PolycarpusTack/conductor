@@ -30,6 +30,14 @@ const TYPE_CONFIG: Record<string, { icon: typeof FileText; color: string }> = {
   test_result: { icon: Terminal, color: 'text-[var(--op-teal,#2DD4BF)]' },
 }
 
+function formatJson(content: string): string | null {
+  try {
+    return JSON.stringify(JSON.parse(content), null, 2)
+  } catch {
+    return null
+  }
+}
+
 function ArtifactContent({ artifact }: { artifact: StepArtifact }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -104,12 +112,7 @@ function ArtifactContent({ artifact }: { artifact: StepArtifact }) {
 
     case 'json': {
       const content = artifact.content || ''
-      let formatted: string | null = null
-      try {
-        formatted = JSON.stringify(JSON.parse(content), null, 2)
-      } catch {
-        // invalid JSON — will render raw content below
-      }
+      const formatted = formatJson(content)
 
       if (formatted === null) {
         return (

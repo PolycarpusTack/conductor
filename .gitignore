@@ -1,1 +1,66 @@
-node_modules/\n.next/\n.env\nprisma/dev.db\nprisma/dev.db-journal
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/migrations/dev/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude / agent tooling (local only)
+.claude/
+.superpowers/
+CLAUDE.local.md
+
+# Archive (local-only working files)
+.archive/
+
+# Misc
+*.zip
+*.tar.gz
+coverage/
+.nyc_output/
+.turbo/
+.cache/
+tmp/
+temp/

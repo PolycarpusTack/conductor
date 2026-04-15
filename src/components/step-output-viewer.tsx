@@ -83,13 +83,22 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
     }
   }, [taskId, executionHistory])
 
+  // Clear stale execution/artifact data when task changes
+  useEffect(() => {
+    setExecutionHistory({})
+    setExpandedExecutions(new Set())
+    setStepArtifacts({})
+  }, [taskId])
+
   // Fetch full step data including outputs
   useEffect(() => {
+    let cancelled = false
+    const abortController = new AbortController()
     const fetchSteps = async () => {
       setLoading(true)
       try {
-        const res = await fetch(`/api/tasks/${taskId}/steps`, { cache: 'no-store' })
-        if (res.ok) {
+        const res = await fetch(`/api/tasks/${taskId}/steps`, { cache: 'no-store', signal: abortController.signal })
+        if (res.ok && !cancelled) {
           const data = await res.json()
           setFullSteps(data)
           // Auto-expand active or failed steps
@@ -103,11 +112,12 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
 
           // Fetch artifacts for all steps that have output (likely have artifacts)
           for (const s of data) {
+            if (cancelled) break
             if (s.status === 'done' || s.output) {
-              fetch(`/api/tasks/${taskId}/steps/${s.id}/artifacts`, { cache: 'no-store' })
+              fetch(`/api/tasks/${taskId}/steps/${s.id}/artifacts`, { cache: 'no-store', signal: abortController.signal })
                 .then(r => r.ok ? r.json() : [])
                 .then(artifacts => {
-                  if (artifacts.length > 0) {
+                  if (!cancelled && artifacts.length > 0) {
                     setStepArtifacts(prev => ({ ...prev, [s.id]: artifacts }))
                   }
                 })
@@ -116,12 +126,17 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
           }
         }
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Error fetching steps:', err)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     fetchSteps()
+    return () => {
+      cancelled = true
+      abortController.abort()
+    }
   }, [taskId])
 
   const toggleStep = (stepId: string) => {

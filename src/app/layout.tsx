@@ -6,25 +6,32 @@ import { Toaster } from "@/components/ui/toaster"
 const ibmPlexSans = IBM_Plex_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600"],
+  display: "swap",
 })
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-head",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["500", "600", "700"],
+  display: "swap",
+  preload: false,
 })
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
   weight: ["400", "500"],
+  display: "swap",
+  preload: false,
 })
 
 const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-mono-alt",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500"],
+  display: "swap",
+  preload: false,
 })
 
 export const metadata: Metadata = {

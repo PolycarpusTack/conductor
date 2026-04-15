@@ -91,10 +91,11 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
 
   useEffect(() => {
     if (!task.steps || task.steps.length === 0) return
+    const abortController = new AbortController()
     const fetchSteps = async () => {
       try {
-        const res = await fetch(`/api/tasks/${task.id}/steps`, { cache: 'no-store' })
-        if (res.ok) {
+        const res = await fetch(`/api/tasks/${task.id}/steps`, { cache: 'no-store', signal: abortController.signal })
+        if (res.ok && !abortController.signal.aborted) {
           const data = await res.json()
           setFullSteps(data)
           const autoExpand = new Set<string>()
@@ -104,10 +105,12 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
           setExpandedSteps(autoExpand)
         }
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Error fetching steps:', err)
       }
     }
     fetchSteps()
+    return () => abortController.abort()
   }, [task.id, task.steps])
 
   const toggleStep = (stepId: string) => {
@@ -127,7 +130,10 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action),
       })
-      if (!res.ok) throw new Error((await res.json()).error || 'Action failed')
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => null)
+        throw new Error(errorBody?.error || `Action failed (${res.status})`)
+      }
       setRejectingStepId(null)
       setRejectionNote('')
       const stepsRes = await fetch(`/api/tasks/${task.id}/steps`, { cache: 'no-store' })

@@ -22,8 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
 import {
   Bot,
@@ -48,6 +50,7 @@ import {
   ExternalLink,
   LogOut,
   GitBranch,
+  ChevronDown,
 } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 import { SettingsModes } from '@/components/settings-modes'
@@ -254,6 +257,9 @@ export default function Home() {
         activeSocket = io(realtimeSocketUrl, {
           transports: ['websocket'],
           auth: { token: data.token },
+          reconnectionAttempts: 5,
+          reconnectionDelay: 2000,
+          reconnectionDelayMax: 10000,
         })
         socketRef.current = activeSocket
 
@@ -264,6 +270,16 @@ export default function Home() {
 
         activeSocket.on('disconnect', () => {
           console.log('[WS] Disconnected')
+          setWsConnected(false)
+        })
+
+        activeSocket.on('connect_error', (err) => {
+          console.warn('[WS] Connection error:', err.message)
+          setWsConnected(false)
+        })
+
+        activeSocket.io.on('reconnect_failed', () => {
+          console.warn('[WS] Reconnection failed after max attempts — stopping')
           setWsConnected(false)
         })
 
@@ -308,29 +324,20 @@ export default function Home() {
           setActivities(prev => [data, ...prev].slice(0, 50))
         })
 
-        activeSocket.on('step-activated', () => {
-          if (currentProject) fetchProject(currentProject.id).then(setCurrentProject)
-        })
+        const refetchCurrentProject = () => {
+          if (isCancelled) return
+          // Use the project ID from the effect closure (stable for this socket's lifetime)
+          fetchProject(currentProject.id).then(proj => {
+            if (!isCancelled) setCurrentProject(proj)
+          })
+        }
 
-        activeSocket.on('step-completed', () => {
-          if (currentProject) fetchProject(currentProject.id).then(setCurrentProject)
-        })
-
-        activeSocket.on('step-failed', () => {
-          if (currentProject) fetchProject(currentProject.id).then(setCurrentProject)
-        })
-
-        activeSocket.on('chain-advanced', () => {
-          if (currentProject) fetchProject(currentProject.id).then(setCurrentProject)
-        })
-
-        activeSocket.on('chain-completed', () => {
-          if (currentProject) fetchProject(currentProject.id).then(setCurrentProject)
-        })
-
-        activeSocket.on('chain-rewound', () => {
-          if (currentProject) fetchProject(currentProject.id).then(setCurrentProject)
-        })
+        activeSocket.on('step-activated', refetchCurrentProject)
+        activeSocket.on('step-completed', refetchCurrentProject)
+        activeSocket.on('step-failed', refetchCurrentProject)
+        activeSocket.on('chain-advanced', refetchCurrentProject)
+        activeSocket.on('chain-completed', refetchCurrentProject)
+        activeSocket.on('chain-rewound', refetchCurrentProject)
       } catch (error) {
         console.error('Error connecting realtime:', error)
         setWsConnected(false)
@@ -1558,28 +1565,58 @@ export default function Home() {
               </Select>
             )}
             
-            {/* Agent status indicators */}
-            {currentProject?.agents && (
-              <div className="hidden sm:flex items-center gap-1">
-                {currentProject.agents.map((agent) => (
-                  <div key={agent.id} className="relative group">
-                    <Avatar className="h-7 w-7 border border-border/30 bg-surface">
-                      <AvatarFallback className="text-xs bg-transparent">
-                        {agent.emoji}
-                      </AvatarFallback>
-                    </Avatar>
-                    {agent.isActive && (
-                      <div className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background">
-                        <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/50" />
-                      </div>
-                    )}
-                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-[10px] px-2 py-0.5 rounded whitespace-nowrap z-10">
-                      {agent.name} {agent.isActive ? '(active)' : ''}
+            {/* Agent status indicators — show active agents + overflow count */}
+            {currentProject?.agents && (() => {
+              const activeAgents = currentProject.agents.filter(a => a.isActive)
+              const totalAgents = currentProject.agents.length
+              const MAX_SHOWN = 5
+              const shown = activeAgents.slice(0, MAX_SHOWN)
+              const overflowCount = activeAgents.length - MAX_SHOWN
+
+              return (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="hidden sm:flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-surface/40 transition-colors">
+                      {shown.length > 0 ? shown.map((agent) => (
+                        <div key={agent.id} className="relative">
+                          <Avatar className="h-6 w-6 border border-border/30 bg-surface">
+                            <AvatarFallback className="text-[10px] bg-transparent">{agent.emoji}</AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500 ring-1 ring-background" />
+                        </div>
+                      )) : (
+                        <span className="text-[10px] text-muted-foreground/50">No active agents</span>
+                      )}
+                      {overflowCount > 0 && (
+                        <span className="text-[10px] text-muted-foreground ml-0.5">+{overflowCount}</span>
+                      )}
+                      <span className="text-[9px] text-muted-foreground/40 ml-1">{activeAgents.length}/{totalAgents}</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2" align="end">
+                    <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider px-2 py-1">
+                      Agents ({activeAgents.length} active / {totalAgents} total)
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                    <div className="max-h-[280px] overflow-y-auto space-y-0.5 mt-1">
+                      {currentProject.agents
+                        .slice()
+                        .sort((a, b) => (a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1))
+                        .map((agent) => {
+                          const taskCount = currentProject.tasks.filter(t => t.agent?.id === agent.id && t.status !== 'DONE').length
+                          return (
+                            <div key={agent.id} className={`flex items-center gap-2 px-2 py-1 rounded-md text-[11px] ${agent.isActive ? 'text-foreground/80' : 'text-muted-foreground/40'}`}>
+                              <span className="text-sm">{agent.emoji}</span>
+                              <span className="flex-1 truncate">{agent.name}</span>
+                              {agent.isActive && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />}
+                              {taskCount > 0 && <span className="text-[9px] text-muted-foreground/50">{taskCount}</span>}
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )
+            })()}
             
             {/* New Project button */}
             <Button
@@ -1663,24 +1700,54 @@ export default function Home() {
           <Separator className="my-4" />
           
           <div className="mt-4">
-            <h3 className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40 mb-2 px-2">Agents</h3>
-            <div className="space-y-0.5">
-              {currentProject?.agents.map((agent) => {
-                const taskCount = currentProject.tasks.filter(t => t.agent?.id === agent.id && t.status !== 'DONE').length
-                return (
-                  <div key={agent.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface/40 transition-colors cursor-pointer">
-                    <span className="text-sm">{agent.emoji}</span>
-                    <span className="text-[11px] text-foreground/70 flex-1">{agent.name}</span>
-                    {agent.isActive && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    )}
-                    {taskCount > 0 && (
-                      <span className="text-[9px] text-muted-foreground/50">{taskCount}</span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            <Collapsible defaultOpen>
+              <CollapsibleTrigger className="flex items-center justify-between w-full px-2 mb-2 group">
+                <h3 className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40">
+                  Agents
+                  {currentProject?.agents && (
+                    <span className="ml-1.5 normal-case tracking-normal">
+                      {currentProject.agents.filter(a => a.isActive).length}/{currentProject.agents.length}
+                    </span>
+                  )}
+                </h3>
+                <ChevronDown className="h-3 w-3 text-muted-foreground/30 transition-transform group-data-[state=closed]:-rotate-90" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="max-h-[220px] overflow-y-auto space-y-0.5">
+                  {currentProject?.agents
+                    .slice()
+                    .sort((a, b) => {
+                      // Active first, then by task count, then alphabetical
+                      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
+                      const aCount = currentProject.tasks.filter(t => t.agent?.id === a.id && t.status !== 'DONE').length
+                      const bCount = currentProject.tasks.filter(t => t.agent?.id === b.id && t.status !== 'DONE').length
+                      if (aCount !== bCount) return bCount - aCount
+                      return a.name.localeCompare(b.name)
+                    })
+                    .map((agent) => {
+                      const taskCount = currentProject!.tasks.filter(t => t.agent?.id === agent.id && t.status !== 'DONE').length
+                      return (
+                        <div
+                          key={agent.id}
+                          className={`flex items-center gap-2 px-2 py-1 rounded-md hover:bg-surface/40 transition-colors cursor-pointer ${
+                            !agent.isActive && taskCount === 0 ? 'opacity-40' : ''
+                          }`}
+                          onClick={() => { setEditingAgent(agent); setAgentName(agent.name); setAgentEmoji(agent.emoji); setAgentColor(agent.color); setAgentDescription(agent.description || ''); setAgentDialogOpen(true) }}
+                        >
+                          <span className="text-sm">{agent.emoji}</span>
+                          <span className="text-[11px] text-foreground/70 flex-1 truncate">{agent.name}</span>
+                          {agent.isActive && (
+                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          )}
+                          {taskCount > 0 && (
+                            <span className="text-[9px] text-muted-foreground/50 shrink-0">{taskCount}</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
           
           <Separator className="my-4" />
@@ -2136,64 +2203,66 @@ export default function Home() {
 
       {/* Chain Creation Dialog */}
       <Dialog open={chainDialogOpen} onOpenChange={(open) => { setChainDialogOpen(open); if (!open) resetTaskForm() }}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[780px] max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Create Chain Task</DialogTitle>
             <DialogDescription>
               Select a template or build a custom workflow chain, then create a task that runs through it.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Task Title</label>
-              <Input
-                value={taskTitle}
-                onChange={(e) => setTaskTitle(e.target.value)}
-                placeholder="What should this chain accomplish?"
-                autoFocus
-              />
-            </div>
+          <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+            <div className="grid gap-4 py-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Task Title</label>
+                <Input
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="What should this chain accomplish?"
+                  autoFocus
+                />
+              </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
-              <Textarea
-                value={taskDescription}
-                onChange={(e) => setTaskDescription(e.target.value)}
-                placeholder="Context and requirements for the chain..."
-                rows={2}
-              />
-            </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <Textarea
+                  value={taskDescription}
+                  onChange={(e) => setTaskDescription(e.target.value)}
+                  placeholder="Context and requirements for the chain..."
+                  rows={2}
+                />
+              </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Priority</label>
-              <Select value={taskPriority} onValueChange={(v) => setTaskPriority(v as any)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">Low</SelectItem>
-                  <SelectItem value="MEDIUM">Medium</SelectItem>
-                  <SelectItem value="HIGH">High</SelectItem>
-                  <SelectItem value="URGENT">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Priority</label>
+                <Select value={taskPriority} onValueChange={(v) => setTaskPriority(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Workflow</label>
-              <ChainBuilder
-                projectId={currentProject?.id || ''}
-                agents={currentProject?.agents || []}
-                modes={projectModes}
-                templates={chainTemplates}
-                steps={taskSteps}
-                onStepsChange={setTaskSteps}
-              />
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Workflow</label>
+                <ChainBuilder
+                  projectId={currentProject?.id || ''}
+                  agents={currentProject?.agents || []}
+                  modes={projectModes}
+                  templates={chainTemplates}
+                  steps={taskSteps}
+                  onStepsChange={setTaskSteps}
+                />
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t pt-4">
             <Button variant="outline" onClick={() => { setChainDialogOpen(false); resetTaskForm() }}>
               Cancel
             </Button>

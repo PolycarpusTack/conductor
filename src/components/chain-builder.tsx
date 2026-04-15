@@ -201,51 +201,48 @@ export function ChainBuilder({
   const visualSteps: DagStep[] = steps.map(toDagStep)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Template selector */}
-      <div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-3">Templates</h3>
-        <div className="grid grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={handleCustomChain}
-            className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left text-sm transition-colors hover:bg-accent ${
-              selectedTemplate === null ? 'border-primary bg-accent' : 'border-border'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <LayoutTemplate className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Custom Chain</span>
-            </div>
-            <span className="text-xs text-muted-foreground">Start from scratch</span>
-          </button>
-
-          {templates.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              onClick={() => handleSelectTemplate(template)}
-              className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left text-sm transition-colors hover:bg-accent ${
-                selectedTemplate === template.id ? 'border-primary bg-accent' : 'border-border'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span>{template.icon}</span>
-                <span className="font-medium truncate">{template.name}</span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {template.description
-                  ? template.description
-                  : `${getStepCount(template)} step${getStepCount(template) !== 1 ? 's' : ''}`}
+      <div className="grid gap-2">
+        <label className="text-sm font-medium text-muted-foreground">Template</label>
+        <Select
+          value={selectedTemplate ?? '__custom__'}
+          onValueChange={(value) => {
+            if (value === '__custom__') {
+              handleCustomChain()
+            } else {
+              const template = templates.find(t => t.id === value)
+              if (template) handleSelectTemplate(template)
+            }
+          }}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="Choose a workflow template..." />
+          </SelectTrigger>
+          <SelectContent className="max-h-[300px]">
+            <SelectItem value="__custom__">
+              <span className="flex items-center gap-2">
+                <LayoutTemplate className="h-3.5 w-3.5 text-muted-foreground" />
+                Custom Chain — start from scratch
               </span>
-              {template.description && (
-                <span className="text-xs text-muted-foreground/70">
-                  {getStepCount(template)} step{getStepCount(template) !== 1 ? 's' : ''}
+            </SelectItem>
+            {templates.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                <span className="flex items-center gap-2">
+                  <span>{template.icon}</span>
+                  {template.name}
+                  <span className="text-muted-foreground">— {getStepCount(template)} steps</span>
                 </span>
-              )}
-            </button>
-          ))}
-        </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedTemplate && (() => {
+          const t = templates.find(t => t.id === selectedTemplate)
+          return t?.description ? (
+            <p className="text-xs text-muted-foreground">{t.description}</p>
+          ) : null
+        })()}
       </div>
 
       {/* View mode toggle */}

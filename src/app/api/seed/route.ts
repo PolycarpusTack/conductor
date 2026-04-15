@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { createAgentApiKey, createProjectApiKey } from '@/lib/server/api-keys'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { seedChainTemplates } from '@/lib/server/chain-templates'
+import { seedProjectAgents } from '@/lib/server/default-agents'
 
 export async function POST() {
   try {
@@ -17,9 +19,19 @@ export async function POST() {
     }
 
     // Check if data already exists
-    const existingProjects = await db.project.count()
-    if (existingProjects > 0) {
-      return NextResponse.json({ message: 'Database already seeded' })
+    const existingProjects = await db.project.findMany({ select: { id: true } })
+    if (existingProjects.length > 0) {
+      // Backfill missing default agents for existing projects
+      let backfilled = 0
+      for (const project of existingProjects) {
+        await seedProjectAgents(project.id)
+        await seedChainTemplates(project.id)
+        backfilled++
+      }
+      return NextResponse.json({
+        message: 'Database already seeded — backfilled default agents and chain templates for existing projects',
+        projectsUpdated: backfilled,
+      })
     }
     
     const projectId = randomUUID()

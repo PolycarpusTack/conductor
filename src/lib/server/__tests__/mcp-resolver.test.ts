@@ -15,6 +15,10 @@ import { db } from '@/lib/db'
 
 const originalFetch = globalThis.fetch
 
+function setMockFetch(impl: (...args: any[]) => Promise<Response>) {
+  globalThis.fetch = mock(impl) as unknown as typeof fetch
+}
+
 beforeEach(() => {
   globalThis.fetch = originalFetch;
   (db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockReset()
@@ -56,7 +60,7 @@ describe('executeMcpTool', () => {
       { id: 'conn1', name: 'myserver', endpoint: 'http://localhost:3001' },
     ])
 
-    globalThis.fetch = mock(() =>
+    setMockFetch(() =>
       Promise.resolve({
         ok: true,
         json: () =>
@@ -79,7 +83,7 @@ describe('executeMcpTool', () => {
     ])
 
     let capturedBody: unknown
-    globalThis.fetch = mock((url, init) => {
+    setMockFetch((url, init) => {
       capturedBody = JSON.parse((init as RequestInit).body as string)
       return Promise.resolve({
         ok: true,
@@ -108,7 +112,7 @@ describe('executeMcpTool', () => {
     ])
 
     let capturedUrl: string | undefined
-    globalThis.fetch = mock((url) => {
+    setMockFetch((url) => {
       capturedUrl = url as string
       return Promise.resolve({
         ok: true,
@@ -126,7 +130,7 @@ describe('executeMcpTool', () => {
     ])
 
     const mockResult = { content: [{ type: 'image', data: 'abc123', mimeType: 'image/png' }], extra: 42 }
-    globalThis.fetch = mock(() =>
+    setMockFetch(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ result: mockResult }),
@@ -144,7 +148,7 @@ describe('executeMcpTool', () => {
       { id: 'conn1', name: 'myserver', endpoint: 'http://localhost:3001' },
     ])
 
-    globalThis.fetch = mock(() =>
+    setMockFetch(() =>
       Promise.resolve({
         ok: true,
         json: () =>
@@ -171,7 +175,7 @@ describe('executeMcpTool', () => {
       { id: 'conn1', name: 'myserver', endpoint: 'http://localhost:3001' },
     ])
 
-    globalThis.fetch = mock(() => Promise.reject(new Error('ECONNREFUSED')))
+    setMockFetch(() => Promise.reject(new Error('ECONNREFUSED')))
 
     const result = await executeMcpTool('myserver__some_tool', {}, ['conn1'])
     const parsed = JSON.parse(result.text)
@@ -185,7 +189,7 @@ describe('executeMcpTool', () => {
       { id: 'conn1', name: 'myserver', endpoint: 'http://localhost:3001' },
     ])
 
-    globalThis.fetch = mock(() =>
+    setMockFetch(() =>
       Promise.resolve({
         ok: false,
         status: 503,
@@ -205,7 +209,7 @@ describe('executeMcpTool', () => {
     ])
 
     let capturedBody: { params?: { name?: string } } | undefined
-    globalThis.fetch = mock((_, init) => {
+    setMockFetch((_, init) => {
       capturedBody = JSON.parse((init as RequestInit).body as string)
       return Promise.resolve({
         ok: true,

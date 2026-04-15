@@ -7,6 +7,15 @@ interface DiscoveredModel {
   tier: string
 }
 
+const ALLOWED_API_KEY_ENV_VARS = new Set([
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'GOOGLE_AI_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'ZAI_API_KEY',
+  'ZHIPU_API_KEY',
+])
+
 function classifyTier(modelId: string): string {
   const id = modelId.toLowerCase()
   if (id.includes('opus')) return 'deep'
@@ -175,6 +184,13 @@ export async function POST(
 
     if (!apiKeyEnvVar || typeof apiKeyEnvVar !== 'string') {
       return NextResponse.json({ error: 'API key environment variable name is required' }, { status: 400 })
+    }
+
+    if (!ALLOWED_API_KEY_ENV_VARS.has(apiKeyEnvVar)) {
+      return NextResponse.json(
+        { error: `Environment variable "${apiKeyEnvVar}" is not in the allowed list` },
+        { status: 400 },
+      )
     }
 
     const apiKey = process.env[apiKeyEnvVar]

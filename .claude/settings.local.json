@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(bun run:*)",
+      "Bash(npx prisma:*)",
+      "Bash(ls /mnt/c/Projects/AgentBoard/.env*)",
+      "Bash(ls /mnt/c/Projects/AgentBoard/*.env)",
+      "Bash(DATABASE_URL=\"file:./prisma/dev.db\" npx prisma db push --accept-data-loss 2>&1)",
+      "Bash(git stash:*)",
+      "Bash(./node_modules/.bin/prisma db:*)",
+      "Bash(node:*)",
+      "Bash(git:*)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(GIT_DIR=/mnt/c/Projects/AgentBoard/.git GIT_WORK_TREE=/mnt/c/Projects/AgentBoard git status)",
+      "Bash(echo \"done $?\")",
+      "Bash(ls:*)",
+      "Bash(export PATH=\"$HOME/.bun/bin:$PATH\")",
+      "Bash(npx --yes prisma version)",
+      "Bash(npx --yes tsc --noEmit --pretty)",
+      "Bash(find /mnt/c/Projects/AgentBoard/node_modules/prisma -name index.* -maxdepth 3)",
+      "Bash(npm install:*)",
+      "Bash(npx --yes tsc --noEmit)",
+      "Bash(npx next:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(sqlite3:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(GIT_EDITOR=true git commit --no-edit -m \"perf: debounce agent heartbeat writes to reduce SQLite contention:*)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(echo EXIT:$?)",
+      "Bash(GIT_TRACE=1 git -C /mnt/c/Projects/AgentBoard log --oneline -1)",
+      "Bash(GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true git -C /mnt/c/Projects/AgentBoard commit -m \"fix: log error and set task WAITING when startChain finds no root steps\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\" 2>&1)",
+      "Bash(GIT_TRACE=0 git -C /mnt/c/Projects/AgentBoard log --oneline -6 2>&1)",
+      "Bash(grep -n \"await broadcastProjectEvent\" /mnt/c/Projects/AgentBoard/src/app/api/cli/route.ts /mnt/c/Projects/AgentBoard/src/app/api/agent/tasks/[id]/route.ts)"
+    ]
+  }
+}
