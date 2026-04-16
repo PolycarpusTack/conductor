@@ -1,16 +1,30 @@
 import { PrismaClient } from '@/generated/prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
+/** True when connected to PostgreSQL (enables pgvector features). */
+export const isPostgresDb = (process.env.DATABASE_URL || '').startsWith('postgresql')
+
 function createClient() {
-  const connectionString = process.env.DATABASE_URL
-    || 'postgresql://conductor:conductor_dev@localhost:5432/conductor'
+  // Adapter is resolved synchronously at startup.
+  // Both adapter packages are installed; only one is loaded per environment.
+  if (isPostgresDb) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('@prisma/adapter-pg')
+    const adapter = new mod.PrismaPg({ connectionString: process.env.DATABASE_URL! })
+    return new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === 'production' ? ['error'] : ['query'],
+    })
+  }
 
-  const adapter = new PrismaPg({ connectionString })
-
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const mod = require('@prisma/adapter-better-sqlite3')
+  const adapter = new mod.PrismaBetterSqlite3({
+    url: process.env.DATABASE_URL || 'file:./prisma/dev.db',
+  })
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'production' ? ['error'] : ['query'],

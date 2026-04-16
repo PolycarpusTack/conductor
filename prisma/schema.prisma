@@ -2,14 +2,12 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider        = "prisma-client"
-  output          = "../src/generated/prisma"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider   = "postgresql"
-  extensions = [vector]
+  provider = "sqlite"
 }
 
 model Project {
@@ -326,7 +324,7 @@ model Skill {
   description  String?
   body         String    // markdown content — the actual skill/playbook
   tags         String?   // JSON array of tags
-  embedding    Unsupported("vector(1536)")?
+  embedding    String?   // JSON float array on SQLite; cast to vector(1536) via raw SQL on Postgres
   sourceTaskId String?
   version      Int       @default(1)
   parentId     String?   // points to previous version's id

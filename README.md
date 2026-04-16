@@ -15,32 +15,28 @@ A professional-grade orchestration platform for AI agents with workflow chains, 
 ## Requirements
 
 - Node.js 18+ or Bun
-- Docker (for PostgreSQL + pgvector)
+- Optional: Docker (for PostgreSQL + pgvector — enables semantic skill search)
 
 ## Quick Start
 
-### 1. Start PostgreSQL
-
-```bash
-docker compose up -d
-```
-
-This starts PostgreSQL 17 with pgvector on port 5432.
-
-### 2. Install Dependencies
+### 1. Install Dependencies
 
 ```bash
 bun install
-# or
-npm install
 ```
 
-### 3. Setup Database
+### 2. Setup Database
 
+**SQLite (default — zero config):**
 ```bash
-bun run db:migrate
-# or
-npx prisma migrate dev
+bun run db:push
+```
+
+**PostgreSQL (optional — for semantic search via pgvector):**
+```bash
+docker compose up -d
+# Update .env: DATABASE_URL="postgresql://conductor:conductor_dev@localhost:5432/conductor"
+bun run db:push
 ```
 
 ### 4. Start Development Server
@@ -138,7 +134,8 @@ curl -X PUT "http://localhost:3000/api/agent/tasks/TASK_ID" \
 Create a `.env` file:
 
 ```env
-DATABASE_URL="postgresql://conductor:conductor_dev@localhost:5432/conductor"
+DATABASE_URL="file:./prisma/dev.db"
+# For PostgreSQL + pgvector: DATABASE_URL="postgresql://conductor:conductor_dev@localhost:5432/conductor"
 AGENTBOARD_ADMIN_PASSWORD="change-me"
 # Optional: separate session salt for admin cookies
 AGENTBOARD_ADMIN_SESSION_SECRET="replace-with-a-random-secret"
@@ -178,9 +175,9 @@ Set the same `AGENTBOARD_WS_SECRET` and `AGENTBOARD_WS_INTERNAL_SECRET` for both
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4
 - **UI Components**: shadcn/ui
-- **Database**: Prisma ORM with PostgreSQL 17 + pgvector
+- **Database**: Prisma ORM with SQLite (default) or PostgreSQL 17 + pgvector
 - **Real-time**: Socket.io
-- **Search**: pgvector cosine similarity (skills)
+- **Search**: Text search (SQLite) or pgvector cosine similarity (PostgreSQL)
 
 ## License
 

@@ -1,9 +1,40 @@
 import { NextResponse } from 'next/server'
 
-import { db } from '@/lib/db'
+import { db, isPostgresDb } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { skillSearchSchema } from '@/lib/server/contracts'
 import { generateEmbedding } from '@/lib/server/embeddings'
+
+async function textSearch(q: string, workspaceId: string | undefined, limit: number) {
+  const where: Record<string, unknown> = {
+    OR: [
+      { title: { contains: q } },
+      { description: { contains: q } },
+      { body: { contains: q } },
+      { tags: { contains: q } },
+    ],
+  }
+  if (workspaceId) where.workspaceId = workspaceId
+
+  const skills = await db.skill.findMany({
+    where,
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      tags: true,
+      version: true,
+      createdAt: true,
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: limit,
+  })
+
+  return {
+    data: skills.map((s) => ({ ...s, tags: s.tags ? JSON.parse(s.tags) : [], score: null })),
+    method: 'text' as const,
+  }
+}
 
 export async function GET(request: Request) {
   try {
@@ -26,41 +57,18 @@ export async function GET(request: Request) {
 
     const { q, workspaceId, limit } = parsed.data
 
+    // SQLite: always text search (no pgvector)
+    if (!isPostgresDb) {
+      return NextResponse.json(await textSearch(q, workspaceId, limit))
+    }
+
+    // Postgres: try semantic search, fall back to text
     const embedding = await generateEmbedding(q)
 
     if (!embedding) {
-      // Fallback to text search if embedding generation fails
-      const where: Record<string, unknown> = {
-        OR: [
-          { title: { contains: q, mode: 'insensitive' } },
-          { description: { contains: q, mode: 'insensitive' } },
-          { body: { contains: q, mode: 'insensitive' } },
-          { tags: { contains: q } },
-        ],
-      }
-      if (workspaceId) where.workspaceId = workspaceId
-
-      const skills = await db.skill.findMany({
-        where,
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          tags: true,
-          version: true,
-          createdAt: true,
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: limit,
-      })
-
-      return NextResponse.json({
-        data: skills.map((s) => ({ ...s, tags: s.tags ? JSON.parse(s.tags) : [], score: null })),
-        method: 'text',
-      })
+      return NextResponse.json(await textSearch(q, workspaceId, limit))
     }
 
-    // Semantic search via pgvector cosine distance
     const vectorStr = `[${embedding.join(',')}]`
 
     const results = workspaceId
