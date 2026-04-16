@@ -30,7 +30,6 @@ interface Workspace {
 interface WorkspaceSwitcherProps {
   currentWorkspaceId?: string | null
   onSwitch: (workspaceId: string) => void
-  onCreate?: () => void
 }
 
 function slugify(name: string): string {

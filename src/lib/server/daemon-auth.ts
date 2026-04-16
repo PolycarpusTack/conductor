@@ -62,7 +62,7 @@ export async function updateDaemonHeartbeat(daemonId: string) {
   })
 }
 
-export async function markDaemonOffline(daemonId: string, reason?: string) {
+export async function markDaemonOffline(daemonId: string) {
   await db.daemon.update({
     where: { id: daemonId },
     data: {

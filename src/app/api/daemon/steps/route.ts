@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
         where: { id: stepId },
         data: {
           status: 'completed',
-          output: output?.slice(0, 5000),
+          output: output?.slice(0, MAX_OUTPUT_CHARS),
           completedAt: new Date(),
         },
       })
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
         where: { id: stepId },
         data: {
           status: willRetry ? 'pending' : 'failed',
-          error: errorMsg?.slice(0, 5000),
+          error: errorMsg?.slice(0, MAX_OUTPUT_CHARS),
           attempts: { increment: 1 },
         },
       })

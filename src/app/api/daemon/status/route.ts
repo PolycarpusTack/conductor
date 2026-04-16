@@ -33,7 +33,9 @@ export async function GET() {
 
     const parsed = daemons.map((d) => {
       let caps: Record<string, unknown> = {}
-      try { caps = JSON.parse(d.capabilities) } catch {}
+      try { caps = JSON.parse(d.capabilities) } catch {
+        console.error(`Corrupt capabilities JSON for daemon ${d.id}`)
+      }
       const runtimes = Object.keys(caps).filter((k) => k !== '_health')
       return { ...d, capabilities: caps, runtimes }
     })

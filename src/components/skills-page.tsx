@@ -103,8 +103,8 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
   const fetchSkillBody = async (skillId: string) => {
     const existing = skills.find((s) => s.id === skillId)
     if (existing?.body) { setSelectedSkill(existing); return }
-    // Skills list doesn't include body — fetch full skill
-    // For now, show what we have (body will come from a detail endpoint later)
+    // DEBT: Skills list endpoint doesn't return body — need GET /api/skills/:id detail endpoint
+    // When to pay: before skills feature is user-facing in production
     setSelectedSkill(existing || null)
   }
 

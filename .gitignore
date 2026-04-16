@@ -55,6 +55,9 @@ CLAUDE.local.md
 # Archive (local-only working files)
 .archive/
 
+# Lock files (project uses bun.lock)
+package-lock.json
+
 # Misc
 *.zip
 *.tar.gz

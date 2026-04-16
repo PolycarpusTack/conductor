@@ -62,24 +62,32 @@ export async function GET(request: Request) {
 
     // Semantic search via pgvector cosine distance
     const vectorStr = `[${embedding.join(',')}]`
-    const wsFilter = workspaceId ? `AND "workspaceId" = '${workspaceId}'` : ''
 
-    const results = await db.$queryRawUnsafe<Array<{
-      id: string
-      title: string
-      description: string | null
-      tags: string | null
-      version: number
-      createdAt: Date
-      distance: number
-    }>>(
-      `SELECT id, title, description, tags, version, "createdAt",
-              embedding <=> '${vectorStr}'::vector AS distance
-       FROM "Skill"
-       WHERE embedding IS NOT NULL ${wsFilter}
-       ORDER BY distance ASC
-       LIMIT ${limit}`,
-    )
+    const results = workspaceId
+      ? await db.$queryRawUnsafe<Array<{
+          id: string; title: string; description: string | null
+          tags: string | null; version: number; createdAt: Date; distance: number
+        }>>(
+          `SELECT id, title, description, tags, version, "createdAt",
+                  embedding <=> $1::vector AS distance
+           FROM "Skill"
+           WHERE embedding IS NOT NULL AND "workspaceId" = $2
+           ORDER BY distance ASC
+           LIMIT $3`,
+          vectorStr, workspaceId, limit,
+        )
+      : await db.$queryRawUnsafe<Array<{
+          id: string; title: string; description: string | null
+          tags: string | null; version: number; createdAt: Date; distance: number
+        }>>(
+          `SELECT id, title, description, tags, version, "createdAt",
+                  embedding <=> $1::vector AS distance
+           FROM "Skill"
+           WHERE embedding IS NOT NULL
+           ORDER BY distance ASC
+           LIMIT $2`,
+          vectorStr, limit,
+        )
 
     const data = results.map((r) => ({
       ...r,

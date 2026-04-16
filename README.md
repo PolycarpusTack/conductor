@@ -15,11 +15,19 @@ A professional-grade orchestration platform for AI agents with workflow chains, 
 ## Requirements
 
 - Node.js 18+ or Bun
-- SQLite (included)
+- Docker (for PostgreSQL + pgvector)
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Start PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+This starts PostgreSQL 17 with pgvector on port 5432.
+
+### 2. Install Dependencies
 
 ```bash
 bun install
@@ -27,15 +35,15 @@ bun install
 npm install
 ```
 
-### 2. Setup Database
+### 3. Setup Database
 
 ```bash
-bun run db:push
+bun run db:migrate
 # or
-npx prisma db push
+npx prisma migrate dev
 ```
 
-### 3. Start Development Server
+### 4. Start Development Server
 
 ```bash
 bun run dev
@@ -43,11 +51,11 @@ bun run dev
 npm run dev
 ```
 
-### 4. Open in Browser
+### 5. Open in Browser
 
 Navigate to `http://localhost:3000`
 
-### 5. Create Your First Project
+### 6. Create Your First Project
 
 Open the board, sign in with the admin password, and create a project from the header. You can choose whether to provision starter agents during project creation.
 
@@ -130,7 +138,7 @@ curl -X PUT "http://localhost:3000/api/agent/tasks/TASK_ID" \
 Create a `.env` file:
 
 ```env
-DATABASE_URL="file:./db/custom.db"
+DATABASE_URL="postgresql://conductor:conductor_dev@localhost:5432/conductor"
 AGENTBOARD_ADMIN_PASSWORD="change-me"
 # Optional: separate session salt for admin cookies
 AGENTBOARD_ADMIN_SESSION_SECRET="replace-with-a-random-secret"
@@ -170,8 +178,9 @@ Set the same `AGENTBOARD_WS_SECRET` and `AGENTBOARD_WS_INTERNAL_SECRET` for both
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4
 - **UI Components**: shadcn/ui
-- **Database**: Prisma ORM with SQLite
+- **Database**: Prisma ORM with PostgreSQL 17 + pgvector
 - **Real-time**: Socket.io
+- **Search**: pgvector cosine similarity (skills)
 
 ## License
 

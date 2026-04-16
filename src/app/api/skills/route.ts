@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
-import { createSkillSchema, updateSkillSchema } from '@/lib/server/contracts'
+import { createSkillSchema } from '@/lib/server/contracts'
 import { requireWorkspaceId } from '@/lib/server/workspace'
 
 export async function GET(request: Request) {
