@@ -26,6 +26,7 @@ interface Agent {
   runtimeModel?: string | null
   systemPrompt?: string | null
   mcpConnectionIds?: string | null
+  invocationMode?: string | null
   isActive: boolean
   lastSeen?: string | null
 }
@@ -125,6 +126,7 @@ export function AgentCreationModal({
   const [runtimeId, setRuntimeId] = useState<string | null>(null)
   const [runtimeModel, setRuntimeModel] = useState<string | null>(null)
   const [systemPrompt, setSystemPrompt] = useState('')
+  const [invocationMode, setInvocationMode] = useState<'HTTP' | 'DAEMON'>('HTTP')
 
   // Connections
   const [selectedMcpIds, setSelectedMcpIds] = useState<string[]>([])
@@ -146,6 +148,7 @@ export function AgentCreationModal({
       setRuntimeId(editingAgent.runtimeId || null)
       setRuntimeModel(editingAgent.runtimeModel || null)
       setSystemPrompt(editingAgent.systemPrompt || '')
+      setInvocationMode((editingAgent.invocationMode as 'HTTP' | 'DAEMON') || 'HTTP')
       setSelectedMcpIds(parseJsonSafe<string[]>(editingAgent.mcpConnectionIds, []))
     } else {
       setName('')
@@ -161,6 +164,7 @@ export function AgentCreationModal({
       setRuntimeId(null)
       setRuntimeModel(null)
       setSystemPrompt('')
+      setInvocationMode('HTTP')
       setSelectedMcpIds([])
     }
     setTab('identity')
@@ -218,6 +222,7 @@ export function AgentCreationModal({
       runtimeId: runtimeId || undefined,
       runtimeModel: runtimeModel || undefined,
       systemPrompt: systemPrompt.trim() || undefined,
+      invocationMode,
       mcpConnectionIds: selectedMcpIds.length > 0 ? selectedMcpIds : undefined,
     }
 
@@ -430,6 +435,33 @@ export function AgentCreationModal({
 
             {/* Tab 2: Runtime */}
             <TabsContent value="runtime" className="mt-0 space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Invocation Mode</label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={invocationMode === 'HTTP' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setInvocationMode('HTTP')}
+                  >
+                    HTTP (Agent Polls)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={invocationMode === 'DAEMON' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setInvocationMode('DAEMON')}
+                  >
+                    Daemon (Conductor Launches)
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {invocationMode === 'HTTP'
+                    ? 'Agent polls the REST/CLI API for tasks (legacy mode).'
+                    : 'Conductor daemon spawns the agent CLI when a task is assigned.'}
+                </p>
+              </div>
+
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Runtime</label>
                 {runtimes.length === 0 ? (

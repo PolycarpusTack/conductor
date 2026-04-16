@@ -8,20 +8,29 @@ import { createProjectSchema } from '@/lib/server/contracts'
 import { seedChainTemplates } from '@/lib/server/chain-templates'
 import { seedProjectModes } from '@/lib/server/default-modes'
 import { seedProjectAgents } from '@/lib/server/default-agents'
+import { requireWorkspaceId } from '@/lib/server/workspace'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const unauthorized = await requireAdminSession()
     if (unauthorized) {
       return unauthorized
     }
 
+    const { searchParams } = new URL(request.url)
+    const workspaceId = searchParams.get('workspaceId') || undefined
+
+    const where: Record<string, unknown> = {}
+    if (workspaceId) where.workspaceId = workspaceId
+
     const projects = await db.project.findMany({
+      where,
       select: {
         id: true,
         name: true,
         description: true,
         color: true,
+        workspaceId: true,
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -52,9 +61,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid project payload' }, { status: 400 })
     }
 
-    const { name, description, color } = parsed.data
+    const { name, description, color, workspaceId: requestedWorkspaceId } = parsed.data
     const id = randomUUID()
     const provisionedKey = createProjectApiKey(id)
+    const workspaceId = await requireWorkspaceId(requestedWorkspaceId)
 
     const project = await db.project.create({
       data: {
@@ -62,6 +72,7 @@ export async function POST(request: Request) {
         name,
         description,
         color: color || '#3b82f6',
+        workspaceId,
         apiKeyHash: provisionedKey.hash,
         apiKeyPreview: provisionedKey.preview,
       },

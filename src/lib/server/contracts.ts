@@ -25,6 +25,7 @@ export const createProjectSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: trimmedOptionalString,
   color: colorSchema.optional(),
+  workspaceId: z.string().trim().min(1).optional(),
 })
 
 export const updateProjectSchema = createProjectSchema.partial().refine(
@@ -35,6 +36,8 @@ export const updateProjectSchema = createProjectSchema.partial().refine(
 export const agentRoleSchema = z.enum([
   'developer', 'architect', 'security', 'reviewer', 'qa', 'analyst', 'writer', 'researcher', 'support', 'custom'
 ])
+
+export const agentInvocationModeSchema = z.enum(['HTTP', 'DAEMON'])
 
 export const createAgentSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -51,6 +54,7 @@ export const createAgentSchema = z.object({
   runtimeModel: z.string().trim().max(120).optional(),
   systemPrompt: z.string().max(10000).optional(),
   mcpConnectionIds: z.array(z.string().trim().min(1)).max(10).optional(),
+  invocationMode: agentInvocationModeSchema.optional(),
 })
 
 export const updateAgentSchema = z.object({
@@ -67,6 +71,7 @@ export const updateAgentSchema = z.object({
   runtimeModel: z.string().trim().max(120).optional().nullable(),
   systemPrompt: z.string().max(10000).optional().nullable(),
   mcpConnectionIds: z.array(z.string().trim().min(1)).max(10).optional().nullable(),
+  invocationMode: agentInvocationModeSchema.optional(),
 }).refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
 
 export const stepConditionSchema = z.object({
@@ -99,6 +104,8 @@ export const taskStepSchema = z.object({
   requiredSignOffs: z.number().int().min(1).max(10).optional(),
 })
 
+export const runtimeOverrideSchema = z.enum(['claude-code', 'codex', 'copilot'])
+
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(240),
   description: trimmedOptionalString,
@@ -109,6 +116,7 @@ export const createTaskSchema = z.object({
   agentId: z.string().trim().min(1).optional().nullable().transform((value) => value || undefined),
   notes: trimmedOptionalString,
   steps: z.array(taskStepSchema).max(10).optional(),
+  runtimeOverride: runtimeOverrideSchema.optional().nullable(),
 })
 
 export const updateTaskSchema = z
@@ -121,6 +129,7 @@ export const updateTaskSchema = z
     agentId: z.string().trim().min(1).optional().nullable(),
     notes: trimmedOptionalString,
     order: z.number().int().min(0).optional(),
+    runtimeOverride: runtimeOverrideSchema.optional().nullable(),
   })
   .refine((value) => Object.keys(value).length > 0, 'Provide at least one task field to update')
 
@@ -232,6 +241,30 @@ export const rejectStepSchema = z.object({
 export const updateChainTemplateSchema = createChainTemplateSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
+
+// ── Skills ──────────────────────────────────────────────────────────────────
+
+export const createSkillSchema = z.object({
+  title: z.string().trim().min(1).max(240),
+  description: z.string().max(1000).optional(),
+  body: z.string().min(1).max(50000),
+  tags: z.array(z.string().trim().max(60)).max(20).optional(),
+  sourceTaskId: z.string().trim().min(1).optional(),
+  workspaceId: z.string().trim().min(1).optional(),
+})
+
+export const updateSkillSchema = z.object({
+  title: z.string().trim().min(1).max(240).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  body: z.string().min(1).max(50000).optional(),
+  tags: z.array(z.string().trim().max(60)).max(20).optional().nullable(),
+}).refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
+
+export const skillSearchSchema = z.object({
+  q: z.string().trim().min(1).max(500),
+  workspaceId: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(20).default(5),
+})
 
 export const stepArtifactSchema = z.object({
   type: z.enum(['text', 'code', 'diff', 'url', 'image', 'file', 'json', 'log', 'test_result']),

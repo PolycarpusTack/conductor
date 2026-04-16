@@ -27,6 +27,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
+import { WorkspaceSwitcher } from '@/components/workspace-switcher'
+import { RuntimeDashboard } from '@/components/runtime-dashboard'
 import {
   Bot,
   Plus,
@@ -101,6 +103,7 @@ interface Task {
   order: number
   startedAt?: string | null
   completedAt?: string | null
+  runtimeOverride?: string | null
   steps?: any[]
 }
 
@@ -159,7 +162,8 @@ const realtimeSocketUrl = process.env.NEXT_PUBLIC_AGENTBOARD_WS_URL || '/?XTrans
 const showDemoSeed = process.env.NODE_ENV !== 'production'
 
 export default function Home() {
-  const [view, setView] = useState<'landing' | 'board'>('landing')
+  const [view, setView] = useState<'landing' | 'board' | 'runtime'>('landing')
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [projects, setProjects] = useState<ProjectListItem[]>([])
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(false)
@@ -211,6 +215,8 @@ export default function Home() {
   const [taskTag, setTaskTag] = useState('')
   const [taskAgentId, setTaskAgentId] = useState<string>('')
   const [taskNotes, setTaskNotes] = useState('')
+  const [taskRuntimeOverride, setTaskRuntimeOverride] = useState<string>('')
+  const [daemonLogs, setDaemonLogs] = useState<Array<{ taskId: string; stepId?: string; daemonId: string; event: { type: 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'completed' | 'error'; [key: string]: unknown }; timestamp: string }>>([])
   
   // Form state for projects
   const [projectName, setProjectName] = useState('')
@@ -331,6 +337,11 @@ export default function Home() {
             if (!isCancelled) setCurrentProject(proj)
           })
         }
+
+        activeSocket.on('daemon-agent-event', (data: unknown) => {
+          const entry = data as typeof daemonLogs[number]
+          setDaemonLogs(prev => [...prev, entry].slice(-500))
+        })
 
         activeSocket.on('step-activated', refetchCurrentProject)
         activeSocket.on('step-completed', refetchCurrentProject)
@@ -770,6 +781,7 @@ export default function Home() {
             tag: taskTag || undefined,
             agentId: taskAgentId || null,
             notes: taskNotes || undefined,
+            runtimeOverride: taskRuntimeOverride && taskRuntimeOverride !== 'none' ? taskRuntimeOverride : null,
           }),
         })
 
@@ -797,6 +809,7 @@ export default function Home() {
             tag: taskTag || undefined,
             agentId: taskAgentId || undefined,
             notes: taskNotes || undefined,
+            runtimeOverride: taskRuntimeOverride || undefined,
             projectId: currentProject.id,
             steps: taskSteps.length > 0 ? taskSteps : undefined,
           }),
@@ -1011,6 +1024,7 @@ export default function Home() {
     setTaskTag(task.tag || '')
     setTaskAgentId(task.agent?.id || '')
     setTaskNotes(task.notes || '')
+    setTaskRuntimeOverride(task.runtimeOverride || '')
     setTaskDialogOpen(true)
   }
 
@@ -1034,6 +1048,7 @@ export default function Home() {
     setTaskTag('')
     setTaskAgentId('')
     setTaskNotes('')
+    setTaskRuntimeOverride('')
     setTaskSteps([])
     setEditingTask(null)
   }
@@ -1538,6 +1553,12 @@ export default function Home() {
               <span className="text-sm font-semibold tracking-tight font-heading">Conductor</span>
             </a>
 
+            <WorkspaceSwitcher
+              currentWorkspaceId={currentWorkspaceId}
+              onSwitch={(id) => setCurrentWorkspaceId(id)}
+              onCreate={() => {/* TODO: open workspace creation dialog */}}
+            />
+
             {/* WebSocket status */}
             <div className={`hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-mono ${wsConnected ? 'bg-[var(--op-teal-bg)] text-[var(--op-teal)] border border-[var(--op-teal-dim)]' : 'bg-muted text-muted-foreground'}`}>
               <div className={`h-1.5 w-1.5 rounded-full ${wsConnected ? 'bg-[var(--op-teal)] animate-pulse' : 'bg-muted-foreground/50'}`} />
@@ -1637,6 +1658,15 @@ export default function Home() {
               onClick={() => setSettingsTab('general')}
             >
               <Settings className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 ${view === 'runtime' ? 'bg-accent' : ''}`}
+              onClick={() => setView(view === 'runtime' ? 'board' : 'runtime')}
+              title="Runtime Dashboard"
+            >
+              <Activity className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -1790,7 +1820,17 @@ export default function Home() {
               {authError}
             </div>
           )}
-          {loading ? (
+          {view === 'runtime' ? (
+            <div className="p-6 max-w-6xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold">Runtime Dashboard</h2>
+                <Button variant="outline" size="sm" onClick={() => setView('board')}>
+                  Back to Board
+                </Button>
+              </div>
+              <RuntimeDashboard daemonLogs={daemonLogs} />
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
               <div className="flex flex-col items-center gap-3">
                 <Sparkles className="h-8 w-8 text-muted-foreground/30 animate-pulse" />
@@ -2167,6 +2207,22 @@ export default function Home() {
               </div>
             </div>
             
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Runtime Override</label>
+              <Select value={taskRuntimeOverride} onValueChange={setTaskRuntimeOverride}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Use agent default" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Use agent default</SelectItem>
+                  <SelectItem value="claude-code">Claude Code</SelectItem>
+                  <SelectItem value="codex">Codex</SelectItem>
+                  <SelectItem value="copilot">GitHub Copilot</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Override the runtime for this specific task (daemon mode only).</p>
+            </div>
+
             <div className="grid gap-2">
               <label className="text-sm font-medium">Notes</label>
               <Textarea

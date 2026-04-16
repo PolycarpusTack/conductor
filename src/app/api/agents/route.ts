@@ -83,7 +83,7 @@ export async function POST(request: Request) {
 
     const { name, emoji, color, description, projectId, role, capabilities,
             maxConcurrent, supportedModes, modeInstructions, runtimeId,
-            runtimeModel, systemPrompt, mcpConnectionIds } = parsed.data
+            runtimeModel, systemPrompt, mcpConnectionIds, invocationMode } = parsed.data
     const id = randomUUID()
     const provisionedKey = createAgentApiKey(id)
 
@@ -104,6 +104,7 @@ export async function POST(request: Request) {
         runtimeModel,
         systemPrompt,
         mcpConnectionIds: mcpConnectionIds ? JSON.stringify(mcpConnectionIds) : undefined,
+        invocationMode: invocationMode || 'HTTP',
         apiKeyHash: provisionedKey.hash,
         apiKeyPreview: provisionedKey.preview,
       },
