@@ -29,6 +29,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Separator } from '@/components/ui/separator'
 import { WorkspaceSwitcher } from '@/components/workspace-switcher'
 import { RuntimeDashboard } from '@/components/runtime-dashboard'
+import { SkillsPage } from '@/components/skills-page'
 import {
   Bot,
   Plus,
@@ -47,6 +48,7 @@ import {
   Check,
   Key,
   Activity,
+  BookOpen,
   FolderPlus,
   RefreshCw,
   ExternalLink,
@@ -84,6 +86,7 @@ interface Agent {
   maxConcurrent: number
   supportedModes?: string | null
   modeInstructions?: string | null
+  invocationMode?: string | null
   runtimeId?: string | null
   runtimeModel?: string | null
   systemPrompt?: string | null
@@ -162,7 +165,7 @@ const realtimeSocketUrl = process.env.NEXT_PUBLIC_AGENTBOARD_WS_URL || '/?XTrans
 const showDemoSeed = process.env.NODE_ENV !== 'production'
 
 export default function Home() {
-  const [view, setView] = useState<'landing' | 'board' | 'runtime'>('landing')
+  const [view, setView] = useState<'landing' | 'board' | 'runtime' | 'skills'>('landing')
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [projects, setProjects] = useState<ProjectListItem[]>([])
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
@@ -1556,7 +1559,6 @@ export default function Home() {
             <WorkspaceSwitcher
               currentWorkspaceId={currentWorkspaceId}
               onSwitch={(id) => setCurrentWorkspaceId(id)}
-              onCreate={() => {/* TODO: open workspace creation dialog */}}
             />
 
             {/* WebSocket status */}
@@ -1625,9 +1627,19 @@ export default function Home() {
                         .map((agent) => {
                           const taskCount = currentProject.tasks.filter(t => t.agent?.id === agent.id && t.status !== 'DONE').length
                           return (
-                            <div key={agent.id} className={`flex items-center gap-2 px-2 py-1 rounded-md text-[11px] ${agent.isActive ? 'text-foreground/80' : 'text-muted-foreground/40'}`}>
+                            <div key={agent.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] ${agent.isActive ? 'text-foreground/80' : 'text-muted-foreground/40'}`}>
                               <span className="text-sm">{agent.emoji}</span>
-                              <span className="flex-1 truncate">{agent.name}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="truncate">{agent.name}</span>
+                                  {agent.invocationMode === 'DAEMON' && (
+                                    <span className="text-[8px] px-1 py-0 rounded bg-violet-500/15 text-violet-500 border border-violet-500/20 shrink-0">DAEMON</span>
+                                  )}
+                                </div>
+                                {agent.role && (
+                                  <span className="text-[9px] text-muted-foreground/50 capitalize">{agent.role}</span>
+                                )}
+                              </div>
                               {agent.isActive && <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />}
                               {taskCount > 0 && <span className="text-[9px] text-muted-foreground/50">{taskCount}</span>}
                             </div>
@@ -1658,6 +1670,15 @@ export default function Home() {
               onClick={() => setSettingsTab('general')}
             >
               <Settings className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 ${view === 'skills' ? 'bg-accent' : ''}`}
+              onClick={() => setView(view === 'skills' ? 'board' : 'skills')}
+              title="Skills Library"
+            >
+              <BookOpen className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -1829,6 +1850,16 @@ export default function Home() {
                 </Button>
               </div>
               <RuntimeDashboard daemonLogs={daemonLogs} />
+            </div>
+          ) : view === 'skills' ? (
+            <div className="p-6 max-w-6xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div />
+                <Button variant="outline" size="sm" onClick={() => setView('board')}>
+                  Back to Board
+                </Button>
+              </div>
+              <SkillsPage workspaceId={currentWorkspaceId} />
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
