@@ -102,7 +102,7 @@ export const PUT = withErrorHandling(
         const actionName = actionResult.data === 'claim' ? 'claimed' : 'started'
         const result = await claimOrStartTask(id, agent, actionName)
         if ('error' in result) {
-          throw new ApiError(result.status, result.error)
+          throw new ApiError(result.status ?? 400, result.error)
         }
         return NextResponse.json({ success: true, task: result.task, action: actionName })
       }

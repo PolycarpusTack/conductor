@@ -29,7 +29,18 @@ export const conflict = (message: string, details?: unknown) =>
   new ApiError(409, message, details)
 export const tooLarge = (message = 'Payload too large') => new ApiError(413, message)
 
-type RouteHandler<Ctx> = (request: Request, context: Ctx) => Promise<Response>
+/**
+ * Shape Next.js passes as the second arg to every route handler. Even
+ * non-dynamic routes receive `{ params: Promise<{}> }`. Dynamic routes
+ * narrow this via the generic.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+type RouteContext = { params: Promise<{}> }
+
+type RouteHandler<Ctx extends RouteContext = RouteContext> = (
+  request: Request,
+  context: Ctx,
+) => Promise<Response>
 
 /**
  * Wraps a Next.js route handler with uniform error handling.
@@ -42,7 +53,7 @@ type RouteHandler<Ctx> = (request: Request, context: Ctx) => Promise<Response>
  * The `tag` should identify the route (e.g. `"api/tasks"`) so logs can be
  * correlated with a specific handler.
  */
-export function withErrorHandling<Ctx = undefined>(
+export function withErrorHandling<Ctx extends RouteContext = RouteContext>(
   tag: string,
   handler: RouteHandler<Ctx>,
 ): RouteHandler<Ctx> {
