@@ -40,6 +40,7 @@ export async function GET(request: Request) {
           runtimeId: true,
           runtimeModel: true,
           systemPrompt: true,
+          invocationMode: true,
           project: {
             select: projectSummarySelect,
           },
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
         description: true,
         isActive: true,
         lastSeen: true,
+        invocationMode: true,
         project: {
           select: projectSummarySelect,
         },

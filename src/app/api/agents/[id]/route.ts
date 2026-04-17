@@ -35,6 +35,7 @@ export async function GET(
         runtimeModel: true,
         systemPrompt: true,
         mcpConnectionIds: true,
+        invocationMode: true,
         project: {
           select: projectSummarySelect,
         },
@@ -113,6 +114,7 @@ export async function PUT(
         runtimeModel: true,
         systemPrompt: true,
         mcpConnectionIds: true,
+        invocationMode: true,
         project: {
           select: projectSummarySelect,
         },

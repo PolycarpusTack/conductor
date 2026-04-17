@@ -13,6 +13,7 @@ export const agentSummarySelect = {
   description: true,
   isActive: true,
   lastSeen: true,
+  invocationMode: true,
 } as const
 
 export const taskBoardInclude = {
