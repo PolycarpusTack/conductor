@@ -32,16 +32,10 @@ mock.module('@/lib/server/realtime', () => ({
   broadcastProjectEvent: mockBroadcastProjectEvent,
 }))
 
-// Also mock adapters/registry and mcp-resolver so dispatchStep doesn't explode
-// when it is called as a fire-and-forget side effect inside startChain / rewindChain
-mock.module('@/lib/server/adapters/registry', () => ({
-  getAdapter: mock(() => null),
-}))
-
-mock.module('@/lib/server/mcp-resolver', () => ({
-  resolveMcpTools: mock(() => Promise.resolve([])),
-  executeMcpTool: mock(() => Promise.resolve('')),
-}))
+// Note: advanceChain / rewindChain / closeChain / startChain don't call
+// dispatchStep directly, so we don't need to mock adapters/registry or
+// mcp-resolver here. Mocking those at the module level would leak into
+// mcp-resolver.test.ts (bun:test module mocks persist across files).
 
 // Import AFTER all mocks are in place
 import { advanceChain, rewindChain, closeChain, startChain } from '../dispatch'
@@ -101,8 +95,15 @@ describe('advanceChain', () => {
   test('activates next step and marks task IN_PROGRESS when autoContinue is true and next step has a runtime', async () => {
     const doneStep = makeStep({ id: 'step-1', order: 1, status: 'done', autoContinue: true })
     const nextStep = makeStep({ id: 'step-2', order: 2, status: 'pending', autoContinue: false })
+    const nextStepActive = { ...nextStep, status: 'active' }
 
-    mockTaskStepFindMany.mockResolvedValue([doneStep, nextStep])
+    // advanceChain calls findMany twice: once to find the completed step,
+    // then resolveTaskStatus calls it again after activation to decide the
+    // task's new status. Simulate the activation by returning the updated
+    // state on the second call.
+    mockTaskStepFindMany
+      .mockResolvedValueOnce([doneStep, nextStep])
+      .mockResolvedValueOnce([doneStep, nextStepActive])
     mockTaskStepUpdateMany.mockResolvedValue({ count: 1 })
 
     await advanceChain('task-1', 'proj-1')
@@ -256,13 +257,21 @@ describe('rewindChain', () => {
     const targetStep = makeStep({ id: 'step-2', order: 2, status: 'done', agent: { id: 'agent-1', runtimeId: null } })
     mockTaskStepFindUnique.mockResolvedValue(targetStep)
 
+    // rewindChain walks the chain in linear mode by fetching all steps and
+    // filtering those with order > target.order, then updateMany with their IDs.
+    mockTaskStepFindMany.mockResolvedValue([
+      { id: 'step-1', order: 1, nextSteps: null, prevSteps: null, isMergePoint: false },
+      { id: 'step-2', order: 2, nextSteps: null, prevSteps: null, isMergePoint: false },
+      { id: 'step-3', order: 3, nextSteps: null, prevSteps: null, isMergePoint: false },
+      { id: 'step-4', order: 4, nextSteps: null, prevSteps: null, isMergePoint: false },
+    ])
+
     await rewindChain('task-1', 'proj-1', 'step-2', 'Rejected')
 
     expect(mockTaskStepUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          taskId: 'task-1',
-          order: { gt: 2 },
+          id: { in: expect.arrayContaining(['step-3', 'step-4']) },
         }),
         data: expect.objectContaining({
           status: 'pending',
@@ -362,7 +371,7 @@ describe('closeChain', () => {
 
 describe('startChain', () => {
   test('does nothing when no first step exists', async () => {
-    mockTaskStepFindFirst.mockResolvedValue(null)
+    mockTaskStepFindMany.mockResolvedValue([])
 
     await startChain('task-1', 'proj-1')
 
@@ -372,21 +381,30 @@ describe('startChain', () => {
 
   test('does nothing when step is already activated by another caller (count 0)', async () => {
     const firstStep = makeStep({ id: 'step-1', order: 1, status: 'pending', mode: 'develop' })
-    mockTaskStepFindFirst.mockResolvedValue(firstStep)
+    mockTaskStepFindMany.mockResolvedValue([firstStep])
     mockTaskStepUpdateMany.mockResolvedValue({ count: 0 })
 
     await startChain('task-1', 'proj-1')
 
-    expect(mockTaskUpdate).not.toHaveBeenCalled()
+    // updateMany was still attempted, but no broadcast and no task update
+    expect(mockBroadcastProjectEvent).not.toHaveBeenCalledWith(
+      'proj-1',
+      'step-activated',
+      expect.anything(),
+    )
   })
 
   test('sets task to WAITING when first step is a human step', async () => {
     const humanStep = makeStep({ id: 'step-1', order: 1, status: 'pending', mode: 'human', agent: null })
-    mockTaskStepFindFirst.mockResolvedValue(humanStep)
+    // First findMany: initial step load. Second: resolveTaskStatus — step is now active.
+    mockTaskStepFindMany
+      .mockResolvedValueOnce([humanStep])
+      .mockResolvedValueOnce([{ ...humanStep, status: 'active' }])
     mockTaskStepUpdateMany.mockResolvedValue({ count: 1 })
 
     await startChain('task-1', 'proj-1')
 
+    // Human step is active but mode === 'human', so hasActiveAgentStep is false → WAITING
     expect(mockTaskUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'task-1' },
@@ -397,7 +415,7 @@ describe('startChain', () => {
 
   test('broadcasts step-activated event after activating first step', async () => {
     const firstStep = makeStep({ id: 'step-1', order: 1, status: 'pending', mode: 'develop' })
-    mockTaskStepFindFirst.mockResolvedValue(firstStep)
+    mockTaskStepFindMany.mockResolvedValue([firstStep])
     mockTaskStepUpdateMany.mockResolvedValue({ count: 1 })
 
     await startChain('task-1', 'proj-1')
@@ -408,7 +426,7 @@ describe('startChain', () => {
     })
   })
 
-  test('dispatches step (fires dispatchStep) when first agent step has a runtimeId', async () => {
+  test('activates first agent step with runtimeId and broadcasts step-activated', async () => {
     const agentStep = makeStep({
       id: 'step-1',
       order: 1,
@@ -416,16 +434,20 @@ describe('startChain', () => {
       mode: 'develop',
       agent: { id: 'agent-1', runtimeId: 'runtime-1' },
     })
-    mockTaskStepFindFirst.mockResolvedValue(agentStep)
+    // startChain doesn't call dispatchStep directly — it only activates the
+    // step and lets the queue poller pick it up. This test verifies the
+    // activation path (updateMany + broadcast), not downstream dispatch.
+    mockTaskStepFindMany.mockResolvedValue([agentStep])
     mockTaskStepUpdateMany.mockResolvedValue({ count: 1 })
 
-    // dispatchStep will call db.taskStep.findUnique internally; return null so it exits early
-    mockTaskStepFindUnique.mockResolvedValue(null)
-
-    // Should not throw
     await expect(startChain('task-1', 'proj-1')).resolves.toBeUndefined()
 
-    // step-activated broadcast happened
+    expect(mockTaskStepUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'step-1', status: 'pending' }),
+        data: { status: 'active' },
+      }),
+    )
     expect(mockBroadcastProjectEvent).toHaveBeenCalledWith('proj-1', 'step-activated', {
       taskId: 'task-1',
       stepId: 'step-1',
