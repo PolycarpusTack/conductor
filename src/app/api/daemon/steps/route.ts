@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
+import { advanceChain } from '@/lib/server/dispatch'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
 export async function POST(request: Request) {
@@ -60,9 +61,11 @@ export async function POST(request: Request) {
       await db.taskStep.update({
         where: { id: stepId },
         data: {
-          status: 'completed',
+          status: 'done',
           output: output?.slice(0, MAX_OUTPUT_CHARS),
           completedAt: new Date(),
+          leasedBy: null,
+          leasedAt: null,
         },
       })
 
@@ -73,6 +76,12 @@ export async function POST(request: Request) {
         output: output?.slice(0, 500),
         truncated,
       })
+
+      try {
+        await advanceChain(step.taskId, step.task.projectId, stepId)
+      } catch (chainErr) {
+        console.error('advanceChain failed after daemon step completion:', chainErr)
+      }
     } else if (action === 'fail') {
       await db.taskStep.update({
         where: { id: stepId },
@@ -80,6 +89,9 @@ export async function POST(request: Request) {
           status: willRetry ? 'pending' : 'failed',
           error: errorMsg?.slice(0, MAX_OUTPUT_CHARS),
           attempts: { increment: 1 },
+          completedAt: willRetry ? null : new Date(),
+          leasedBy: null,
+          leasedAt: null,
         },
       })
 

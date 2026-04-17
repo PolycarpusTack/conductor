@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const { title, description, status, priority, tag, projectId, agentId, notes } = parsed.data
+    const { title, description, status, priority, tag, projectId, agentId, notes, runtimeOverride } = parsed.data
 
     if (agentId) {
       const agent = await db.agent.findUnique({
@@ -113,6 +113,7 @@ export async function POST(request: Request) {
           projectId,
           agentId,
           notes,
+          runtimeOverride,
           order,
         },
       })

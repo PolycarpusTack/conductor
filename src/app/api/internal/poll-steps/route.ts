@@ -9,7 +9,13 @@ export async function POST(request: Request) {
   }
 
   const secret = request.headers.get('x-internal-secret')
-  if (!secret || !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))) {
+  const providedBuffer = secret ? Buffer.from(secret) : null
+  const expectedBuffer = Buffer.from(expectedSecret)
+  if (
+    !providedBuffer ||
+    providedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(providedBuffer, expectedBuffer)
+  ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
