@@ -1,22 +1,18 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { badRequest, forbidden, notFound, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
 import { advanceChain } from '@/lib/server/dispatch'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
-export async function POST(request: Request) {
-  try {
+export const POST = withErrorHandling('api/daemon/steps', async (request: Request) => {
     const rawToken = extractDaemonToken(request)
-    if (!rawToken) {
-      return NextResponse.json({ error: 'Missing daemon token' }, { status: 401 })
-    }
+    if (!rawToken) throw unauthorized('Missing daemon token')
 
     const daemon = await resolveDaemonByToken(rawToken)
-    if (!daemon) {
-      return NextResponse.json({ error: 'Invalid daemon token' }, { status: 401 })
-    }
+    if (!daemon) throw unauthorized('Invalid daemon token')
 
     const body = await request.json()
     const { stepId, action, output, error: errorMsg, willRetry } = body as {
@@ -27,12 +23,7 @@ export async function POST(request: Request) {
       willRetry?: boolean
     }
 
-    if (!stepId || !action) {
-      return NextResponse.json(
-        { error: 'stepId and action are required' },
-        { status: 400 },
-      )
-    }
+    if (!stepId || !action) throw badRequest('stepId and action are required')
 
     const step = await db.taskStep.findUnique({
       where: { id: stepId },
@@ -46,16 +37,9 @@ export async function POST(request: Request) {
       },
     })
 
-    if (!step) {
-      return NextResponse.json({ error: 'Step not found' }, { status: 404 })
-    }
+    if (!step) throw notFound('Step not found')
 
-    if (step.leasedBy !== daemon.id) {
-      return NextResponse.json(
-        { error: 'Step is not leased by this daemon' },
-        { status: 403 },
-      )
-    }
+    if (step.leasedBy !== daemon.id) throw forbidden('Step is not leased by this daemon')
 
     if (action === 'complete') {
       const truncated = output ? output.length > 5000 : false
@@ -109,8 +93,4 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ status: 'ok', stepId, action })
-  } catch (error) {
-    console.error('Daemon step update error:', error)
-    return NextResponse.json({ error: 'Failed to update step' }, { status: 500 })
-  }
-}
+})

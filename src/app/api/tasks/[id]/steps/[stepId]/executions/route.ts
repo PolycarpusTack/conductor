@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { notFound, withErrorHandling } from '@/lib/server/api-errors'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string; stepId: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/tasks/[id]/steps/[stepId]/executions',
+  async (
+    request: Request,
+    { params }: { params: Promise<{ id: string; stepId: string }> },
+  ) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -17,9 +19,7 @@ export async function GET(
       select: { taskId: true },
     })
 
-    if (!step || step.taskId !== id) {
-      return NextResponse.json({ error: 'Step not found' }, { status: 404 })
-    }
+    if (!step || step.taskId !== id) throw notFound('Step not found')
 
     const executions = await db.stepExecution.findMany({
       where: { stepId },
@@ -27,8 +27,5 @@ export async function GET(
     })
 
     return NextResponse.json(executions)
-  } catch (error) {
-    console.error('Error fetching executions:', error)
-    return NextResponse.json({ error: 'Failed to fetch executions' }, { status: 500 })
-  }
-}
+  },
+)

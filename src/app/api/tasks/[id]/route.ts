@@ -2,20 +2,17 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateTaskSchema } from '@/lib/server/contracts'
 import { startChain } from '@/lib/server/dispatch'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/tasks/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const task = await db.task.findUnique({
@@ -23,26 +20,17 @@ export async function GET(
       include: taskBoardInclude,
     })
 
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!task) throw notFound('Task not found')
 
     return NextResponse.json(task)
-  } catch (error) {
-    console.error('Error fetching task:', error)
-    return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const PUT = withErrorHandling(
+  'api/tasks/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const existingTask = await db.task.findUnique({
@@ -50,16 +38,11 @@ export async function PUT(
       select: { projectId: true, status: true },
     })
 
-    if (!existingTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!existingTask) throw notFound('Task not found')
 
     const parsed = updateTaskSchema.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid task payload' },
-        { status: 400 },
-      )
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid task payload')
     }
 
     const previousStatus = existingTask.status
@@ -71,10 +54,7 @@ export async function PUT(
       })
 
       if (!agent || agent.projectId !== existingTask.projectId) {
-        return NextResponse.json(
-          { error: 'Assigned agent must belong to the same project' },
-          { status: 400 },
-        )
+        throw badRequest('Assigned agent must belong to the same project')
       }
     }
 
@@ -107,21 +87,14 @@ export async function PUT(
     }
 
     return NextResponse.json(task)
-  } catch (error) {
-    console.error('Error updating task:', error)
-    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = withErrorHandling(
+  'api/tasks/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const task = await db.task.findUnique({
@@ -129,19 +102,12 @@ export async function DELETE(
       select: { id: true, projectId: true },
     })
 
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!task) throw notFound('Task not found')
 
-    await db.task.delete({
-      where: { id },
-    })
+    await db.task.delete({ where: { id } })
 
     broadcastProjectEvent(task.projectId, 'task-deleted', task.id)
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting task:', error)
-    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 })
-  }
-}
+  },
+)

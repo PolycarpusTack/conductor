@@ -3,118 +3,93 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { generateDaemonToken, extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { registerDaemonSchema } from '@/lib/server/daemon-contracts'
 
-export async function POST(request: Request) {
-  try {
-    const unauthorized = await requireAdminSession()
-    if (unauthorized) return unauthorized
+export const POST = withErrorHandling('api/daemon/register', async (request: Request) => {
+  const unauth = await requireAdminSession()
+  if (unauth) return unauth
 
-    const body = await request.json()
-    const parsed = registerDaemonSchema.safeParse(body)
+  const body = await request.json()
+  const parsed = registerDaemonSchema.safeParse(body)
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid registration payload' },
-        { status: 400 },
-      )
-    }
+  if (!parsed.success) {
+    throw badRequest(parsed.error.issues[0]?.message || 'Invalid registration payload')
+  }
 
-    const { hostname, platform, version, capabilities, workspaceId } = parsed.data
+  const { hostname, platform, version, capabilities, workspaceId } = parsed.data
 
-    let resolvedWorkspaceId = workspaceId
-    if (!resolvedWorkspaceId) {
-      const defaultWorkspace = await db.workspace.findFirst({
-        orderBy: { createdAt: 'asc' },
-        select: { id: true },
+  let resolvedWorkspaceId = workspaceId
+  if (!resolvedWorkspaceId) {
+    const defaultWorkspace = await db.workspace.findFirst({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    })
+
+    if (!defaultWorkspace) {
+      const ws = await db.workspace.create({
+        data: {
+          id: randomUUID(),
+          slug: 'default',
+          name: 'Default Workspace',
+        },
       })
-
-      if (!defaultWorkspace) {
-        const ws = await db.workspace.create({
-          data: {
-            id: randomUUID(),
-            slug: 'default',
-            name: 'Default Workspace',
-          },
-        })
-        resolvedWorkspaceId = ws.id
-      } else {
-        resolvedWorkspaceId = defaultWorkspace.id
-      }
+      resolvedWorkspaceId = ws.id
+    } else {
+      resolvedWorkspaceId = defaultWorkspace.id
     }
+  }
 
-    const daemonId = randomUUID()
-    const token = generateDaemonToken(daemonId)
+  const daemonId = randomUUID()
+  const token = generateDaemonToken(daemonId)
 
-    const daemon = await db.daemon.create({
-      data: {
-        id: daemonId,
-        workspaceId: resolvedWorkspaceId,
-        hostname,
-        platform,
-        version,
-        capabilities: JSON.stringify(capabilities),
-        tokenHash: token.hash,
-        tokenPreview: token.preview,
-        status: 'online',
-        lastSeenAt: new Date(),
-      },
-    })
-
-    return NextResponse.json({
-      daemonId: daemon.id,
-      token: token.rawToken,
+  const daemon = await db.daemon.create({
+    data: {
+      id: daemonId,
       workspaceId: resolvedWorkspaceId,
-      wsPath: '/api/daemon/ws',
-    })
-  } catch (error) {
-    console.error('Daemon registration error:', error)
-    return NextResponse.json(
-      { error: 'Failed to register daemon' },
-      { status: 500 },
-    )
-  }
-}
+      hostname,
+      platform,
+      version,
+      capabilities: JSON.stringify(capabilities),
+      tokenHash: token.hash,
+      tokenPreview: token.preview,
+      status: 'online',
+      lastSeenAt: new Date(),
+    },
+  })
 
-export async function GET(request: Request) {
-  try {
-    const rawToken = extractDaemonToken(request)
-    if (!rawToken) {
-      return NextResponse.json(
-        { error: 'Missing daemon token', hint: 'Use Authorization: Bearer <token>' },
-        { status: 401 },
-      )
-    }
+  return NextResponse.json({
+    daemonId: daemon.id,
+    token: token.rawToken,
+    workspaceId: resolvedWorkspaceId,
+    wsPath: '/api/daemon/ws',
+  })
+})
 
-    const daemon = await resolveDaemonByToken(rawToken)
-    if (!daemon) {
-      return NextResponse.json({ error: 'Invalid daemon token' }, { status: 401 })
-    }
+export const GET = withErrorHandling('api/daemon/register', async (request: Request) => {
+  const rawToken = extractDaemonToken(request)
+  if (!rawToken) throw unauthorized('Missing daemon token')
 
-    await updateDaemonHeartbeat(daemon.id)
+  const daemon = await resolveDaemonByToken(rawToken)
+  if (!daemon) throw unauthorized('Invalid daemon token')
 
-    const fullDaemon = await db.daemon.findUnique({
-      where: { id: daemon.id },
-      select: {
-        id: true,
-        hostname: true,
-        platform: true,
-        version: true,
-        capabilities: true,
-        status: true,
-        lastSeenAt: true,
-        workspaceId: true,
-        createdAt: true,
-      },
-    })
+  await updateDaemonHeartbeat(daemon.id)
 
-    return NextResponse.json(fullDaemon)
-  } catch (error) {
-    console.error('Daemon status error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch daemon status' },
-      { status: 500 },
-    )
-  }
-}
+  const fullDaemon = await db.daemon.findUnique({
+    where: { id: daemon.id },
+    select: {
+      id: true,
+      hostname: true,
+      platform: true,
+      version: true,
+      capabilities: true,
+      status: true,
+      lastSeenAt: true,
+      workspaceId: true,
+      createdAt: true,
+    },
+  })
+
+  return NextResponse.json(fullDaemon)
+})

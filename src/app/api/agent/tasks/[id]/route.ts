@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { ApiError, badRequest, forbidden, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { updateAgentHeartbeat, toRealtimeActivity, claimOrStartTask } from '@/lib/server/agent-helpers'
 import { agentTaskActionSchema, taskStatusSchema, stepArtifactSchema } from '@/lib/server/contracts'
@@ -31,15 +32,11 @@ async function getAgentFromRequest(request: Request, body?: Record<string, unkno
   return { agent }
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/agent/tasks/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const auth = await getAgentFromRequest(request)
-    if (auth.error) {
-      return auth.error
-    }
+    if (auth.error) return auth.error
 
     const agent = auth.agent!
     const { id } = await params
@@ -49,32 +46,21 @@ export async function GET(
       include: taskBoardInclude,
     })
 
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!task) throw notFound('Task not found')
 
-    if (task.projectId !== agent.projectId) {
-      return NextResponse.json({ error: 'Task not in your project' }, { status: 403 })
-    }
+    if (task.projectId !== agent.projectId) throw forbidden('Task not in your project')
 
     await updateAgentHeartbeat(agent.id)
     return NextResponse.json(task)
-  } catch (error) {
-    console.error('Error fetching task:', error)
-    return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const PUT = withErrorHandling(
+  'api/agent/tasks/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const body = await request.json()
     const auth = await getAgentFromRequest(request, body)
-    if (auth.error) {
-      return auth.error
-    }
+    if (auth.error) return auth.error
 
     const agent = auth.agent!
     const { id } = await params
@@ -83,19 +69,13 @@ export async function PUT(
       include: { steps: { select: { id: true, status: true, order: true, agentId: true } } }
     })
 
-    if (!existingTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!existingTask) throw notFound('Task not found')
 
-    if (existingTask.projectId !== agent.projectId) {
-      return NextResponse.json({ error: 'Task not in your project' }, { status: 403 })
-    }
+    if (existingTask.projectId !== agent.projectId) throw forbidden('Task not in your project')
 
     const actionResult =
       body.action === undefined ? { success: true, data: undefined } : agentTaskActionSchema.safeParse(body.action)
-    if (!actionResult.success) {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-    }
+    if (!actionResult.success) throw badRequest('Invalid action')
 
     const MAX_FIELD_LENGTH = 5000
     const rawNotes = typeof body.notes === 'string' ? body.notes : undefined
@@ -107,9 +87,7 @@ export async function PUT(
     const explicitStatus =
       body.status === undefined ? { success: true, data: undefined } : taskStatusSchema.safeParse(body.status)
 
-    if (!explicitStatus.success) {
-      return NextResponse.json({ error: 'Invalid task status' }, { status: 400 })
-    }
+    if (!explicitStatus.success) throw badRequest('Invalid task status')
 
     let updateData: Record<string, unknown> = {}
     let logAction = 'updated'
@@ -121,14 +99,14 @@ export async function PUT(
         const actionName = actionResult.data === 'claim' ? 'claimed' : 'started'
         const result = await claimOrStartTask(id, agent, actionName)
         if ('error' in result) {
-          return NextResponse.json({ error: result.error }, { status: result.status })
+          throw new ApiError(result.status, result.error)
         }
         return NextResponse.json({ success: true, task: result.task, action: actionName })
       }
 
       case 'progress':
         if (existingTask.agentId !== agent.id) {
-          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+          throw forbidden('Task is not assigned to this agent')
         }
         updateData = { notes: notes || existingTask.notes }
         logAction = 'progress'
@@ -137,7 +115,7 @@ export async function PUT(
 
       case 'complete':
         if (existingTask.agentId !== agent.id) {
-          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+          throw forbidden('Task is not assigned to this agent')
         }
         // For chained tasks, don't set DONE — let advanceChain handle it
         updateData = {
@@ -154,7 +132,7 @@ export async function PUT(
 
       case 'review':
         if (existingTask.agentId !== agent.id) {
-          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+          throw forbidden('Task is not assigned to this agent')
         }
         updateData = {
           status: 'REVIEW',
@@ -166,7 +144,7 @@ export async function PUT(
 
       case 'block':
         if (existingTask.agentId !== agent.id) {
-          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+          throw forbidden('Task is not assigned to this agent')
         }
         updateData = {
           notes: `BLOCKED: ${notes || existingTask.notes || ''}`.trim(),
@@ -177,16 +155,13 @@ export async function PUT(
 
       default:
         if (existingTask.agentId && existingTask.agentId !== agent.id) {
-          return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
+          throw forbidden('Task is not assigned to this agent')
         }
 
         // Agents can only update notes/output in the default branch — not status.
         // Status changes must go through explicit actions (claim, start, complete, review, block).
         if (explicitStatus.data !== undefined) {
-          return NextResponse.json(
-            { error: 'Use an explicit action (claim, start, complete, review, block) to change task status' },
-            { status: 400 },
-          )
+          throw badRequest('Use an explicit action (claim, start, complete, review, block) to change task status')
         }
 
         updateData = {
@@ -245,10 +220,11 @@ export async function PUT(
       } else {
         const agentActiveSteps = task.steps.filter((s) => s.status === 'active' && s.agentId === agent.id)
         if (agentActiveSteps.length > 1) {
-          return NextResponse.json({
-            error: 'Multiple active steps for this agent. Provide step_id to disambiguate.',
-            activeSteps: agentActiveSteps.map((s) => ({ id: s.id, order: s.order })),
-          }, { status: 409 })
+          throw new ApiError(
+            409,
+            'Multiple active steps for this agent. Provide step_id to disambiguate.',
+            { activeSteps: agentActiveSteps.map((s) => ({ id: s.id, order: s.order })) },
+          )
         }
         activeStep = agentActiveSteps[0] || null
       }
@@ -300,37 +276,24 @@ export async function PUT(
       ...(notesTruncated && { notesTruncated: true }),
       ...(outputTruncated && { outputTruncated: true }),
     })
-  } catch (error) {
-    console.error('Error updating task:', error)
-    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = withErrorHandling(
+  'api/agent/tasks/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const auth = await getAgentFromRequest(request)
-    if (auth.error) {
-      return auth.error
-    }
+    if (auth.error) return auth.error
 
     const agent = auth.agent!
     const { id } = await params
     const task = await db.task.findUnique({ where: { id } })
 
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!task) throw notFound('Task not found')
 
-    if (task.projectId !== agent.projectId) {
-      return NextResponse.json({ error: 'Task not in your project' }, { status: 403 })
-    }
+    if (task.projectId !== agent.projectId) throw forbidden('Task not in your project')
 
-    if (task.agentId !== agent.id) {
-      return NextResponse.json({ error: 'Task is not assigned to this agent' }, { status: 403 })
-    }
+    if (task.agentId !== agent.id) throw forbidden('Task is not assigned to this agent')
 
     const updatedTask = await db.task.update({
       where: { id },
@@ -360,8 +323,5 @@ export async function DELETE(
     await updateAgentHeartbeat(agent.id)
 
     return NextResponse.json({ success: true, task: updatedTask })
-  } catch (error) {
-    console.error('Error unassigning task:', error)
-    return NextResponse.json({ error: 'Failed to unassign task' }, { status: 500 })
-  }
-}
+  },
+)

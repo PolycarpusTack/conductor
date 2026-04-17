@@ -7,6 +7,7 @@ import {
   isAdminAuthConfigured,
   verifyAdminPassword,
 } from '@/lib/server/admin-session'
+import { ApiError, badRequest, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { adminLoginSchema } from '@/lib/server/contracts'
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
@@ -43,54 +44,34 @@ export async function GET() {
   })
 }
 
-export async function POST(request: Request) {
-  try {
-    const trustProxy = process.env.TRUSTED_PROXY === 'true'
-    const ip = trustProxy
-      ? (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-         request.headers.get('x-real-ip') ||
-         'unknown')
-      : 'global' // single bucket when no trusted proxy — can't be bypassed by IP rotation
+export const POST = withErrorHandling('api/admin/session', async (request: Request) => {
+  const trustProxy = process.env.TRUSTED_PROXY === 'true'
+  const ip = trustProxy
+    ? (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+       request.headers.get('x-real-ip') ||
+       'unknown')
+    : 'global' // single bucket when no trusted proxy — can't be bypassed by IP rotation
 
-    if (isRateLimited(ip)) {
-      return NextResponse.json(
-        { error: 'Too many login attempts. Try again later.' },
-        { status: 429 },
-      )
-    }
-
-    if (!isAdminAuthConfigured()) {
-      return NextResponse.json(
-        { error: 'Admin authentication is not configured on the server' },
-        { status: 503 },
-      )
-    }
-
-    const parsed = adminLoginSchema.safeParse(await request.json())
-    if (!parsed.success) {
-      return NextResponse.json({ error: 'Password is required' }, { status: 400 })
-    }
-
-    const validPassword = await verifyAdminPassword(parsed.data.password)
-    if (!validPassword) {
-      return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
-    }
-
-    loginAttempts.delete(ip)
-    await createAdminSession()
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error creating admin session:', error)
-    return NextResponse.json({ error: 'Failed to sign in' }, { status: 500 })
+  if (isRateLimited(ip)) {
+    throw new ApiError(429, 'Too many login attempts. Try again later.')
   }
-}
 
-export async function DELETE() {
-  try {
-    await clearAdminSession()
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error clearing admin session:', error)
-    return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 })
+  if (!isAdminAuthConfigured()) {
+    throw new ApiError(503, 'Admin authentication is not configured on the server')
   }
-}
+
+  const parsed = adminLoginSchema.safeParse(await request.json())
+  if (!parsed.success) throw badRequest('Password is required')
+
+  const validPassword = await verifyAdminPassword(parsed.data.password)
+  if (!validPassword) throw unauthorized('Invalid password')
+
+  loginAttempts.delete(ip)
+  await createAdminSession()
+  return NextResponse.json({ success: true })
+})
+
+export const DELETE = withErrorHandling('api/admin/session', async () => {
+  await clearAdminSession()
+  return NextResponse.json({ success: true })
+})

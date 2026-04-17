@@ -1,43 +1,25 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { badRequest, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { taskStatusSchema } from '@/lib/server/contracts'
 import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const apiKey = extractAgentApiKey(request)
-    const statusParam = searchParams.get('status')
+export const GET = withErrorHandling('api/agent/tasks', async (request: Request) => {
+  const { searchParams } = new URL(request.url)
+  const apiKey = extractAgentApiKey(request)
+  const statusParam = searchParams.get('status')
 
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: 'Missing agent API key',
-          hint: 'Use Authorization: Bearer <agent-key> or X-Agent-Key header',
-        },
-        { status: 401 },
-      )
-    }
+  if (!apiKey) throw unauthorized('Missing agent API key')
 
-    const agent = await resolveAgentByApiKey(apiKey)
+  const agent = await resolveAgentByApiKey(apiKey)
 
-    if (!agent) {
-      return NextResponse.json(
-        {
-          error: 'Invalid API key',
-          hint: 'Check your agent API key in the AgentBoard UI',
-        },
-        { status: 401 },
-      )
-    }
+  if (!agent) throw unauthorized('Invalid API key')
 
-    const parsedStatus =
-      statusParam === null ? { success: true, data: undefined } : taskStatusSchema.safeParse(statusParam)
-    if (!parsedStatus.success) {
-      return NextResponse.json({ error: 'Invalid task status filter' }, { status: 400 })
-    }
+  const parsedStatus =
+    statusParam === null ? { success: true, data: undefined } : taskStatusSchema.safeParse(statusParam)
+  if (!parsedStatus.success) throw badRequest('Invalid task status filter')
 
     await db.agent.update({
       where: { id: agent.id },
@@ -69,21 +51,17 @@ export async function GET(request: Request) {
       select: { name: true },
     })
 
-    return NextResponse.json({
-      agent: {
-        id: agent.id,
-        name: agent.name,
-        emoji: agent.emoji,
-      },
-      project: {
-        id: agent.projectId,
-        name: project?.name || 'Unknown Project',
-      },
-      tasks,
-      count: tasks.length,
-    })
-  } catch (error) {
-    console.error('Error fetching agent tasks:', error)
-    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
-  }
-}
+  return NextResponse.json({
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      emoji: agent.emoji,
+    },
+    project: {
+      id: agent.projectId,
+      name: project?.name || 'Unknown Project',
+    },
+    tasks,
+    count: tasks.length,
+  })
+})

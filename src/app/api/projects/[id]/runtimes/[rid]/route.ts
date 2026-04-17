@@ -1,27 +1,23 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateProjectRuntimeSchema } from '@/lib/server/contracts'
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string; rid: string }> },
-) {
-  try {
+export const PUT = withErrorHandling(
+  'api/projects/[id]/runtimes/[rid]',
+  async (request: Request, { params }: { params: Promise<{ id: string; rid: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
     const { id, rid } = await params
     const existing = await db.projectRuntime.findUnique({ where: { id: rid }, select: { projectId: true } })
     if (!existing || existing.projectId !== id) {
-      return NextResponse.json({ error: 'Runtime not found in this project' }, { status: 404 })
+      throw notFound('Runtime not found in this project')
     }
     const parsed = updateProjectRuntimeSchema.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid runtime payload' },
-        { status: 400 },
-      )
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid runtime payload')
     }
 
     const data = { ...parsed.data } as Record<string, unknown>
@@ -38,30 +34,22 @@ export async function PUT(
     })
 
     return NextResponse.json(runtime)
-  } catch (error) {
-    console.error('Error updating runtime:', error)
-    return NextResponse.json({ error: 'Failed to update runtime' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string; rid: string }> },
-) {
-  try {
+export const DELETE = withErrorHandling(
+  'api/projects/[id]/runtimes/[rid]',
+  async (request: Request, { params }: { params: Promise<{ id: string; rid: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
     const { id, rid } = await params
     const existing = await db.projectRuntime.findUnique({ where: { id: rid }, select: { projectId: true } })
     if (!existing || existing.projectId !== id) {
-      return NextResponse.json({ error: 'Runtime not found in this project' }, { status: 404 })
+      throw notFound('Runtime not found in this project')
     }
     await db.projectRuntime.delete({ where: { id: rid } })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting runtime:', error)
-    return NextResponse.json({ error: 'Failed to delete runtime' }, { status: 500 })
-  }
-}
+  },
+)

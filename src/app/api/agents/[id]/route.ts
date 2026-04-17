@@ -2,18 +2,15 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateAgentSchema } from '@/lib/server/contracts'
 import { projectSummarySelect } from '@/lib/server/selects'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/agents/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const agent = await db.agent.findUnique({
@@ -50,34 +47,22 @@ export async function GET(
       },
     })
 
-    if (!agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
-    }
+    if (!agent) throw notFound('Agent not found')
 
     return NextResponse.json(agent)
-  } catch (error) {
-    console.error('Error fetching agent:', error)
-    return NextResponse.json({ error: 'Failed to fetch agent' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const PUT = withErrorHandling(
+  'api/agents/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const parsed = updateAgentSchema.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid agent payload' },
-        { status: 400 },
-      )
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid agent payload')
     }
 
     const data: Record<string, unknown> = { ...parsed.data }
@@ -122,30 +107,18 @@ export async function PUT(
     })
 
     return NextResponse.json(agent)
-  } catch (error) {
-    console.error('Error updating agent:', error)
-    return NextResponse.json({ error: 'Failed to update agent' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = withErrorHandling(
+  'api/agents/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
-    await db.agent.delete({
-      where: { id },
-    })
+    await db.agent.delete({ where: { id } })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting agent:', error)
-    return NextResponse.json({ error: 'Failed to delete agent' }, { status: 500 })
-  }
-}
+  },
+)

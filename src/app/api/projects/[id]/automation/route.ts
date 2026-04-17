@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import {
   startProjectAutomation,
   stopProjectAutomation,
@@ -9,11 +10,9 @@ import {
 } from '@/lib/server/scheduler'
 
 // GET — get automation status and config
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/projects/[id]/automation',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -27,9 +26,7 @@ export async function GET(
       },
     })
 
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
+    if (!project) throw notFound('Project not found')
 
     return NextResponse.json({
       ...project,
@@ -38,18 +35,13 @@ export async function GET(
         : null,
       running: isProjectRunning(id),
     })
-  } catch (error) {
-    console.error('Error fetching automation config:', error)
-    return NextResponse.json({ error: 'Failed to fetch automation config' }, { status: 500 })
-  }
-}
+  },
+)
 
 // PUT — update automation config and apply
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const PUT = withErrorHandling(
+  'api/projects/[id]/automation',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -58,10 +50,7 @@ export async function PUT(
 
     const validModes = ['manual', 'always', 'scheduled', 'startup']
     if (body.mode && !validModes.includes(body.mode)) {
-      return NextResponse.json(
-        { error: `Invalid mode. Use: ${validModes.join(', ')}` },
-        { status: 400 },
-      )
+      throw badRequest(`Invalid mode. Use: ${validModes.join(', ')}`)
     }
 
     const updateData: Record<string, unknown> = {}
@@ -92,18 +81,13 @@ export async function PUT(
       success: true,
       running: isProjectRunning(id),
     })
-  } catch (error) {
-    console.error('Error updating automation config:', error)
-    return NextResponse.json({ error: 'Failed to update automation config' }, { status: 500 })
-  }
-}
+  },
+)
 
 // POST — manual start/stop control
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const POST = withErrorHandling(
+  'api/projects/[id]/automation',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -115,9 +99,7 @@ export async function POST(
         where: { id },
         select: { automationPollMs: true },
       })
-      if (!project) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-      }
+      if (!project) throw notFound('Project not found')
       manualStartAutomation(id, project.automationPollMs || 10000)
       return NextResponse.json({ success: true, running: true })
     }
@@ -127,16 +109,11 @@ export async function POST(
         where: { id },
         select: { id: true },
       })
-      if (!project) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-      }
+      if (!project) throw notFound('Project not found')
       stopProjectAutomation(id)
       return NextResponse.json({ success: true, running: false })
     }
 
-    return NextResponse.json({ error: 'Invalid action. Use: start, stop' }, { status: 400 })
-  } catch (error) {
-    console.error('Error controlling automation:', error)
-    return NextResponse.json({ error: 'Failed to control automation' }, { status: 500 })
-  }
-}
+    throw badRequest('Invalid action. Use: start, stop')
+  },
+)

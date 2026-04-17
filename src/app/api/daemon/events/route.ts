@@ -1,64 +1,44 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { badRequest, notFound, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
 import { daemonEventSchema } from '@/lib/server/daemon-contracts'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
-export async function POST(request: Request) {
-  try {
-    const rawToken = extractDaemonToken(request)
-    if (!rawToken) {
-      return NextResponse.json({ error: 'Missing daemon token' }, { status: 401 })
-    }
+export const POST = withErrorHandling('api/daemon/events', async (request: Request) => {
+  const rawToken = extractDaemonToken(request)
+  if (!rawToken) throw unauthorized('Missing daemon token')
 
-    const daemon = await resolveDaemonByToken(rawToken)
-    if (!daemon) {
-      return NextResponse.json({ error: 'Invalid daemon token' }, { status: 401 })
-    }
+  const daemon = await resolveDaemonByToken(rawToken)
+  if (!daemon) throw unauthorized('Invalid daemon token')
 
-    const body = await request.json()
-    const { taskId, stepId, event } = body as {
-      taskId?: string
-      stepId?: string
-      event?: unknown
-    }
-
-    if (!taskId || !event) {
-      return NextResponse.json(
-        { error: 'taskId and event are required' },
-        { status: 400 },
-      )
-    }
-
-    const parsed = daemonEventSchema.safeParse(event)
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid event shape' },
-        { status: 400 },
-      )
-    }
-
-    const task = await db.task.findUnique({
-      where: { id: taskId },
-      select: { projectId: true },
-    })
-
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
-
-    broadcastProjectEvent(task.projectId, 'daemon-agent-event', {
-      taskId,
-      stepId,
-      daemonId: daemon.id,
-      event: parsed.data,
-      timestamp: new Date().toISOString(),
-    })
-
-    return NextResponse.json({ status: 'ok' })
-  } catch (error) {
-    console.error('Daemon event error:', error)
-    return NextResponse.json({ error: 'Failed to process event' }, { status: 500 })
+  const body = await request.json()
+  const { taskId, stepId, event } = body as {
+    taskId?: string
+    stepId?: string
+    event?: unknown
   }
-}
+
+  if (!taskId || !event) throw badRequest('taskId and event are required')
+
+  const parsed = daemonEventSchema.safeParse(event)
+  if (!parsed.success) throw badRequest('Invalid event shape')
+
+  const task = await db.task.findUnique({
+    where: { id: taskId },
+    select: { projectId: true },
+  })
+
+  if (!task) throw notFound('Task not found')
+
+  broadcastProjectEvent(task.projectId, 'daemon-agent-event', {
+    taskId,
+    stepId,
+    daemonId: daemon.id,
+    event: parsed.data,
+    timestamp: new Date().toISOString(),
+  })
+
+  return NextResponse.json({ status: 'ok' })
+})

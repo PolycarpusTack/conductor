@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import {
   getProjectStats,
   getAgentScorecard,
@@ -8,11 +9,12 @@ import {
   getChainBottlenecks,
 } from '@/lib/server/analytics'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/projects/[id]/analytics',
+  async (
+    request: Request,
+    { params }: { params: Promise<{ id: string }> },
+  ) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -32,13 +34,9 @@ export async function GET(
       case 'bottlenecks':
         return NextResponse.json(await getChainBottlenecks(projectId))
       default:
-        return NextResponse.json(
-          { error: `Unknown view: ${view}. Use: overview, agents, runtimes, failures, bottlenecks` },
-          { status: 400 },
+        throw badRequest(
+          `Unknown view: ${view}. Use: overview, agents, runtimes, failures, bottlenecks`,
         )
     }
-  } catch (error) {
-    console.error('Error fetching analytics:', error)
-    return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })
-  }
-}
+  },
+)

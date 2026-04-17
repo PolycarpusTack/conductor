@@ -1,11 +1,13 @@
 import { timingSafeEqual } from 'crypto'
 import { NextResponse } from 'next/server'
+
+import { ApiError, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { pollAndDispatch } from '@/lib/server/step-queue'
 
-export async function POST(request: Request) {
+export const POST = withErrorHandling('api/internal/poll-steps', async (request: Request) => {
   const expectedSecret = process.env.AGENTBOARD_WS_INTERNAL_SECRET
   if (!expectedSecret) {
-    return NextResponse.json({ error: 'Internal secret not configured' }, { status: 503 })
+    throw new ApiError(503, 'Internal secret not configured')
   }
 
   const secret = request.headers.get('x-internal-secret')
@@ -16,14 +18,9 @@ export async function POST(request: Request) {
     providedBuffer.length !== expectedBuffer.length ||
     !timingSafeEqual(providedBuffer, expectedBuffer)
   ) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    throw unauthorized()
   }
 
-  try {
-    const result = await pollAndDispatch()
-    return NextResponse.json(result)
-  } catch (error) {
-    console.error('[Queue] Poll error:', error)
-    return NextResponse.json({ error: 'Poll failed' }, { status: 500 })
-  }
-}
+  const result = await pollAndDispatch()
+  return NextResponse.json(result)
+})

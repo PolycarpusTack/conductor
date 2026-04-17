@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createProjectRuntimeSchema } from '@/lib/server/contracts'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/projects/[id]/runtimes',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -19,27 +18,19 @@ export async function GET(
     })
 
     return NextResponse.json(runtimes)
-  } catch (error) {
-    console.error('Error fetching runtimes:', error)
-    return NextResponse.json({ error: 'Failed to fetch runtimes' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const POST = withErrorHandling(
+  'api/projects/[id]/runtimes',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
     const { id } = await params
     const parsed = createProjectRuntimeSchema.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid runtime payload' },
-        { status: 400 },
-      )
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid runtime payload')
     }
 
     const runtime = await db.projectRuntime.create({
@@ -52,8 +43,5 @@ export async function POST(
     })
 
     return NextResponse.json(runtime)
-  } catch (error) {
-    console.error('Error creating runtime:', error)
-    return NextResponse.json({ error: 'Failed to create runtime' }, { status: 500 })
-  }
-}
+  },
+)

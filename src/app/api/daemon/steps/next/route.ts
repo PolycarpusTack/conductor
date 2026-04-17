@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { resolveRuntime } from '@/lib/server/daemon-dispatch'
 
@@ -14,19 +15,14 @@ import { resolveRuntime } from '@/lib/server/daemon-dispatch'
  *
  * Also refreshes the daemon's heartbeat.
  */
-export async function GET(request: Request) {
-  try {
-    const rawToken = extractDaemonToken(request)
-    if (!rawToken) {
-      return NextResponse.json({ error: 'Missing daemon token' }, { status: 401 })
-    }
+export const GET = withErrorHandling('api/daemon/steps/next', async (request: Request) => {
+  const rawToken = extractDaemonToken(request)
+  if (!rawToken) throw unauthorized('Missing daemon token')
 
-    const daemon = await resolveDaemonByToken(rawToken)
-    if (!daemon) {
-      return NextResponse.json({ error: 'Invalid daemon token' }, { status: 401 })
-    }
+  const daemon = await resolveDaemonByToken(rawToken)
+  if (!daemon) throw unauthorized('Invalid daemon token')
 
-    await updateDaemonHeartbeat(daemon.id)
+  await updateDaemonHeartbeat(daemon.id)
 
     const step = await db.taskStep.findFirst({
       where: {
@@ -102,8 +98,4 @@ export async function GET(request: Request) {
         },
       },
     })
-  } catch (error) {
-    console.error('Daemon steps/next error:', error)
-    return NextResponse.json({ error: 'Failed to fetch next step' }, { status: 500 })
-  }
-}
+})

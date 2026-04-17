@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { ApiError, badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { dispatchStep, advanceChain, rewindChain, closeChain, findPreviousAgentStep } from '@/lib/server/dispatch'
 import { submitReview } from '@/lib/server/review-logic'
 import { stepReviewSchema } from '@/lib/server/contracts'
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string; stepId: string }> },
-) {
-  try {
+export const PUT = withErrorHandling(
+  'api/tasks/[id]/steps/[stepId]',
+  async (request: Request, { params }: { params: Promise<{ id: string; stepId: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -21,9 +20,7 @@ export async function PUT(
       include: { task: { select: { projectId: true } } },
     })
 
-    if (!existingStep || existingStep.taskId !== id) {
-      return NextResponse.json({ error: 'Step not found' }, { status: 404 })
-    }
+    if (!existingStep || existingStep.taskId !== id) throw notFound('Step not found')
 
     const projectId = existingStep.task.projectId
 
@@ -50,15 +47,11 @@ export async function PUT(
     // Handle reject → redo (rewind to previous agent step)
     if (body.action === 'reject' && body.target === 'redo') {
       const note = typeof body.note === 'string' ? body.note : ''
-      if (!note) {
-        return NextResponse.json({ error: 'Rejection note is required' }, { status: 400 })
-      }
+      if (!note) throw badRequest('Rejection note is required')
 
       const previousAgentStep = await findPreviousAgentStep(id, stepId)
 
-      if (!previousAgentStep) {
-        return NextResponse.json({ error: 'No previous agent step to redo' }, { status: 400 })
-      }
+      if (!previousAgentStep) throw badRequest('No previous agent step to redo')
 
       await db.taskStep.update({
         where: { id: stepId },
@@ -72,12 +65,8 @@ export async function PUT(
     // Handle reject → reassign (rewind to previous agent step with a different agent)
     if (body.action === 'reject' && body.target === 'reassign') {
       const note = typeof body.note === 'string' ? body.note : ''
-      if (!note) {
-        return NextResponse.json({ error: 'Rejection note is required' }, { status: 400 })
-      }
-      if (!body.reassignAgentId) {
-        return NextResponse.json({ error: 'reassignAgentId is required for reassign' }, { status: 400 })
-      }
+      if (!note) throw badRequest('Rejection note is required')
+      if (!body.reassignAgentId) throw badRequest('reassignAgentId is required for reassign')
 
       // Validate reassign agent belongs to same project
       const reassignAgent = await db.agent.findUnique({
@@ -85,17 +74,12 @@ export async function PUT(
         select: { projectId: true },
       })
       if (!reassignAgent || reassignAgent.projectId !== existingStep.task.projectId) {
-        return NextResponse.json(
-          { error: 'Reassign agent must belong to the same project' },
-          { status: 400 },
-        )
+        throw badRequest('Reassign agent must belong to the same project')
       }
 
       const previousAgentStep = await findPreviousAgentStep(id, stepId)
 
-      if (!previousAgentStep) {
-        return NextResponse.json({ error: 'No previous agent step to reassign' }, { status: 400 })
-      }
+      if (!previousAgentStep) throw badRequest('No previous agent step to reassign')
 
       // Switch the agent on the target step
       await db.taskStep.update({
@@ -132,10 +116,7 @@ export async function PUT(
     if (body.action === 'review') {
       const parsed = stepReviewSchema.safeParse(body)
       if (!parsed.success) {
-        return NextResponse.json(
-          { error: parsed.error.issues[0]?.message || 'Invalid review payload' },
-          { status: 400 },
-        )
+        throw badRequest(parsed.error.issues[0]?.message || 'Invalid review payload')
       }
 
       const result = await submitReview({
@@ -166,10 +147,7 @@ export async function PUT(
       }
       const allowed = validTransitions[existingStep.status] || []
       if (!allowed.includes(body.status)) {
-        return NextResponse.json(
-          { error: `Cannot transition step from "${existingStep.status}" to "${body.status}"` },
-          { status: 400 },
-        )
+        throw badRequest(`Cannot transition step from "${existingStep.status}" to "${body.status}"`)
       }
       updateData.status = body.status
     }
@@ -191,7 +169,7 @@ export async function PUT(
     })
 
     if (updated.count === 0) {
-      return NextResponse.json({ error: 'Step already updated (concurrent request)' }, { status: 409 })
+      throw new ApiError(409, 'Step already updated (concurrent request)')
     }
 
     // updateMany doesn't support include, so fetch the updated step separately.
@@ -216,8 +194,5 @@ export async function PUT(
     }
 
     return NextResponse.json(step)
-  } catch (error) {
-    console.error('Error updating step:', error)
-    return NextResponse.json({ error: 'Failed to update step' }, { status: 500 })
-  }
-}
+  },
+)

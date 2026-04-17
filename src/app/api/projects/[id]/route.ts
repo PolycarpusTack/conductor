@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateProjectSchema } from '@/lib/server/contracts'
 import { agentSummarySelect } from '@/lib/server/selects'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/projects/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const project = await db.project.findUnique({
@@ -49,31 +46,22 @@ export async function GET(
       },
     })
 
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
+    if (!project) throw notFound('Project not found')
 
     return NextResponse.json(project)
-  } catch (error) {
-    console.error('Error fetching project:', error)
-    return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const PUT = withErrorHandling(
+  'api/projects/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const parsed = updateProjectSchema.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid project payload' }, { status: 400 })
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid project payload')
     }
     const { name, description, color } = parsed.data
 
@@ -89,30 +77,18 @@ export async function PUT(
     })
 
     return NextResponse.json(project)
-  } catch (error) {
-    console.error('Error updating project:', error)
-    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = withErrorHandling(
+  'api/projects/[id]',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
-    await db.project.delete({
-      where: { id },
-    })
+    await db.project.delete({ where: { id } })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting project:', error)
-    return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 })
-  }
-}
+  },
+)

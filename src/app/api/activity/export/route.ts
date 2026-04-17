@@ -1,10 +1,8 @@
-import { NextResponse } from 'next/server'
-
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 
-export async function GET(request: Request) {
-  try {
+export const GET = withErrorHandling('api/activity/export', async (request: Request) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -15,9 +13,7 @@ export async function GET(request: Request) {
     const to = searchParams.get('to')
     const limit = Math.min(parseInt(searchParams.get('limit') || '10000', 10) || 10000, 50000)
 
-    if (!projectId) {
-      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
-    }
+    if (!projectId) throw badRequest('projectId is required')
 
     const where: Record<string, unknown> = { projectId }
     if (from || to) {
@@ -73,8 +69,4 @@ export async function GET(request: Request) {
         'Content-Disposition': `attachment; filename="activity-${projectId}-${new Date().toISOString().slice(0, 10)}.jsonl"`,
       },
     })
-  } catch (error) {
-    console.error('Activity export error:', error)
-    return NextResponse.json({ error: 'Failed to export activities' }, { status: 500 })
-  }
-}
+})

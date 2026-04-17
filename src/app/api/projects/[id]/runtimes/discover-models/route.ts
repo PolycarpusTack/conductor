@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 
 interface DiscoveredModel {
   id: string
@@ -165,11 +166,9 @@ async function fetchOpenAIModels(apiKey: string): Promise<DiscoveredModel[]> {
     .sort((a: DiscoveredModel, b: DiscoveredModel) => a.name.localeCompare(b.name))
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const POST = withErrorHandling(
+  'api/projects/[id]/runtimes/discover-models',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -178,27 +177,19 @@ export async function POST(
     const body = await request.json()
     const { adapter, apiKeyEnvVar } = body
 
-    if (!adapter || typeof adapter !== 'string') {
-      return NextResponse.json({ error: 'Adapter is required' }, { status: 400 })
-    }
+    if (!adapter || typeof adapter !== 'string') throw badRequest('Adapter is required')
 
     if (!apiKeyEnvVar || typeof apiKeyEnvVar !== 'string') {
-      return NextResponse.json({ error: 'API key environment variable name is required' }, { status: 400 })
+      throw badRequest('API key environment variable name is required')
     }
 
     if (!ALLOWED_API_KEY_ENV_VARS.has(apiKeyEnvVar)) {
-      return NextResponse.json(
-        { error: `Environment variable "${apiKeyEnvVar}" is not in the allowed list` },
-        { status: 400 },
-      )
+      throw badRequest(`Environment variable "${apiKeyEnvVar}" is not in the allowed list`)
     }
 
     const apiKey = process.env[apiKeyEnvVar]
     if (!apiKey) {
-      return NextResponse.json(
-        { error: `Environment variable "${apiKeyEnvVar}" is not set on the server` },
-        { status: 400 },
-      )
+      throw badRequest(`Environment variable "${apiKeyEnvVar}" is not set on the server`)
     }
 
     let models: DiscoveredModel[] = []
@@ -217,16 +208,9 @@ export async function POST(
         models = await fetchGoogleModels(apiKey)
         break
       default:
-        return NextResponse.json(
-          { error: `Model discovery is not supported for "${adapter}". Add models manually.` },
-          { status: 400 },
-        )
+        throw badRequest(`Model discovery is not supported for "${adapter}". Add models manually.`)
     }
 
     return NextResponse.json({ models })
-  } catch (error) {
-    console.error('Error discovering models:', error)
-    const message = error instanceof Error ? error.message : 'Failed to discover models'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
-}
+  },
+)

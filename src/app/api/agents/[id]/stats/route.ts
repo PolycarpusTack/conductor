@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { notFound, withErrorHandling } from '@/lib/server/api-errors'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/agents/[id]/stats',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -17,9 +16,7 @@ export async function GET(
       select: { id: true, name: true, emoji: true },
     })
 
-    if (!agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
-    }
+    if (!agent) throw notFound('Agent not found')
 
     const now = new Date()
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -86,8 +83,5 @@ export async function GET(
       },
       modeBreakdown,
     })
-  } catch (error) {
-    console.error('Error fetching agent stats:', error)
-    return NextResponse.json({ error: 'Failed to fetch agent stats' }, { status: 500 })
-  }
-}
+  },
+)

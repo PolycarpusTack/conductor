@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { stepArtifactSchema } from '@/lib/server/contracts'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string; stepId: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/tasks/[id]/steps/[stepId]/artifacts',
+  async (request: Request, { params }: { params: Promise<{ id: string; stepId: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -18,9 +17,7 @@ export async function GET(
       select: { taskId: true },
     })
 
-    if (!step || step.taskId !== id) {
-      return NextResponse.json({ error: 'Step not found' }, { status: 404 })
-    }
+    if (!step || step.taskId !== id) throw notFound('Step not found')
 
     const artifacts = await db.stepArtifact.findMany({
       where: { stepId },
@@ -28,17 +25,12 @@ export async function GET(
     })
 
     return NextResponse.json(artifacts)
-  } catch (error) {
-    console.error('Error fetching artifacts:', error)
-    return NextResponse.json({ error: 'Failed to fetch artifacts' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string; stepId: string }> },
-) {
-  try {
+export const POST = withErrorHandling(
+  'api/tasks/[id]/steps/[stepId]/artifacts',
+  async (request: Request, { params }: { params: Promise<{ id: string; stepId: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -47,10 +39,7 @@ export async function POST(
 
     const parsed = stepArtifactSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid artifact payload' },
-        { status: 400 },
-      )
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid artifact payload')
     }
 
     const step = await db.taskStep.findUnique({
@@ -58,9 +47,7 @@ export async function POST(
       select: { taskId: true },
     })
 
-    if (!step || step.taskId !== id) {
-      return NextResponse.json({ error: 'Step not found' }, { status: 404 })
-    }
+    if (!step || step.taskId !== id) throw notFound('Step not found')
 
     const artifact = await db.stepArtifact.create({
       data: {
@@ -75,8 +62,5 @@ export async function POST(
     })
 
     return NextResponse.json(artifact)
-  } catch (error) {
-    console.error('Error creating artifact:', error)
-    return NextResponse.json({ error: 'Failed to create artifact' }, { status: 500 })
-  }
-}
+  },
+)

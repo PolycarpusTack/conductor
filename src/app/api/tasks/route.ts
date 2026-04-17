@@ -2,97 +2,79 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createTaskSchema } from '@/lib/server/contracts'
 import { normalizeDagEdges } from '@/lib/server/dispatch'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
 
-export async function GET(request: Request) {
-  try {
-    const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+export const GET = withErrorHandling('api/tasks', async (request: Request) => {
+  const unauthorized = await requireAdminSession()
+  if (unauthorized) return unauthorized
 
-    const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('projectId')
-    const take = Math.min(Math.max(parseInt(searchParams.get('limit') || '200', 10) || 200, 1), 500)
-    const skip = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0)
+  const { searchParams } = new URL(request.url)
+  const projectId = searchParams.get('projectId')
+  const take = Math.min(Math.max(parseInt(searchParams.get('limit') || '200', 10) || 200, 1), 500)
+  const skip = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0)
 
-    const where = projectId ? { projectId } : {}
+  const where = projectId ? { projectId } : {}
 
-    const [tasks, total] = await Promise.all([
-      db.task.findMany({
-        where,
-        include: taskBoardInclude,
-        orderBy: [{ status: 'asc' }, { order: 'asc' }],
-        take,
-        skip,
-      }),
-      db.task.count({ where }),
-    ])
+  const [tasks, total] = await Promise.all([
+    db.task.findMany({
+      where,
+      include: taskBoardInclude,
+      orderBy: [{ status: 'asc' }, { order: 'asc' }],
+      take,
+      skip,
+    }),
+    db.task.count({ where }),
+  ])
 
-    return NextResponse.json({ data: tasks, total, limit: take, offset: skip })
-  } catch (error) {
-    console.error('Error fetching tasks:', error)
-    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
+  return NextResponse.json({ data: tasks, total, limit: take, offset: skip })
+})
+
+export const POST = withErrorHandling('api/tasks', async (request: Request) => {
+  const unauthorized = await requireAdminSession()
+  if (unauthorized) return unauthorized
+
+  const parsed = createTaskSchema.safeParse(await request.json())
+  if (!parsed.success) {
+    throw badRequest(parsed.error.issues[0]?.message || 'Invalid task payload')
   }
-}
 
-export async function POST(request: Request) {
-  try {
-    const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
+  const { title, description, status, priority, tag, projectId, agentId, notes, runtimeOverride } = parsed.data
+
+  if (agentId) {
+    const agent = await db.agent.findUnique({
+      where: { id: agentId },
+      select: { projectId: true },
+    })
+
+    if (!agent || agent.projectId !== projectId) {
+      throw badRequest('Assigned agent must belong to the same project')
     }
+  }
 
-    const parsed = createTaskSchema.safeParse(await request.json())
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid task payload' },
-        { status: 400 },
-      )
-    }
+  const steps = parsed.data.steps
 
-    const { title, description, status, priority, tag, projectId, agentId, notes, runtimeOverride } = parsed.data
-
-    if (agentId) {
-      const agent = await db.agent.findUnique({
-        where: { id: agentId },
-        select: { projectId: true },
+  // Validate step agents (including fallback agents) before transaction
+  if (steps && steps.length > 0) {
+    const stepAgentIds = [
+      ...steps.map(s => s.agentId),
+      ...steps.map(s => s.fallbackAgentId),
+    ].filter((id): id is string => !!id)
+    if (stepAgentIds.length > 0) {
+      const uniqueIds = [...new Set(stepAgentIds)]
+      const agents = await db.agent.findMany({
+        where: { id: { in: uniqueIds } },
+        select: { id: true, projectId: true },
       })
-
-      if (!agent || agent.projectId !== projectId) {
-        return NextResponse.json(
-          { error: 'Assigned agent must belong to the same project' },
-          { status: 400 },
-        )
+      const invalidAgent = agents.find(a => a.projectId !== projectId)
+      if (invalidAgent || agents.length !== uniqueIds.length) {
+        throw badRequest('All step agents (including fallback agents) must belong to the same project')
       }
     }
-
-    const steps = parsed.data.steps
-
-    // Validate step agents (including fallback agents) before transaction
-    if (steps && steps.length > 0) {
-      const stepAgentIds = [
-        ...steps.map(s => s.agentId),
-        ...steps.map(s => s.fallbackAgentId),
-      ].filter((id): id is string => !!id)
-      if (stepAgentIds.length > 0) {
-        const uniqueIds = [...new Set(stepAgentIds)]
-        const agents = await db.agent.findMany({
-          where: { id: { in: uniqueIds } },
-          select: { id: true, projectId: true },
-        })
-        const invalidAgent = agents.find(a => a.projectId !== projectId)
-        if (invalidAgent || agents.length !== uniqueIds.length) {
-          return NextResponse.json(
-            { error: 'All step agents (including fallback agents) must belong to the same project' },
-            { status: 400 },
-          )
-        }
-      }
-    }
+  }
 
     // Create task and steps atomically
     const task = await db.$transaction(async (tx) => {
@@ -227,13 +209,9 @@ export async function POST(request: Request) {
       })
     })
 
-    // Normalize DAG edge symmetry (synthesize missing nextSteps from prevSteps and vice versa)
-    await normalizeDagEdges(task.id)
+  // Normalize DAG edge symmetry (synthesize missing nextSteps from prevSteps and vice versa)
+  await normalizeDagEdges(task.id)
 
-    broadcastProjectEvent(projectId, 'task-created', task)
-    return NextResponse.json(task)
-  } catch (error) {
-    console.error('Error creating task:', error)
-    return NextResponse.json({ error: 'Failed to create task' }, { status: 500 })
-  }
-}
+  broadcastProjectEvent(projectId, 'task-created', task)
+  return NextResponse.json(task)
+})

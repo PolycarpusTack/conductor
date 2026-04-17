@@ -3,16 +3,13 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { createAgentApiKey } from '@/lib/server/api-keys'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { notFound, withErrorHandling } from '@/lib/server/api-errors'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/agents/[id]/key',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const agent = await db.agent.findUnique({
@@ -20,29 +17,20 @@ export async function GET(
       select: { apiKeyPreview: true },
     })
 
-    if (!agent) {
-      return NextResponse.json({ error: 'Agent not found' }, { status: 404 })
-    }
+    if (!agent) throw notFound('Agent not found')
 
     return NextResponse.json({
       preview: agent.apiKeyPreview || null,
       revealable: false,
     })
-  } catch (error) {
-    console.error('Error fetching agent API key:', error)
-    return NextResponse.json({ error: 'Failed to fetch agent API key' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const POST = withErrorHandling(
+  'api/agents/[id]/key',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+    if (unauthorized) return unauthorized
 
     const { id } = await params
     const nextKey = createAgentApiKey(id)
@@ -60,8 +48,5 @@ export async function POST(
       apiKey: nextKey.rawKey,
       preview: agent.apiKeyPreview,
     })
-  } catch (error) {
-    console.error('Error rotating agent API key:', error)
-    return NextResponse.json({ error: 'Failed to rotate agent API key' }, { status: 500 })
-  }
-}
+  },
+)

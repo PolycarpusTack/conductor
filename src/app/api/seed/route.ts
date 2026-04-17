@@ -4,19 +4,17 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { createAgentApiKey, createProjectApiKey } from '@/lib/server/api-keys'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { forbidden, withErrorHandling } from '@/lib/server/api-errors'
 import { seedChainTemplates } from '@/lib/server/chain-templates'
 import { seedProjectAgents } from '@/lib/server/default-agents'
 
-export async function POST() {
-  try {
-    const unauthorized = await requireAdminSession()
-    if (unauthorized) {
-      return unauthorized
-    }
+export const POST = withErrorHandling('api/seed', async () => {
+  const unauthorized = await requireAdminSession()
+  if (unauthorized) return unauthorized
 
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json({ error: 'Seeding is disabled in production' }, { status: 403 })
-    }
+  if (process.env.NODE_ENV === 'production') {
+    throw forbidden('Seeding is disabled in production')
+  }
 
     // Check if data already exists
     const existingProjects = await db.project.findMany({ select: { id: true } })
@@ -246,10 +244,6 @@ export async function POST() {
         { id: writer.id, name: writer.name },
         { id: qa.id, name: qa.name },
       ],
-      tasksCount: tasks.count,
-    })
-  } catch (error) {
-    console.error('Error seeding database:', error)
-    return NextResponse.json({ error: 'Failed to seed database' }, { status: 500 })
-  }
-}
+    tasksCount: tasks.count,
+  })
+})

@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createProjectMcpSchema } from '@/lib/server/contracts'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/projects/[id]/mcp-connections',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -19,27 +18,19 @@ export async function GET(
     })
 
     return NextResponse.json(connections)
-  } catch (error) {
-    console.error('Error fetching MCP connections:', error)
-    return NextResponse.json({ error: 'Failed to fetch MCP connections' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const POST = withErrorHandling(
+  'api/projects/[id]/mcp-connections',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
     const { id } = await params
     const parsed = createProjectMcpSchema.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid MCP connection payload' },
-        { status: 400 },
-      )
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid MCP connection payload')
     }
 
     const connection = await db.projectMcpConnection.create({
@@ -55,8 +46,5 @@ export async function POST(
     })
 
     return NextResponse.json(connection)
-  } catch (error) {
-    console.error('Error creating MCP connection:', error)
-    return NextResponse.json({ error: 'Failed to create MCP connection' }, { status: 500 })
-  }
-}
+  },
+)

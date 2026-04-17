@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { normalizeDagEdges } from '@/lib/server/dispatch'
 import { taskStepSchema } from '@/lib/server/contracts'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withErrorHandling(
+  'api/tasks/[id]/steps',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -22,17 +21,12 @@ export async function GET(
     })
 
     return NextResponse.json(steps)
-  } catch (error) {
-    console.error('Error fetching steps:', error)
-    return NextResponse.json({ error: 'Failed to fetch steps' }, { status: 500 })
-  }
-}
+  },
+)
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const POST = withErrorHandling(
+  'api/tasks/[id]/steps',
+  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
 
@@ -42,24 +36,16 @@ export async function POST(
       select: { status: true },
     })
 
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    }
+    if (!task) throw notFound('Task not found')
 
     if (task.status !== 'BACKLOG') {
-      return NextResponse.json(
-        { error: 'Can only add steps to BACKLOG tasks' },
-        { status: 400 },
-      )
+      throw badRequest('Can only add steps to BACKLOG tasks')
     }
 
     const body = await request.json()
     const parsed = taskStepSchema.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid step' },
-        { status: 400 },
-      )
+      throw badRequest(parsed.error.issues[0]?.message || 'Invalid step')
     }
 
     const maxOrder = await db.taskStep.findFirst({
@@ -75,19 +61,14 @@ export async function POST(
         where: { id },
         select: { projectId: true },
       })
-      if (!taskWithProject) {
-        return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-      }
+      if (!taskWithProject) throw notFound('Task not found')
       const agents = await db.agent.findMany({
         where: { id: { in: agentIdsToValidate } },
         select: { id: true, projectId: true },
       })
       const invalidAgent = agents.find(a => a.projectId !== taskWithProject.projectId)
       if (invalidAgent || agents.length !== new Set(agentIdsToValidate).size) {
-        return NextResponse.json(
-          { error: 'Step agents (including fallback) must belong to the same project as the task' },
-          { status: 400 },
-        )
+        throw badRequest('Step agents (including fallback) must belong to the same project as the task')
       }
     }
 
@@ -109,10 +90,7 @@ export async function POST(
 
       const invalidIds = referencedIds.filter((refId: string) => !existingIds.has(refId))
       if (invalidIds.length > 0) {
-        return NextResponse.json(
-          { error: `DAG edges reference non-existent step IDs in this task: ${invalidIds.join(', ')}` },
-          { status: 400 },
-        )
+        throw badRequest(`DAG edges reference non-existent step IDs in this task: ${invalidIds.join(', ')}`)
       }
 
       // Cycle detection: build adjacency from existing steps + the new step's edges
@@ -150,10 +128,7 @@ export async function POST(
         if (hasCycle) break
       }
       if (hasCycle) {
-        return NextResponse.json(
-          { error: 'DAG edges would create a cycle — circular references are not allowed' },
-          { status: 400 },
-        )
+        throw badRequest('DAG edges would create a cycle — circular references are not allowed')
       }
     }
 
@@ -185,8 +160,5 @@ export async function POST(
     await normalizeDagEdges(id)
 
     return NextResponse.json(step)
-  } catch (error) {
-    console.error('Error creating step:', error)
-    return NextResponse.json({ error: 'Failed to create step' }, { status: 500 })
-  }
-}
+  },
+)

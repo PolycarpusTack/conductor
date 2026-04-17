@@ -1,40 +1,27 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { updateAgentHeartbeat } from '@/lib/server/agent-helpers'
 
 /**
  * Agent HTTP API - Get next available task
- * 
+ *
  * GET /api/agent/next
  * Returns the highest priority task that is either:
  * - Unassigned and in BACKLOG
  * - Assigned to this agent and in BACKLOG or IN_PROGRESS
  */
-export async function GET(request: Request) {
-  try {
-    const apiKey = extractAgentApiKey(request)
+export const GET = withErrorHandling('api/agent/next', async (request: Request) => {
+  const apiKey = extractAgentApiKey(request)
 
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: 'Missing agent API key',
-          hint: 'Use Authorization: Bearer <agent-key> or X-Agent-Key header',
-        },
-        { status: 401 },
-      )
-    }
+  if (!apiKey) throw unauthorized('Missing agent API key')
 
-    const agent = await resolveAgentByApiKey(apiKey)
+  const agent = await resolveAgentByApiKey(apiKey)
 
-    if (!agent) {
-      return NextResponse.json({
-        error: 'Invalid API key',
-        hint: 'Check your agent API key in the AgentBoard UI',
-      }, { status: 401 })
-    }
+  if (!agent) throw unauthorized('Invalid API key')
 
     // Update agent last seen (debounced — at most one DB write per 30s per agent)
     const didWrite = await updateAgentHeartbeat(agent.id)
@@ -113,13 +100,9 @@ export async function GET(request: Request) {
       })
     }
 
-    return NextResponse.json({
-      message: 'No tasks available',
-      task: null,
-      suggestion: 'Check back later or contact your project manager',
-    })
-  } catch (error) {
-    console.error('Error fetching next task:', error)
-    return NextResponse.json({ error: 'Failed to fetch next task' }, { status: 500 })
-  }
-}
+  return NextResponse.json({
+    message: 'No tasks available',
+    task: null,
+    suggestion: 'Check back later or contact your project manager',
+  })
+})

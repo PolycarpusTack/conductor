@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { db, isPostgresDb } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { skillSearchSchema } from '@/lib/server/contracts'
 import { generateEmbedding } from '@/lib/server/embeddings'
 
@@ -36,31 +37,27 @@ async function textSearch(q: string, workspaceId: string | undefined, limit: num
   }
 }
 
-export async function GET(request: Request) {
-  try {
-    const unauthorized = await requireAdminSession()
-    if (unauthorized) return unauthorized
+export const GET = withErrorHandling('api/skills/search', async (request: Request) => {
+  const unauthorized = await requireAdminSession()
+  if (unauthorized) return unauthorized
 
-    const { searchParams } = new URL(request.url)
-    const parsed = skillSearchSchema.safeParse({
-      q: searchParams.get('q'),
-      workspaceId: searchParams.get('workspaceId') || undefined,
-      limit: searchParams.get('limit') || undefined,
-    })
+  const { searchParams } = new URL(request.url)
+  const parsed = skillSearchSchema.safeParse({
+    q: searchParams.get('q'),
+    workspaceId: searchParams.get('workspaceId') || undefined,
+    limit: searchParams.get('limit') || undefined,
+  })
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || 'Invalid search query' },
-        { status: 400 },
-      )
-    }
+  if (!parsed.success) {
+    throw badRequest(parsed.error.issues[0]?.message || 'Invalid search query')
+  }
 
-    const { q, workspaceId, limit } = parsed.data
+  const { q, workspaceId, limit } = parsed.data
 
-    // SQLite: always text search (no pgvector)
-    if (!isPostgresDb) {
-      return NextResponse.json(await textSearch(q, workspaceId, limit))
-    }
+  // SQLite: always text search (no pgvector)
+  if (!isPostgresDb) {
+    return NextResponse.json(await textSearch(q, workspaceId, limit))
+  }
 
     // Postgres: try semantic search, fall back to text
     const embedding = await generateEmbedding(q)
@@ -103,9 +100,5 @@ export async function GET(request: Request) {
       score: 1 - r.distance,
     }))
 
-    return NextResponse.json({ data, method: 'semantic' })
-  } catch (error) {
-    console.error('Skill search error:', error)
-    return NextResponse.json({ error: 'Failed to search skills' }, { status: 500 })
-  }
-}
+  return NextResponse.json({ data, method: 'semantic' })
+})
