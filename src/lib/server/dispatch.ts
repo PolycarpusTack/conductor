@@ -621,7 +621,7 @@ async function activateStep(
  * - Only human/no-runtime active steps → WAITING
  * - All done/skipped → DONE
  */
-async function resolveTaskStatus(taskId: string, projectId: string) {
+export async function resolveTaskStatus(taskId: string, projectId: string) {
   const steps = await db.taskStep.findMany({
     where: { taskId },
     select: { status: true, mode: true, agent: { select: { runtimeId: true } } },

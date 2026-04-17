@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { badRequest, forbidden, notFound, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
-import { advanceChain } from '@/lib/server/dispatch'
+import { advanceChain, resolveTaskStatus } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
@@ -86,6 +86,7 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
         },
       })
 
+      // Daemon-specific event for the runtime dashboard's live log
       broadcastProjectEvent(step.task.projectId, 'daemon-step-failed', {
         stepId,
         taskId: step.taskId,
@@ -93,6 +94,23 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
         error: errorMsg?.slice(0, 500),
         willRetry,
       })
+
+      // Terminal failure must drive the task state machine like HTTP-dispatched
+      // failures do (see dispatch.ts:failStep). Emit the generic step-failed
+      // event so the board refetches, and call resolveTaskStatus so the task
+      // doesn't stay stuck in IN_PROGRESS when no other branches are active.
+      if (!willRetry) {
+        broadcastProjectEvent(step.task.projectId, 'step-failed', {
+          taskId: step.taskId,
+          stepId,
+          error: errorMsg,
+        })
+        try {
+          await resolveTaskStatus(step.taskId, step.task.projectId)
+        } catch (resolveErr) {
+          log.error('resolveTaskStatus failed after daemon terminal fail', resolveErr, { stepId })
+        }
+      }
     }
 
     return NextResponse.json({ status: 'ok', stepId, action })
