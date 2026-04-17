@@ -254,13 +254,18 @@ model StepArtifact {
 }
 
 model StepReview {
-  id        String   @id @default(cuid())
-  stepId    String
-  step      TaskStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  reviewer  String
-  decision  String // approved, rejected, revision_requested
-  note      String?
-  createdAt DateTime @default(now())
+  id           String    @id @default(cuid())
+  stepId       String
+  step         TaskStep  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  reviewer     String
+  decision     String // approved, rejected, revision_requested
+  note         String?
+  // Set when a later rejection/revision resets the step — these reviews
+  // no longer count toward the next approval gate but remain for audit.
+  supersededAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([stepId, supersededAt])
 }
 
 enum TaskStatus {

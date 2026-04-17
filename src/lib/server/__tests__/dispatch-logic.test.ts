@@ -10,6 +10,7 @@ const mockTaskStepFindUnique = mock(() => Promise.resolve(null)) as any
 const mockTaskStepUpdate = mock(() => Promise.resolve({})) as any
 const mockTaskStepUpdateMany = mock(() => Promise.resolve({ count: 1 })) as any
 const mockTaskUpdate = mock(() => Promise.resolve({})) as any
+const mockStepReviewUpdateMany = mock(() => Promise.resolve({ count: 0 })) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -22,6 +23,9 @@ mock.module('@/lib/db', () => ({
     },
     task: {
       update: mockTaskUpdate,
+    },
+    stepReview: {
+      updateMany: mockStepReviewUpdateMany,
     },
   },
 }))
@@ -76,6 +80,7 @@ beforeEach(() => {
   mockTaskStepUpdate.mockReset()
   mockTaskStepUpdateMany.mockReset()
   mockTaskUpdate.mockReset()
+  mockStepReviewUpdateMany.mockReset()
   mockBroadcastProjectEvent.mockReset()
 
   // Restore sensible defaults so tests that don't set them don't blow up
@@ -85,6 +90,7 @@ beforeEach(() => {
   mockTaskStepUpdate.mockResolvedValue({})
   mockTaskStepUpdateMany.mockResolvedValue({ count: 1 })
   mockTaskUpdate.mockResolvedValue({})
+  mockStepReviewUpdateMany.mockResolvedValue({ count: 0 })
 })
 
 // ===========================================================================

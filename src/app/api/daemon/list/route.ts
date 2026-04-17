@@ -4,6 +4,9 @@ import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { withErrorHandling } from '@/lib/server/api-errors'
 import { markStaleDaemons } from '@/lib/server/daemon-auth'
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('api/daemon/list')
 
 export const GET = withErrorHandling('api/daemon/list', async (request: Request) => {
   const unauthorized = await requireAdminSession()
@@ -36,10 +39,16 @@ export const GET = withErrorHandling('api/daemon/list', async (request: Request)
     orderBy: { createdAt: 'desc' },
   })
 
-  const parsed = daemons.map((d) => ({
-    ...d,
-    capabilities: JSON.parse(d.capabilities),
-  }))
+  // One corrupt capabilities blob must not fail the whole listing —
+  // surface it per-row instead. /api/daemon/status already does this.
+  const parsed = daemons.map((d) => {
+    try {
+      return { ...d, capabilities: JSON.parse(d.capabilities) as Record<string, unknown> }
+    } catch (err) {
+      log.error('corrupt capabilities JSON', err, { daemonId: d.id })
+      return { ...d, capabilities: {}, capabilitiesError: true as const }
+    }
+  })
 
   return NextResponse.json({ data: parsed, total: parsed.length })
 })

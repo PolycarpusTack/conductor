@@ -1076,13 +1076,27 @@ export default function Home() {
     setCreateStarterAgents(true)
   }
 
-  const openEditAgentDialog = (agent: Agent) => {
-    setEditingAgent(agent)
+  const openEditAgentDialog = async (agent: Agent) => {
+    // Board-level agent objects come from taskBoardInclude's summary select
+    // (missing maxConcurrent, invocationMode, capabilities, supportedModes,
+    // modeInstructions, runtimeModel, systemPrompt, mcpConnectionIds).
+    // Fetch the full record so the edit form doesn't populate defaults for
+    // unseen fields and silently overwrite them on save.
     setAgentName(agent.name)
     setAgentEmoji(agent.emoji)
     setAgentColor(agent.color)
     setAgentDescription(agent.description || '')
     setAgentDialogOpen(true)
+    try {
+      const res = await fetch(`/api/agents/${agent.id}`, { cache: 'no-store' })
+      if (res.ok) {
+        setEditingAgent(await res.json())
+      } else {
+        setEditingAgent(agent) // fall back to summary shape rather than block editing
+      }
+    } catch {
+      setEditingAgent(agent)
+    }
   }
 
   const resetAgentForm = () => {
@@ -1796,7 +1810,7 @@ export default function Home() {
                           className={`flex items-center gap-2 px-2 py-1 rounded-md hover:bg-surface/40 transition-colors cursor-pointer ${
                             !agent.isActive && taskCount === 0 ? 'opacity-40' : ''
                           }`}
-                          onClick={() => { setEditingAgent(agent); setAgentName(agent.name); setAgentEmoji(agent.emoji); setAgentColor(agent.color); setAgentDescription(agent.description || ''); setAgentDialogOpen(true) }}
+                          onClick={() => openEditAgentDialog(agent)}
                         >
                           <span className="text-sm">{agent.emoji}</span>
                           <span className="text-[11px] text-foreground/70 flex-1 truncate">{agent.name}</span>

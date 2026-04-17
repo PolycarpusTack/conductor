@@ -14,6 +14,9 @@ export const agentSummarySelect = {
   isActive: true,
   lastSeen: true,
   invocationMode: true,
+  // supportedModes is a JSON string of allowed step modes; ChainBuilder needs
+  // it to constrain which steps a given agent can be assigned to.
+  supportedModes: true,
 } as const
 
 export const taskBoardInclude = {

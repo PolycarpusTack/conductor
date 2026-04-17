@@ -16,12 +16,18 @@ interface ReviewDecision {
 export async function submitReview(input: ReviewDecision) {
   const step = await db.taskStep.findUnique({
     where: { id: input.stepId },
-    include: { reviews: true },
+    include: {
+      // Only current-round reviews count toward sign-offs or duplicate-approver
+      // checks. Historical reviews from before a rejection/revision are kept
+      // in the DB for audit (see supersededAt) but excluded here.
+      reviews: { where: { supersededAt: null } },
+    },
   })
 
   if (!step) throw new Error('Step not found')
 
-  // Prevent the same reviewer from approving a step multiple times
+  // Prevent the same reviewer from approving a step multiple times (within
+  // the current round — a reviewer may approve again after a revision cycle).
   if (input.decision === 'approved') {
     const existingApproval = step.reviews.find(
       r => r.reviewer === input.reviewer && r.decision === 'approved'
@@ -105,6 +111,9 @@ async function handleRejection(
     data: { status: 'pending', output: null, completedAt: null },
   })
 
+  // rewindChain will supersede reviews on every step it resets (including
+  // this review step itself — it's downstream of the target), so no manual
+  // supersede call needed here.
   await rewindChain(
     step.taskId,
     input.projectId,
@@ -133,6 +142,7 @@ async function handleRevisionRequest(
     data: { status: 'pending', output: null, completedAt: null },
   })
 
+  // rewindChain supersedes reviews on reset steps — see note in handleRejection.
   await rewindChain(
     step.taskId,
     input.projectId,

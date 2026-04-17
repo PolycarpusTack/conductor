@@ -747,6 +747,13 @@ export async function rewindChain(
         completedAt: null,
       },
     })
+
+    // Supersede any reviews on the reset steps — stale approvals from a
+    // previous round must not count toward the next sign-off gate.
+    await db.stepReview.updateMany({
+      where: { stepId: { in: resetIds }, supersededAt: null },
+      data: { supersededAt: new Date() },
+    })
   }
 
   await db.task.update({
