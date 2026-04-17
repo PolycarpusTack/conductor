@@ -41,6 +41,7 @@ export async function POST(request: Request) {
         taskId: true,
         status: true,
         leasedBy: true,
+        retryDelayMs: true,
         task: { select: { projectId: true } },
       },
     })
@@ -83,15 +84,18 @@ export async function POST(request: Request) {
         console.error('advanceChain failed after daemon step completion:', chainErr)
       }
     } else if (action === 'fail') {
+      const retryDelayMs = step.retryDelayMs ?? 5000
       await db.taskStep.update({
         where: { id: stepId },
         data: {
-          status: willRetry ? 'pending' : 'failed',
+          // Retry: keep step 'active' so the queue re-leases it after the delay.
+          // Non-retry: 'failed' is terminal.
+          status: willRetry ? 'active' : 'failed',
           error: errorMsg?.slice(0, MAX_OUTPUT_CHARS),
           attempts: { increment: 1 },
           completedAt: willRetry ? null : new Date(),
           leasedBy: null,
-          leasedAt: null,
+          leasedAt: willRetry && retryDelayMs > 0 ? new Date(Date.now() + retryDelayMs) : null,
         },
       })
 
