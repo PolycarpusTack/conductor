@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { dispatchStepToDaemon } from '@/lib/server/daemon-dispatch'
 import { dispatchStep } from '@/lib/server/dispatch'
 
 function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
@@ -44,7 +45,10 @@ export async function pollAndDispatch(projectId?: string) {
         },
       ],
     },
-    select: { id: true },
+    select: {
+      id: true,
+      agent: { select: { invocationMode: true } },
+    },
     take: POLL_BATCH_SIZE,
     orderBy: { createdAt: 'asc' },
   })
@@ -58,7 +62,14 @@ export async function pollAndDispatch(projectId?: string) {
       mode: { not: 'human' },
       task: { status: 'IN_PROGRESS', ...(projectId ? { projectId } : {}) },
     },
-    select: { id: true, taskId: true, order: true, prevSteps: true, isMergePoint: true },
+    select: {
+      id: true,
+      taskId: true,
+      order: true,
+      prevSteps: true,
+      isMergePoint: true,
+      agent: { select: { invocationMode: true } },
+    },
     take: POLL_BATCH_SIZE,
     orderBy: { createdAt: 'asc' },
   })
@@ -113,8 +124,15 @@ export async function pollAndDispatch(projectId?: string) {
 
   if (allSteps.length === 0) return { polled: 0, succeeded: 0, failed: 0 }
 
+  // Route each step by its agent's invocationMode.
+  // HTTP: the Next server executes via provider SDKs.
+  // DAEMON: lease the step to an online daemon; the daemon pulls and runs.
   const results = await Promise.allSettled(
-    allSteps.map(step => dispatchStep(step.id))
+    allSteps.map(step =>
+      step.agent?.invocationMode === 'DAEMON'
+        ? dispatchStepToDaemon(step.id)
+        : dispatchStep(step.id),
+    ),
   )
 
   return {
