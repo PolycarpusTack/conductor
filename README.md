@@ -157,7 +157,10 @@ API keys are now managed as previews plus rotation:
 
 ## WebSocket Service (Optional)
 
-For real-time updates, start the WebSocket service:
+Solo local dev works fine without this — the board falls back to polling.
+Recommended for shared deployments (live cursors + multi-client board updates).
+
+To start the WebSocket service:
 
 ```bash
 cd mini-services/board-ws
