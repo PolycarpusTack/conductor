@@ -5,18 +5,10 @@ import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
 import { createExecution, succeedExecution, failExecution, timeoutExecution } from '@/lib/server/execution-log'
 import { resolveNextSteps, type StepEdge } from '@/lib/server/condition-evaluator'
+import { safeJsonParse } from '@/lib/server/utils'
 import { randomBytes } from 'crypto'
 
 const WORKER_ID = `worker-${randomBytes(4).toString('hex')}`
-
-function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
-  if (!value) return fallback
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return fallback
-  }
-}
 
 /**
  * Find the previous agent step for a given step, DAG-aware.

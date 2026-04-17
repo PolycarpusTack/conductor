@@ -2,15 +2,7 @@ import { db } from '@/lib/db'
 import { sweepStaleDaemonsThrottled } from '@/lib/server/daemon-auth'
 import { dispatchStepToDaemon } from '@/lib/server/daemon-dispatch'
 import { dispatchStep } from '@/lib/server/dispatch'
-
-function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
-  if (!value) return fallback
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return fallback
-  }
-}
+import { safeJsonParse } from '@/lib/server/utils'
 
 const LEASE_TIMEOUT_MS = 600000 // 10 min — if a worker hasn't finished, assume it died
 const POLL_BATCH_SIZE = 5

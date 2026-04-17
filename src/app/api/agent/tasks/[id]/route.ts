@@ -241,13 +241,13 @@ export async function PUT(
       // for this agent — but reject if ambiguous (multiple active branches).
       let activeStep: (typeof task.steps)[number] | null = null
       if (requestedStepId) {
-        activeStep = task.steps.find((s: any) => s.id === requestedStepId && s.status === 'active') || null
+        activeStep = task.steps.find((s) => s.id === requestedStepId && s.status === 'active') || null
       } else {
-        const agentActiveSteps = task.steps.filter((s: any) => s.status === 'active' && s.agentId === agent.id)
+        const agentActiveSteps = task.steps.filter((s) => s.status === 'active' && s.agentId === agent.id)
         if (agentActiveSteps.length > 1) {
           return NextResponse.json({
             error: 'Multiple active steps for this agent. Provide step_id to disambiguate.',
-            activeSteps: agentActiveSteps.map((s: any) => ({ id: s.id, order: s.order })),
+            activeSteps: agentActiveSteps.map((s) => ({ id: s.id, order: s.order })),
           }, { status: 409 })
         }
         activeStep = agentActiveSteps[0] || null

@@ -93,6 +93,19 @@ interface Agent {
   mcpConnectionIds?: string | null
 }
 
+interface TaskStepSummary {
+  id: string
+  order: number
+  mode: string
+  status: string
+  agentId: string | null
+  humanLabel: string | null
+  autoContinue: boolean
+  rejectionNote: string | null
+  attempts: number
+  agent: { id: string; name: string; emoji: string } | null
+}
+
 interface Task {
   id: string
   title: string
@@ -107,7 +120,7 @@ interface Task {
   startedAt?: string | null
   completedAt?: string | null
   runtimeOverride?: string | null
-  steps?: any[]
+  steps?: TaskStepSummary[]
 }
 
 interface Project {
@@ -202,7 +215,7 @@ export default function Home() {
   const [projectMcpConnections, setProjectMcpConnections] = useState<any[]>([])
   const [chainTemplates, setChainTemplates] = useState<any[]>([])
   const [taskSteps, setTaskSteps] = useState<any[]>([])
-  const [viewingTaskSteps, setViewingTaskSteps] = useState<{ id: string; title: string; steps: any[] } | null>(null)
+  const [viewingTaskSteps, setViewingTaskSteps] = useState<{ id: string; title: string; steps: TaskStepSummary[] } | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   // WebSocket
@@ -1971,8 +1984,8 @@ export default function Home() {
                                   </div>
                                   
                                   {task.steps && task.steps.length > 0 && (() => {
-                                    const activeStep = task.steps.find((s: any) => s.status === 'active')
-                                    const doneCount = task.steps.filter((s: any) => s.status === 'done' || s.status === 'skipped').length
+                                    const activeStep = task.steps.find((s) => s.status === 'active')
+                                    const doneCount = task.steps.filter((s) => s.status === 'done' || s.status === 'skipped').length
                                     const currentStep = activeStep || task.steps[doneCount]
                                     if (!currentStep) return null
                                     return (
@@ -2077,8 +2090,8 @@ export default function Home() {
                                   </div>
 
                                   {task.steps && task.steps.length > 0 && (() => {
-                                    const activeStep = task.steps.find((s: any) => s.status === 'active')
-                                    const doneCount = task.steps.filter((s: any) => s.status === 'done' || s.status === 'skipped').length
+                                    const activeStep = task.steps.find((s) => s.status === 'active')
+                                    const doneCount = task.steps.filter((s) => s.status === 'done' || s.status === 'skipped').length
                                     const currentStep = activeStep || task.steps[doneCount]
                                     if (!currentStep) return null
                                     return (
@@ -2322,7 +2335,7 @@ export default function Home() {
 
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Priority</label>
-                <Select value={taskPriority} onValueChange={(v) => setTaskPriority(v as any)}>
+                <Select value={taskPriority} onValueChange={(v) => setTaskPriority(v as TaskPriority)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -2787,7 +2800,7 @@ export default function Home() {
               if (currentProject) fetchProject(currentProject.id).then(p => {
                 setCurrentProject(p)
                 if (p) {
-                  const updated = p.tasks?.find((t: any) => t.id === selectedTask.id)
+                  const updated = p.tasks?.find((t) => t.id === selectedTask.id)
                   if (updated) setSelectedTask(updated)
                 }
               })

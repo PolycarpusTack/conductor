@@ -94,8 +94,8 @@ export async function PUT(
     }
 
     if (parsed.data.status === 'IN_PROGRESS' && task.steps && task.steps.length > 0) {
-      const hasActiveStep = task.steps.some((s: any) => s.status === 'active')
-      const hasCompletedSteps = task.steps.some((s: any) => s.status === 'done' || s.status === 'skipped')
+      const hasActiveStep = task.steps.some((s) => s.status === 'active')
+      const hasCompletedSteps = task.steps.some((s) => s.status === 'done' || s.status === 'skipped')
       if (!hasActiveStep && !hasCompletedSteps) {
         // Only start chain if no steps have been touched yet
         try {

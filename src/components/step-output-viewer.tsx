@@ -24,6 +24,30 @@ interface TaskStep {
   agent?: { id: string; name: string; emoji: string } | null
 }
 
+interface StepExecutionSummary {
+  id: string
+  attempt: number
+  status: string
+  output?: string | null
+  error?: string | null
+  tokensUsed?: number | null
+  cost?: number | null
+  durationMs?: number | null
+  startedAt: string
+  completedAt?: string | null
+}
+
+interface StepArtifactSummary {
+  id: string
+  type: string
+  label: string
+  content?: string | null
+  url?: string | null
+  mimeType?: string | null
+  metadata?: string | null
+  createdAt: string
+}
+
 interface StepOutputViewerProps {
   taskId: string
   taskTitle: string
@@ -56,9 +80,9 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null)
   const [rejectionNote, setRejectionNote] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
-  const [executionHistory, setExecutionHistory] = useState<Record<string, any[]>>({})
+  const [executionHistory, setExecutionHistory] = useState<Record<string, StepExecutionSummary[]>>({})
   const [expandedExecutions, setExpandedExecutions] = useState<Set<string>>(new Set())
-  const [stepArtifacts, setStepArtifacts] = useState<Record<string, any[]>>({})
+  const [stepArtifacts, setStepArtifacts] = useState<Record<string, StepArtifactSummary[]>>({})
 
   const fetchExecutions = useCallback(async (stepId: string) => {
     if (executionHistory[stepId]) {
@@ -428,7 +452,7 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
 
                           {expandedExecutions.has(step.id) && executionHistory[step.id] && (
                             <div className="mt-2 space-y-1.5">
-                              {executionHistory[step.id].map((exec: any) => (
+                              {executionHistory[step.id].map((exec) => (
                                 <div
                                   key={exec.id}
                                   className="rounded border border-border/20 bg-card/20 p-2 text-[10px] font-mono"
