@@ -2,6 +2,10 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('admin-session')
+
 const ADMIN_COOKIE_NAME = 'agentboard_admin_session'
 const ADMIN_SESSION_NONCE_COOKIE = 'agentboard_admin_nonce'
 const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 12
@@ -11,7 +15,7 @@ function getAdminPassword() {
 }
 
 if (!getAdminPassword()) {
-  console.warn('[Conductor] WARNING: No admin password configured. Set AGENTBOARD_ADMIN_PASSWORD in .env to enable admin access.')
+  log.warn('No admin password configured. Set AGENTBOARD_ADMIN_PASSWORD in .env to enable admin access.')
 }
 
 function getSessionSecret() {

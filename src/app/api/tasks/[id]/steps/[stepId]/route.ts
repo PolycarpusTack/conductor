@@ -3,8 +3,11 @@ import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { ApiError, badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { dispatchStep, advanceChain, rewindChain, closeChain, findPreviousAgentStep } from '@/lib/server/dispatch'
+import { getLogger } from '@/lib/server/logger'
 import { submitReview } from '@/lib/server/review-logic'
 import { stepReviewSchema } from '@/lib/server/contracts'
+
+const log = getLogger('api/tasks/[id]/steps/[stepId]')
 
 export const PUT = withErrorHandling(
   'api/tasks/[id]/steps/[stepId]',
@@ -30,7 +33,7 @@ export const PUT = withErrorHandling(
         where: { id: stepId },
         data: { status: 'active', error: null, startedAt: new Date(), completedAt: null },
       })
-      dispatchStep(stepId).catch(console.error)
+      dispatchStep(stepId).catch((err) => log.error('dispatchStep failed', err, { stepId }))
       return NextResponse.json({ success: true, action: 'retrying' })
     }
 
@@ -185,11 +188,11 @@ export const PUT = withErrorHandling(
       try {
         await advanceChain(id, projectId, stepId)
       } catch (chainErr) {
-        console.error('advanceChain failed after step completion:', chainErr)
+        log.error('advanceChain failed after step completion', chainErr, { stepId })
         await db.task.update({
           where: { id },
           data: { status: 'WAITING' },
-        }).catch(console.error)
+        }).catch((err) => log.error('failed to set task WAITING after advanceChain failure', err, { taskId: id }))
       }
     }
 

@@ -5,8 +5,11 @@ import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateTaskSchema } from '@/lib/server/contracts'
 import { startChain } from '@/lib/server/dispatch'
+import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
+
+const log = getLogger('api/tasks/[id]')
 
 export const GET = withErrorHandling(
   'api/tasks/[id]',
@@ -81,7 +84,7 @@ export const PUT = withErrorHandling(
         try {
           await startChain(task.id, task.projectId)
         } catch (chainErr) {
-          console.error('startChain failed:', chainErr)
+          log.error('startChain failed', chainErr, { taskId: task.id })
         }
       }
     }

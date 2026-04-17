@@ -1,7 +1,10 @@
 import { db } from '@/lib/db'
+import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { startChain } from '@/lib/server/dispatch'
 import { taskBoardInclude } from '@/lib/server/selects'
+
+const log = getLogger('agent-helpers')
 
 type AgentRef = { id: string; name: string; emoji: string; projectId: string }
 
@@ -120,7 +123,7 @@ export async function claimOrStartTask(
   if (task && task.steps && task.steps.length > 0) {
     const hasActiveStep = task.steps.some((s: { status: string }) => s.status === 'active')
     if (!hasActiveStep) {
-      startChain(taskId, agent.projectId).catch(console.error)
+      startChain(taskId, agent.projectId).catch((err) => log.error('startChain failed', err, { taskId }))
     }
   }
 

@@ -6,8 +6,11 @@ import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { updateAgentHeartbeat, toRealtimeActivity, claimOrStartTask } from '@/lib/server/agent-helpers'
 import { agentTaskActionSchema, taskStatusSchema, stepArtifactSchema } from '@/lib/server/contracts'
 import { advanceChain } from '@/lib/server/dispatch'
+import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
+
+const log = getLogger('api/agent/tasks/[id]')
 
 async function getAgentFromRequest(request: Request, body?: Record<string, unknown>) {
   const apiKey = extractAgentApiKey(request, body)
@@ -259,11 +262,11 @@ export const PUT = withErrorHandling(
           try {
             await advanceChain(id, agent.projectId, activeStep.id)
           } catch (chainErr) {
-            console.error('advanceChain failed after step completion:', chainErr)
+            log.error('advanceChain failed after step completion', chainErr, { stepId: activeStep.id })
             await db.task.update({
               where: { id },
               data: { status: 'WAITING' },
-            }).catch(console.error)
+            }).catch((err) => log.error('failed to set task WAITING', err, { taskId: id }))
           }
         }
       }

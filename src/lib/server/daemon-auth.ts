@@ -1,6 +1,9 @@
 import { createHash, randomBytes } from 'crypto'
 
 import { db } from '@/lib/db'
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('daemon-auth')
 
 export interface DaemonAuthResult {
   id: string
@@ -101,6 +104,6 @@ export async function sweepStaleDaemonsThrottled(thresholdMs: number = 30_000) {
   try {
     await markStaleDaemons(thresholdMs)
   } catch (err) {
-    console.error('[daemon-auth] sweepStaleDaemons failed:', err)
+    log.error('sweepStaleDaemons failed', err)
   }
 }

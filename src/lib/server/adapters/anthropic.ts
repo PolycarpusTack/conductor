@@ -1,6 +1,9 @@
 import type { RuntimeAdapter, DispatchParams, DispatchResult, McpArtifact } from './types'
+import { getLogger } from '@/lib/server/logger'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
 import { traceToolCall } from '@/lib/server/tool-trace'
+
+const log = getLogger('adapter:anthropic')
 
 const MAX_TOOL_ROUNDS = 10
 
@@ -90,7 +93,7 @@ export const anthropicAdapter: RuntimeAdapter = {
       // Execute each tool call via MCP
       const toolResults: Array<{ type: string; tool_use_id: string; content: string }> = []
       for (const toolBlock of toolUseBlocks) {
-        console.log(`[Dispatch] Executing tool: ${toolBlock.name}`, toolBlock.input)
+        log.debug('executing tool', { tool: toolBlock.name, input: toolBlock.input })
         let resultText: string
         let toolError: string | undefined
         const toolStart = Date.now()
@@ -112,7 +115,7 @@ export const anthropicAdapter: RuntimeAdapter = {
 
         // Trace the tool call if we have an execution context
         if (params.executionId) {
-          traceToolCall(params.executionId, toolBlock.name, toolBlock.input, resultText, toolDurationMs, toolError).catch(console.error)
+          traceToolCall(params.executionId, toolBlock.name, toolBlock.input, resultText, toolDurationMs, toolError).catch((err) => log.error('traceToolCall failed', err))
         }
 
         toolResults.push({
@@ -127,7 +130,7 @@ export const anthropicAdapter: RuntimeAdapter = {
     }
 
     // Safety: hit the round limit
-    console.warn(`[Dispatch] Tool-use loop hit ${maxRounds} round limit`)
+    log.warn('tool-use loop hit round limit', { maxRounds })
     return {
       output: `[Tool execution reached ${maxRounds} round limit. The agent may not have completed its work.]`,
       tokensUsed: totalTokens,

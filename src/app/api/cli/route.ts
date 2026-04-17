@@ -3,8 +3,11 @@ import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { updateAgentHeartbeat, toRealtimeActivity, claimOrStartTask } from '@/lib/server/agent-helpers'
 import { cliActionSchema } from '@/lib/server/contracts'
 import { advanceChain } from '@/lib/server/dispatch'
+import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
+
+const log = getLogger('api/cli')
 
 export async function GET(request: Request) {
   try {
@@ -77,7 +80,7 @@ export async function GET(request: Request) {
         `\n${statusIcon} ${priorityIcon} ${task.title}\n`,
     )
   } catch (error) {
-    console.error('CLI error:', error)
+    log.error('CLI error', error)
     return new Response('ERROR: Internal server error', { status: 500 })
   }
 }
@@ -223,12 +226,12 @@ export async function POST(request: Request) {
           try {
             await advanceChain(taskId, agent.projectId, activeStep.id)
           } catch (chainErr) {
-            console.error('advanceChain failed after step completion:', chainErr)
+            log.error('advanceChain failed after step completion', chainErr, { taskId })
             // Chain is stuck — set task to WAITING so the admin can intervene
             await db.task.update({
               where: { id: taskId },
               data: { status: 'WAITING' },
-            }).catch(console.error)
+            }).catch((err) => log.error('failed to set task WAITING', err, { taskId }))
           }
 
           broadcastProjectEvent(agent.projectId, 'task-updated', {
@@ -375,7 +378,7 @@ export async function POST(request: Request) {
       }
     }
   } catch (error) {
-    console.error('CLI error:', error)
+    log.error('CLI error', error)
     return new Response('ERROR: Internal server error', { status: 500 })
   }
 }

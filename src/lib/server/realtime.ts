@@ -1,5 +1,9 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('realtime')
+
 type RealtimeTokenPayload = {
   projectId: string
   exp: number
@@ -113,9 +117,9 @@ export async function broadcastProjectEvent(
     })
 
     if (!response.ok) {
-      console.error('Failed to broadcast realtime event:', response.status, response.statusText)
+      log.error('broadcast failed', undefined, { status: response.status, statusText: response.statusText })
     }
   } catch (error) {
-    console.error('Failed to broadcast realtime event:', error)
+    log.error('broadcast failed', error)
   }
 }

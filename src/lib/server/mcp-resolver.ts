@@ -5,6 +5,9 @@
 // The adapter loops until the model produces a final text response.
 
 import { db } from '@/lib/db'
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('mcp-resolver')
 
 interface McpTool {
   name: string
@@ -48,7 +51,7 @@ export async function resolveMcpTools(
       const tools = await fetchToolsFromMcp(connection)
       allTools.push(...tools)
     } catch (error) {
-      console.error(`Failed to fetch tools from MCP "${connection.name}":`, error)
+      log.error('failed to fetch tools from MCP', error, { connection: connection.name })
       // Don't fail dispatch if one MCP is unreachable — just skip its tools
     }
   }
@@ -64,7 +67,7 @@ export async function resolveMcpTools(
 
 async function fetchToolsFromMcp(connection: McpConnection): Promise<McpTool[]> {
   if (!connection.endpoint) {
-    console.warn(`MCP "${connection.name}" has no endpoint configured, skipping`)
+    log.warn('MCP has no endpoint configured, skipping', { connection: connection.name })
     return []
   }
 
@@ -97,7 +100,7 @@ async function fetchToolsFromMcp(connection: McpConnection): Promise<McpTool[]> 
       input_schema: tool.inputSchema || { type: 'object', properties: {} },
     }))
   } catch (error) {
-    console.error(`Error fetching tools from ${endpoint}:`, error)
+    log.error('error fetching tools from MCP endpoint', error, { endpoint })
     return []
   }
 }
@@ -118,7 +121,7 @@ export async function executeMcpTool(
   args: Record<string, unknown>,
   mcpConnectionIds: string[],
 ): Promise<McpToolResult> {
-  console.log(`[MCP] Executing tool: ${toolName}`)
+  log.debug('executing tool', { toolName })
   // Parse the connection name and actual tool name from the namespaced format
   const separatorIndex = toolName.indexOf('__')
   if (separatorIndex === -1) {
@@ -194,7 +197,7 @@ export async function executeMcpTool(
       }
     }
 
-    console.log(`[MCP] Tool ${toolName} returned ${textParts.length} text parts, ${artifacts.length} artifacts`)
+    log.debug('tool result', { toolName, textParts: textParts.length, artifacts: artifacts.length })
     const text = textParts.join('\n') || JSON.stringify(data.result || data)
     return { text, artifacts }
   } catch (error) {

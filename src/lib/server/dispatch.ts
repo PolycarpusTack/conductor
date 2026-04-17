@@ -5,9 +5,11 @@ import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
 import { createExecution, succeedExecution, failExecution, timeoutExecution } from '@/lib/server/execution-log'
 import { resolveNextSteps, type StepEdge } from '@/lib/server/condition-evaluator'
+import { getLogger } from '@/lib/server/logger'
 import { safeJsonParse } from '@/lib/server/utils'
 import { randomBytes } from 'crypto'
 
+const log = getLogger('dispatch')
 const WORKER_ID = `worker-${randomBytes(4).toString('hex')}`
 
 /**
@@ -803,7 +805,7 @@ export async function startChain(taskId: string, projectId: string) {
     : allSteps.filter(s => s.order === 1)
 
   if (rootSteps.length === 0) {
-    console.error(`[Chain] startChain: no root steps found for task ${taskId} — possible cyclic DAG or edge normalization issue`)
+    log.error('startChain: no root steps found — possible cyclic DAG or edge normalization issue', undefined, { taskId })
     await db.task.update({
       where: { id: taskId },
       data: {

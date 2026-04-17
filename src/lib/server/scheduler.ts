@@ -1,5 +1,8 @@
 import { db } from '@/lib/db'
+import { getLogger } from '@/lib/server/logger'
 import { pollAndDispatch } from '@/lib/server/step-queue'
+
+const log = getLogger('scheduler')
 
 interface ScheduleWindow {
   startDay: number  // 0=Sunday, 1=Monday, ..., 6=Saturday
@@ -47,7 +50,7 @@ async function pollProject(projectId: string) {
   try {
     await pollAndDispatch(projectId)
   } catch (error) {
-    console.error(`[Scheduler] Poll error for project ${projectId}:`, error)
+    log.error('poll failed', error, { projectId })
   }
 }
 
@@ -55,7 +58,7 @@ function startPolling(projectId: string, pollMs: number) {
   const existing = schedulers.get(projectId)
   if (existing?.running) return // already running
 
-  console.log(`[Scheduler] Starting automation for project ${projectId} (${pollMs}ms interval)`)
+  log.info('starting automation', { projectId, pollMs })
 
   const interval = setInterval(() => pollProject(projectId), pollMs)
   // Run immediately on start
@@ -68,7 +71,7 @@ function stopPolling(projectId: string) {
   const existing = schedulers.get(projectId)
   if (!existing?.running) return
 
-  console.log(`[Scheduler] Stopping automation for project ${projectId}`)
+  log.info('stopping automation', { projectId })
 
   if (existing.interval) {
     clearInterval(existing.interval)
@@ -112,7 +115,7 @@ export async function startProjectAutomation(projectId: string) {
       try {
         schedule = JSON.parse(project.automationSchedule)
       } catch (error) {
-        console.error(`[Scheduler] Invalid automationSchedule JSON for project ${projectId}:`, error)
+        log.error('invalid automationSchedule JSON', error, { projectId })
         return
       }
       if (isWithinSchedule(schedule)) {
@@ -163,7 +166,7 @@ async function checkScheduledProjects() {
       try {
         schedule = JSON.parse(project.automationSchedule)
       } catch (error) {
-        console.error(`[Scheduler] Invalid automationSchedule JSON for project ${project.id}:`, error)
+        log.error('invalid automationSchedule JSON', error, { projectId: project.id })
         continue
       }
       const shouldRun = isWithinSchedule(schedule)
@@ -189,7 +192,7 @@ export async function initializeScheduler() {
   if (globalInitialized) return
   globalInitialized = true
 
-  console.log('[Scheduler] Initializing automation scheduler...')
+  log.info('initializing automation scheduler')
 
   // Start projects with 'startup' or 'always' mode
   const autoStartProjects = await db.project.findMany({
@@ -207,7 +210,7 @@ export async function initializeScheduler() {
   // Check scheduled projects every 60 seconds
   setInterval(checkScheduledProjects, 60000)
 
-  console.log(`[Scheduler] Initialized: ${autoStartProjects.length} auto-start project(s)`)
+  log.info('initialized', { autoStartProjects: autoStartProjects.length })
 }
 
 /**
@@ -219,5 +222,5 @@ export function shutdownScheduler() {
   }
   schedulers.clear()
   globalInitialized = false
-  console.log('[Scheduler] All schedulers stopped')
+  log.info('all schedulers stopped')
 }

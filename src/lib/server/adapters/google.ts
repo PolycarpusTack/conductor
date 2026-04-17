@@ -1,6 +1,9 @@
 import type { RuntimeAdapter, DispatchParams, DispatchResult, McpArtifact } from './types'
+import { getLogger } from '@/lib/server/logger'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
 import { traceToolCall } from '@/lib/server/tool-trace'
+
+const log = getLogger('adapter:google')
 
 const MAX_TOOL_ROUNDS = 10
 
@@ -113,7 +116,7 @@ export const googleAdapter: RuntimeAdapter = {
 
       for (const part of functionCallParts) {
         const { name, args } = part.functionCall as { name: string; args: Record<string, unknown> }
-        console.log(`[Dispatch] Executing tool: ${name}`, args)
+        log.debug('executing tool', { tool: name, args })
         const toolStart = Date.now()
         const mcpResult = await executeMcpTool(name, args, params.mcpConnectionIds!)
         const toolDurationMs = Date.now() - toolStart
@@ -123,7 +126,7 @@ export const googleAdapter: RuntimeAdapter = {
         }
 
         if (params.executionId) {
-          traceToolCall(params.executionId, name, args as Record<string, unknown>, mcpResult.text, toolDurationMs).catch(console.error)
+          traceToolCall(params.executionId, name, args as Record<string, unknown>, mcpResult.text, toolDurationMs).catch((err) => log.error('traceToolCall failed', err))
         }
 
         functionResponseParts.push({

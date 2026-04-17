@@ -1,3 +1,7 @@
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('embeddings')
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'text-embedding-3-small'
 
@@ -18,7 +22,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
     })
 
     if (!res.ok) {
-      console.error('Embedding API error:', res.status, await res.text())
+      log.error('embedding API error', undefined, { status: res.status, body: await res.text() })
       return null
     }
 
@@ -28,7 +32,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
 
     return data.data[0]?.embedding || null
   } catch (error) {
-    console.error('Embedding generation failed:', error)
+    log.error('embedding generation failed', error)
     return null
   }
 }

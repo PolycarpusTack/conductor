@@ -5,7 +5,10 @@ import { badRequest, forbidden, notFound, unauthorized, withErrorHandling } from
 import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
 import { advanceChain } from '@/lib/server/dispatch'
+import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
+
+const log = getLogger('api/daemon/steps')
 
 export const POST = withErrorHandling('api/daemon/steps', async (request: Request) => {
     const rawToken = extractDaemonToken(request)
@@ -65,7 +68,7 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
       try {
         await advanceChain(step.taskId, step.task.projectId, stepId)
       } catch (chainErr) {
-        console.error('advanceChain failed after daemon step completion:', chainErr)
+        log.error('advanceChain failed after daemon step completion', chainErr)
       }
     } else if (action === 'fail') {
       const retryDelayMs = step.retryDelayMs ?? 5000

@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('api')
+
 /**
  * Typed HTTP error a route can throw to short-circuit into a clean response.
  * Anything else that bubbles out becomes a generic 500 (details are logged,
@@ -54,7 +58,7 @@ export function withErrorHandling<Ctx = undefined>(
           { status: err.status },
         )
       }
-      console.error(`[${tag}]`, err)
+      log.error(`unhandled error in ${tag}`, err)
       return NextResponse.json(
         { error: 'Internal server error' },
         { status: 500 },

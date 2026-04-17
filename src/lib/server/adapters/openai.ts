@@ -1,6 +1,9 @@
 import type { RuntimeAdapter, DispatchParams, DispatchResult, McpArtifact } from './types'
+import { getLogger } from '@/lib/server/logger'
 import { executeMcpTool } from '@/lib/server/mcp-resolver'
 import { traceToolCall } from '@/lib/server/tool-trace'
+
+const log = getLogger('adapter:openai')
 
 const MAX_TOOL_ROUNDS = 10
 
@@ -93,7 +96,7 @@ export const openaiAdapter: RuntimeAdapter = {
           ? JSON.parse(toolCall.function.arguments)
           : toolCall.function.arguments || {}
 
-        console.log(`[Dispatch] Executing tool: ${toolCall.function.name}`, args)
+        log.debug('executing tool', { tool: toolCall.function.name, args })
 
         const toolStart = Date.now()
         const mcpResult = await executeMcpTool(
@@ -108,7 +111,7 @@ export const openaiAdapter: RuntimeAdapter = {
         }
 
         if (params.executionId) {
-          traceToolCall(params.executionId, toolCall.function.name, args, mcpResult.text, toolDurationMs).catch(console.error)
+          traceToolCall(params.executionId, toolCall.function.name, args, mcpResult.text, toolDurationMs).catch((err) => log.error('traceToolCall failed', err))
         }
 
         messages.push({
@@ -119,7 +122,7 @@ export const openaiAdapter: RuntimeAdapter = {
       }
     }
 
-    console.warn(`[Dispatch] Tool-use loop hit ${maxRounds} round limit`)
+    log.warn('tool-use loop hit round limit', { maxRounds })
     return {
       output: `[Tool execution reached ${maxRounds} round limit.]`,
       tokensUsed: totalTokens,

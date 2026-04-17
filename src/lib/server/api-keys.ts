@@ -1,5 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('api-keys')
+
 import { db } from '@/lib/db'
 
 type KeyKind = 'agent' | 'project'
@@ -134,7 +138,7 @@ export async function resolveAgentByApiKey(rawKey: string): Promise<AgentAuthRes
         apiKeyHash: hashedKey,
         apiKeyPreview: buildApiKeyPreview(rawKey),
       },
-    }).catch(console.error)
+    }).catch((err) => log.error('failed to migrate legacy agent key', err, { agentId: legacyAgent.id }))
 
     return legacyAgent
   }
