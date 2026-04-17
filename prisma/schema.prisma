@@ -31,7 +31,7 @@ model Project {
   automationMode     String                 @default("manual") // manual, always, scheduled, startup
   automationSchedule String? // JSON: { startDay, startTime, endDay, endTime }
   automationPollMs   Int                    @default(10000) // poll interval in ms
-  // Phase 0: workspace container (nullable; tightened in Phase 3 after backfill)
+  // Workspace container (nullable; backfilled)
   workspaceId        String?
   workspace          Workspace?             @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
@@ -66,7 +66,7 @@ model Agent {
   systemPrompt     String?
   mcpConnectionIds String?
   taskSteps        TaskStep[]          @relation("TaskStepAgent")
-  // Phase 0: HTTP = legacy polling agent; DAEMON = launched by conductor-daemon
+  // HTTP = legacy polling agent; DAEMON = launched by conductor-daemon
   invocationMode   AgentInvocationMode @default(HTTP)
 }
 
@@ -88,7 +88,7 @@ model Task {
   startedAt   DateTime? // When agent started working
   completedAt DateTime? // When task was completed
   order            Int           @default(0)
-  runtimeOverride  String?       // Phase 2: per-task runtime override (claude-code | codex | copilot)
+  runtimeOverride  String?       // Per-task runtime override (claude-code | codex | copilot)
   activities       ActivityLog[]
   steps            TaskStep[]
 
@@ -278,7 +278,7 @@ enum TaskPriority {
   URGENT
 }
 
-// ─── Phase 0: foundations for daemon + workspaces ──────────────────────────
+// ─── Daemon + workspaces ──────────────────────────────────────────────────
 
 model Workspace {
   id        String    @id @default(cuid())
@@ -296,7 +296,7 @@ enum AgentInvocationMode {
   DAEMON
 }
 
-// Empty in Phase 0; populated by conductor-daemon registrations in Phase 1.
+// Populated by conductor-daemon registrations.
 model Daemon {
   id           String    @id @default(cuid())
   workspaceId  String
@@ -314,7 +314,7 @@ model Daemon {
   @@index([workspaceId, status])
 }
 
-// ─── Phase 5: Skills library ─────────────────────────────────────────────
+// ─── Skills library ───────────────────────────────────────────────────────
 
 model Skill {
   id           String    @id @default(cuid())

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -35,9 +35,18 @@ interface SkillsPageProps {
   workspaceId?: string | null
 }
 
+async function loadSkills(workspaceId?: string | null): Promise<Skill[]> {
+  const params = new URLSearchParams()
+  if (workspaceId) params.set('workspaceId', workspaceId)
+  const res = await fetch(`/api/skills?${params}`).catch(() => null)
+  if (!res?.ok) return []
+  const data = await res.json()
+  return data.data || []
+}
+
 export function SkillsPage({ workspaceId }: SkillsPageProps) {
   const [skills, setSkills] = useState<Skill[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Skill[] | null>(null)
   const [searchMethod, setSearchMethod] = useState<string | null>(null)
@@ -49,19 +58,16 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
   const [newTags, setNewTags] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const fetchSkills = useCallback(async () => {
-    setLoading(true)
-    const params = new URLSearchParams()
-    if (workspaceId) params.set('workspaceId', workspaceId)
-    const res = await fetch(`/api/skills?${params}`).catch(() => null)
-    if (res?.ok) {
-      const data = await res.json()
-      setSkills(data.data || [])
-    }
-    setLoading(false)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const data = await loadSkills(workspaceId)
+      if (cancelled) return
+      setSkills(data)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
   }, [workspaceId])
-
-  useEffect(() => { fetchSkills() }, [fetchSkills])
 
   const handleSearch = async () => {
     if (!query.trim()) { setSearchResults(null); return }
@@ -95,7 +101,7 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
       setNewDescription('')
       setNewBody('')
       setNewTags('')
-      fetchSkills()
+      setSkills(await loadSkills(workspaceId))
     }
     setSaving(false)
   }
