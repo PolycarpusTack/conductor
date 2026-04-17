@@ -85,3 +85,22 @@ export async function markStaleDaemons(thresholdMs: number = 30_000) {
     data: { status: 'stale' },
   })
 }
+
+let lastStaleSweep = 0
+const SWEEP_INTERVAL_MS = 30_000
+
+/**
+ * Rate-limited wrapper around markStaleDaemons. Safe to call on hot paths
+ * (e.g. every scheduler tick) — will only hit the DB at most once per
+ * SWEEP_INTERVAL_MS per process.
+ */
+export async function sweepStaleDaemonsThrottled(thresholdMs: number = 30_000) {
+  const now = Date.now()
+  if (now - lastStaleSweep < SWEEP_INTERVAL_MS) return
+  lastStaleSweep = now
+  try {
+    await markStaleDaemons(thresholdMs)
+  } catch (err) {
+    console.error('[daemon-auth] sweepStaleDaemons failed:', err)
+  }
+}

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { sweepStaleDaemonsThrottled } from '@/lib/server/daemon-auth'
 import { dispatchStepToDaemon } from '@/lib/server/daemon-dispatch'
 import { dispatchStep } from '@/lib/server/dispatch'
 
@@ -15,6 +16,11 @@ const LEASE_TIMEOUT_MS = 600000 // 10 min — if a worker hasn't finished, assum
 const POLL_BATCH_SIZE = 5
 
 export async function pollAndDispatch(projectId?: string) {
+  // Flip dead daemons to 'stale' before dispatching, so DAEMON-mode steps
+  // aren't leased to a daemon that has stopped heartbeating. Throttled
+  // internally — safe to call on every tick.
+  await sweepStaleDaemonsThrottled()
+
   const now = new Date()
   const leaseExpiry = new Date(now.getTime() - LEASE_TIMEOUT_MS)
 
