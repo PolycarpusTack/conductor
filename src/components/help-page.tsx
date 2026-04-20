@@ -117,15 +117,6 @@ const TOC: TocGroup[] = [
     ],
   },
   {
-    label: 'Triggers & Reactions',
-    items: [
-      { id: 'help-triggers', title: 'What are triggers & reactions?' },
-      { id: 'help-triggers-catalog', title: 'Integration catalog' },
-      { id: 'help-triggers-configure', title: 'Configuring a trigger' },
-      { id: 'help-reactions', title: 'Configuring a reaction' },
-    ],
-  },
-  {
     label: 'Observability',
     items: [
       { id: 'help-obs-runtime', title: 'Runtime dashboard' },
@@ -167,7 +158,6 @@ const TOC: TocGroup[] = [
       { id: 'help-api-cli', title: 'CLI-style API' },
       { id: 'help-api-http', title: 'HTTP agent API' },
       { id: 'help-api-auth', title: 'Authentication' },
-      { id: 'help-api-webhooks', title: 'Webhooks' },
     ],
   },
   {
@@ -450,24 +440,15 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-release-0-3"
               title="What's new in 0.3"
-              subtitle="Triggers & reactions, human review gates, durable execution, observability — plus a full in-app user guide."
+              subtitle="Human review gates, durable execution, observability — plus a full in-app user guide."
             >
               <Callout tone="neon" title="The headline">
                 <p>
-                  0.3 is the &ldquo;run it in production&rdquo; release. Everything you need to wire Conductor into the rest of
-                  your stack — triggers that start work from the outside world, reactions that push results back,
-                  human review gates that pause a workflow for approval, and a durable execution layer so long-running
-                  chains survive restarts — landed in this version.
+                  0.3 is the &ldquo;run it in production&rdquo; release. Human review gates let you pause a workflow
+                  for approval, a durable execution layer keeps long-running chains alive across restarts, and a
+                  redesigned observability stack shows what each agent and step is doing.
                 </p>
               </Callout>
-
-              <H3 id="help-release-0-3-triggers">Triggers &amp; Reactions (integrations)</H3>
-              <p>
-                You can now start chains from external events (a GitHub issue, a Slack message, a scheduled cron,
-                an inbound webhook) and push results back out (post a PR comment, send an email, update a Jira ticket).
-                Triggers and reactions share a single integration catalogue and can be mixed and matched on any chain.
-                See <Ref href="#help-triggers">Triggers &amp; Reactions</Ref> for the full walkthrough.
-              </p>
 
               <H3 id="help-release-0-3-gates">Human review gates</H3>
               <p>
@@ -508,6 +489,14 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li><strong>Daemon terminal fail</strong> — a crashed daemon-mode step now drives the task state machine the same way an HTTP failure does, so tasks never silently stick in <Term>IN_PROGRESS</Term>.</li>
                 <li><strong>Route error handling</strong> — <Term>withErrorHandling</Term> is now compatible with Next.js route validators; expect fewer 500s with empty bodies.</li>
               </Bullets>
+
+              <H3 id="help-release-0-3-roadmap">On the roadmap (not shipped)</H3>
+              <p>
+                External-event integrations — starting chains from GitHub/Slack/Jira webhooks and pushing results
+                back — are designed but not yet built. The design doc lives at <code>docs/designs/integrations.md</code>.
+                For today, chains are kicked off either by a human dragging a task to In Progress or by the
+                project&apos;s automation poller.
+              </p>
             </Section>
 
             <Section
@@ -609,7 +598,7 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </p>
               <Bullets>
                 <li><strong>Operators and project leads</strong> who set up projects, create agents, and approve work. Most of this guide is for you — stay on Getting Started, The Board, Agents, Modes, and Chains.</li>
-                <li><strong>Power users</strong> who want to plug Conductor into other tools. Read Triggers &amp; Reactions, Automation, and Templates.</li>
+                <li><strong>Power users</strong> who want internal automation rules and reusable templates. Read Automation and Templates.</li>
                 <li><strong>Developers</strong> building their own agents against Conductor&apos;s APIs. Jump to Daemon mode, APIs (advanced), and Security.</li>
               </Bullets>
               <Callout tone="teal" title="No code required for most of it">
@@ -688,13 +677,6 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 A link to a Model Context Protocol server. An MCP server exposes tools (functions) that an agent
                 can call during a step — read a file, query a database, open a ticket. Each project picks which
                 MCP connections its agents can see.
-              </p>
-
-              <H3>Trigger &amp; Reaction</H3>
-              <p>
-                <strong>Triggers</strong> are external events that start a chain (a new GitHub issue, a Slack
-                mention, a cron tick). <strong>Reactions</strong> are outward actions fired when a chain finishes
-                (post a comment, send an email, open a PR). Both come from the same integration catalogue.
               </p>
 
               <H3>Artifact</H3>
@@ -900,7 +882,7 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               <Table
                 head={['Column', 'Meaning', 'Who moves cards here']}
                 rows={[
-                  [<Term key="a">BACKLOG</Term>, 'Unassigned or assigned-but-not-started work.', 'Humans (and triggers).'],
+                  [<Term key="a">BACKLOG</Term>, 'Unassigned or assigned-but-not-started work.', 'Humans (drag, dispatch, or automation poller).'],
                   [<Term key="b">IN_PROGRESS</Term>, 'An agent is actively working on it.', 'Automatic when an agent claims the task.'],
                   [<Term key="c">REVIEW</Term>, 'Work is done but needs human approval.', 'Automatic when a step marked &ldquo;requires review&rdquo; completes.'],
                   [<Term key="d">DONE</Term>, 'Approved or auto-approved. Finished.', 'A human approver or the chain itself.'],
@@ -1772,21 +1754,21 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-automation"
               title="Automation overview"
-              subtitle="Rules that turn events into dispatches. Not the same as triggers."
+              subtitle="Project-wide rules that poll the board and dispatch pending work."
             >
               <p>
-                Automation rules are <em>internal</em>: they react to things that happen on the Conductor board —
-                a task entering a column, a label being added, an agent going idle — and dispatch work accordingly.
-                Triggers and reactions, covered next, handle <em>external</em> events (webhooks, schedules, integrations).
+                Automation runs inside Conductor: a per-project scheduler polls the step queue on an interval
+                (default 10s) and dispatches any step that&apos;s active and has an eligible agent. Configured
+                per project under <em>Settings &rarr; Automation</em>.
               </p>
 
-              <Callout tone="purple" title="Rule of thumb">
-                <p>
-                  External &rarr; internal: use a <Ref href="#help-triggers">trigger</Ref>. Internal &rarr; internal:
-                  use an <strong>automation rule</strong>. Internal &rarr; external: use a
-                  <Ref href="#help-reactions"> reaction</Ref>.
-                </p>
-              </Callout>
+              <H3>Modes</H3>
+              <Bullets>
+                <li><strong>Manual</strong> (default) — no polling; you drag tasks to <Term>IN_PROGRESS</Term> yourself.</li>
+                <li><strong>Startup</strong> — poll starts when the server boots; continues until server restart.</li>
+                <li><strong>Always</strong> — same as startup plus immediate start when the mode is changed.</li>
+                <li><strong>Scheduled</strong> — poll only during a day/time window (e.g. business hours).</li>
+              </Bullets>
 
               <H3>What automation can do</H3>
               <Bullets>
@@ -1798,26 +1780,28 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
             </Section>
 
-            <Section id="help-automation-dispatch" title="Auto-dispatch rules">
+            <Section id="help-automation-dispatch" title="Configuring automation">
               <p>
-                The single most-used automation: &ldquo;when a task enters <Term>BACKLOG</Term>, if it matches X,
-                dispatch to Y&rdquo;. Configured in <em>Settings &rarr; Automation &rarr; + New Dispatch Rule</em>.
+                In <em>Settings &rarr; Automation</em> you pick a mode, set the poll interval, and (for scheduled
+                mode) a weekly time window. There are no per-task rules — the scheduler simply picks up any
+                active step whose agent is eligible and dispatches it.
               </p>
 
-              <H3>Rule anatomy</H3>
+              <H3>Fields</H3>
               <Bullets>
-                <li><strong>Trigger</strong> — <em>task created</em>, <em>task moved to BACKLOG</em>, <em>task tagged</em>, etc.</li>
-                <li><strong>Conditions</strong> — title regex, tag set, priority, assignee, source (<em>created by UI</em>, <em>created by trigger</em>).</li>
-                <li><strong>Action</strong> — dispatch to agent/role in mode, or attach a chain template.</li>
-                <li><strong>Rate limit</strong> — optional ceiling on how many times this rule fires per hour, to stop runaway loops.</li>
+                <li><strong>Mode</strong> — manual / always / startup / scheduled (see overview).</li>
+                <li><strong>Poll interval</strong> — 3s, 5s, 10s (default), 30s, 1m, 5m. Shorter = more responsive, more DB queries.</li>
+                <li><strong>Schedule window</strong> (scheduled mode only) — day-of-week + time range. A window that wraps across the weekend (Fri 18:00 → Mon 08:00) is supported.</li>
+                <li><strong>Running toggle</strong> — shows whether the poller is currently active. The Play/Stop buttons start or stop it manually without changing the mode.</li>
               </Bullets>
 
-              <H3>Rule ordering and conflicts</H3>
-              <p>
-                Rules are evaluated top-to-bottom. The first matching rule wins unless it&apos;s marked
-                &ldquo;continue after match&rdquo; (for rules that add a tag but don&apos;t dispatch). Reorder rules
-                by dragging the handle on the left.
-              </p>
+              <Callout tone="amber" title="Timezone">
+                <p>
+                  Schedule windows evaluate against the server&apos;s local time, not the viewer&apos;s. If the
+                  server and your team are in different timezones, pick your window with the server&apos;s clock
+                  in mind — a DST transition can silently shift it by an hour.
+                </p>
+              </Callout>
 
               <Callout tone="amber" title="Test before you ship">
                 <p>
@@ -1831,133 +1815,6 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             {/* ════════════════════════════════════════════════════════════════
                 TRIGGERS & REACTIONS
                ════════════════════════════════════════════════════════════════ */}
-
-            <Section
-              id="help-triggers"
-              title="What are triggers & reactions?"
-              subtitle="The integration layer. Events in, actions out."
-            >
-              <p>
-                Triggers and reactions are how Conductor connects to the outside world. A <strong>trigger</strong>
-                starts a chain when something happens somewhere else. A <strong>reaction</strong> pushes a result
-                from Conductor back out when something happens here. Both draw from the same integration catalogue —
-                if there&apos;s a trigger for GitHub, there&apos;s a reaction for GitHub too.
-              </p>
-
-              <Callout tone="neon" title="New in 0.3">
-                <p>
-                  Triggers and reactions are the biggest 0.3 feature. Before this, Conductor was largely a
-                  manual-dispatch tool with an API. Now it plugs into your existing stack — GitHub issues become
-                  tasks, Slack mentions become chains, chain outcomes become PR comments.
-                </p>
-              </Callout>
-
-              <H3>Example flows</H3>
-              <Bullets>
-                <li><strong>GitHub issue &rarr; investigation chain &rarr; PR comment</strong> — triage new issues automatically.</li>
-                <li><strong>Slack mention &rarr; draft response &rarr; human review &rarr; post reply</strong> — AI-assisted support.</li>
-                <li><strong>Cron tick &rarr; release-notes chain &rarr; email</strong> — scheduled digest.</li>
-                <li><strong>Jira ticket transitions to &ldquo;In Progress&rdquo; &rarr; reproduce chain &rarr; comment with findings</strong>.</li>
-              </Bullets>
-            </Section>
-
-            <Section id="help-triggers-catalog" title="Integration catalog">
-              <p>
-                The catalogue is the set of services Conductor knows how to talk to. Open it from
-                <em> Settings &rarr; Integrations</em>. Each integration offers some combination of triggers and
-                reactions.
-              </p>
-
-              <Table
-                head={['Integration', 'Triggers', 'Reactions']}
-                rows={[
-                  ['GitHub', 'Issue opened, PR opened/reviewed, push, comment', 'Comment, open PR, label, close, request review'],
-                  ['GitLab', 'Issue, MR, pipeline', 'Comment, open MR, close'],
-                  ['Atlassian (Jira / Confluence)', 'Issue created/transitioned, page updated', 'Comment, transition, create ticket, append page'],
-                  ['Linear', 'Issue created/updated, label added', 'Comment, transition, create issue'],
-                  ['Slack', 'Message in channel, mention, slash command', 'Post to channel, DM, threaded reply'],
-                  ['Email (SMTP/IMAP)', 'Inbound email to watched mailbox', 'Send email'],
-                  ['Webhook (generic)', 'Inbound POST to a stable URL', 'Outbound POST'],
-                  ['Schedule (cron)', 'Cron expression, one-shot time, delay', '—'],
-                  ['Conductor (internal)', 'Task state changes, chain events', 'Dispatch, move, tag'],
-                ]}
-              />
-
-              <p>
-                New integrations land as add-on packages. Check <em>Settings &rarr; Integrations &rarr; Catalog</em>
-                for whatever is bundled with your version.
-              </p>
-            </Section>
-
-            <Section id="help-triggers-configure" title="Configuring a trigger">
-              <p>
-                Triggers are attached to a chain. &ldquo;When this event happens, run this chain.&rdquo;
-              </p>
-              <Steps>
-                <Step title="Open the chain or task template.">{' '}<em>Settings &rarr; Templates &rarr; [template] &rarr; Triggers</em>.</Step>
-                <Step title="Add a trigger.">{' '}Pick the integration and the event type (e.g. GitHub &rarr; issue opened).</Step>
-                <Step title="Filter.">
-                  {' '}Narrow which events fire the chain: a specific repo, label, author, channel, keyword. Filters
-                  are AND&apos;d — event must satisfy all of them.
-                </Step>
-                <Step title="Map fields.">
-                  {' '}Decide how the incoming event populates the new task. Title from issue title, description
-                  from issue body, priority from label. Mapping uses the same Mustache syntax as chain input
-                  templates.
-                </Step>
-                <Step title="Dry-run.">
-                  {' '}Paste a sample event JSON or pick a recent real event — Conductor shows the task it would
-                  create. No dispatch happens.
-                </Step>
-                <Step title="Save &amp; enable.">{' '}Toggle the trigger <em>active</em>. Events from now on fire the chain.</Step>
-              </Steps>
-
-              <H3>Webhook authentication</H3>
-              <p>
-                Inbound webhooks authenticate via a signing secret. Each trigger exposes a stable URL and a secret;
-                if the source service supports signed webhooks (GitHub, GitLab, most SaaS), configure the secret on
-                both sides so Conductor rejects unsigned payloads.
-              </p>
-
-              <Callout tone="amber" title="Rate-limit inbound triggers">
-                <p>
-                  A noisy GitHub repo can fire hundreds of webhooks a minute. Use a rate-limit on the trigger to
-                  avoid creating hundreds of tasks. The default is 60 events/minute per trigger — raise it
-                  deliberately.
-                </p>
-              </Callout>
-            </Section>
-
-            <Section id="help-reactions" title="Configuring a reaction">
-              <p>
-                Reactions run at the end of a step (or at the end of a chain). &ldquo;When this step finishes, do
-                this thing somewhere else.&rdquo;
-              </p>
-              <Steps>
-                <Step title="Pick the step.">{' '}In the chain editor, open the step&apos;s settings and find the <em>Reactions</em> section.</Step>
-                <Step title="Add a reaction.">{' '}Pick an integration and an action (GitHub &rarr; comment, Slack &rarr; post).</Step>
-                <Step title="Pick the target.">{' '}Repo &amp; issue, channel, mailbox. Sometimes this is static; sometimes it&apos;s derived from the task (&ldquo;the repo the triggering issue came from&rdquo;).</Step>
-                <Step title="Write the payload.">{' '}Mustache-templated body using <code>{`{{ step.output }}`}</code>, <code>{`{{ task.title }}`}</code>, any chain variable.</Step>
-                <Step title="Handle failure.">{' '}Choose what happens if the reaction call fails: retry N times, open a task for human attention, or silently log.</Step>
-                <Step title="Save.">{' '}Reaction is now attached to the step.</Step>
-              </Steps>
-
-              <H3>Conditional reactions</H3>
-              <p>
-                Every reaction has an optional condition expression. Example: only post a Slack message if the
-                task has the <code>urgent</code> tag, or only comment on the PR if the review came back with
-                &ldquo;changes requested&rdquo;. Syntax is a small expression language with
-                <code>task.tags</code>, <code>step.output</code>, <code>prev.*</code>, and the usual comparison operators.
-              </p>
-
-              <Callout tone="teal" title="Reactions are idempotent by default">
-                <p>
-                  Conductor deduplicates reactions by step ID, so a chain that&apos;s retried won&apos;t post three
-                  duplicate Slack messages. If you <em>want</em> a reaction to fire every attempt, opt in with the
-                  <em> Fire on every attempt</em> toggle.
-                </p>
-              </Callout>
-            </Section>
 
             {/* ════════════════════════════════════════════════════════════════
                 OBSERVABILITY
@@ -2442,34 +2299,6 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
               </p>
             </Section>
 
-            <Section id="help-api-webhooks" title="Webhooks">
-              <p>
-                Conductor offers webhooks in both directions:
-              </p>
-
-              <H3>Inbound webhooks (triggers)</H3>
-              <p>
-                Each trigger exposes a stable URL at <code>/api/triggers/:id/webhook</code>. Configure the sending
-                service to POST to that URL and include the signing header:
-              </p>
-              <Callout tone="cobalt">
-                <pre className="text-[11px] font-mono bg-surface/40 p-3 rounded border border-border/30 overflow-x-auto">
-{`POST /api/triggers/trg_abc/webhook
-Content-Type: application/json
-X-Conductor-Signature: sha256=<hmac-of-body>
-
-{ ... your payload ... }`}
-                </pre>
-              </Callout>
-
-              <H3>Outbound webhooks (reactions)</H3>
-              <p>
-                The generic <em>Webhook</em> integration in the catalogue lets a reaction POST arbitrary JSON to a
-                URL you provide. Requests carry an <code>X-Conductor-Signature</code> header for your own
-                verification, and retry with exponential backoff on non-2xx responses.
-              </p>
-            </Section>
-
             {/* ════════════════════════════════════════════════════════════════
                 SECURITY
                ════════════════════════════════════════════════════════════════ */}
@@ -2503,8 +2332,7 @@ X-Conductor-Signature: sha256=<hmac-of-body>
 
             <Section id="help-security-keys" title="Key storage">
               <p>
-                All sensitive values — runtime API keys, agent keys, MCP connection tokens, trigger signing
-                secrets — are encrypted at rest. Conductor uses a server-side encryption key stored in an
+                All sensitive values — runtime API keys, agent keys, MCP connection tokens — are encrypted at rest. Conductor uses a server-side encryption key stored in an
                 environment variable (<code>CONDUCTOR_ENCRYPTION_KEY</code>) or a local KMS endpoint.
               </p>
 
@@ -2665,13 +2493,6 @@ X-Conductor-Signature: sha256=<hmac-of-body>
                 another&apos;s input, build a chain.
               </p>
 
-              <H3>Can I self-host the triggers/reactions?</H3>
-              <p>
-                Yes. Conductor itself is self-hosted; triggers and reactions run in-process. Inbound webhooks need
-                your Conductor to be reachable from the event source (GitHub, Slack, etc.). For internal-only
-                deployments, use the generic webhook integration with a tunnel like Cloudflare Tunnel or tailscale.
-              </p>
-
               <H3>How much does it cost to run?</H3>
               <p>
                 Infrastructure: small. A single server and a database. The AI provider bills are the dominant cost;
@@ -2698,13 +2519,11 @@ X-Conductor-Signature: sha256=<hmac-of-body>
                   ['Mode', 'A role the agent is playing (ANALYZE, DEVELOP, etc.). Changes prompt and tool access.'],
                   ['MCP', 'Model Context Protocol. The standard Conductor speaks to expose tools to agents.'],
                   ['Project', 'A bounded unit of work inside a workspace. Has its own board, agents, keys, MCP connections.'],
-                  ['Reaction', 'An outward action fired at the end of a chain step (GitHub comment, Slack post, …).'],
                   ['Runtime', 'A credentialed connection to an AI provider.'],
                   ['Skill', 'A reusable prompt fragment or playbook in the workspace-wide library.'],
                   ['Step', 'A single node in a chain. Pairs a mode with an agent and has attempts.'],
                   ['Task', 'A unit of work. A card on the board.'],
                   ['Template', 'A saved form — task template or chain template.'],
-                  ['Trigger', 'An external event that starts a chain.'],
                   ['WAITING', 'A transient state where a task is paused for an external event.'],
                   ['Workflow', 'An alias for a chain, sometimes used to emphasise branching/parallel flows.'],
                   ['Workspace', 'The top-level container. Holds projects, agents, runtimes, skills.'],
