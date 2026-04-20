@@ -101,4 +101,32 @@ describe('resolvePrompt', () => {
   test('handles consecutive placeholders', () => {
     expect(resolvePrompt('{{task.title}}{{step.mode}}', baseCtx)).toBe('Fix login timeoutanalyze')
   })
+
+  test('replaces memory.recent', () => {
+    const ctx = {
+      ...baseCtx,
+      memory: { recent: '- Prior task A\n- Prior task B', relevant: '' },
+    }
+    expect(resolvePrompt('Memory: {{memory.recent}}', ctx)).toBe(
+      'Memory: - Prior task A\n- Prior task B'
+    )
+  })
+
+  test('replaces memory.relevant', () => {
+    const ctx = {
+      ...baseCtx,
+      memory: { recent: '', relevant: '- Fact: prod DB is at 10.0.0.5' },
+    }
+    expect(resolvePrompt('{{memory.relevant}}', ctx)).toBe('- Fact: prod DB is at 10.0.0.5')
+  })
+
+  test('missing memory context leaves placeholder', () => {
+    // baseCtx has no memory key — placeholder should stay unresolved
+    expect(resolvePrompt('{{memory.recent}}', baseCtx)).toBe('{{memory.recent}}')
+  })
+
+  test('both memory slots empty render as empty strings when present', () => {
+    const ctx = { ...baseCtx, memory: { recent: '', relevant: '' } }
+    expect(resolvePrompt('a{{memory.recent}}b{{memory.relevant}}c', ctx)).toBe('abc')
+  })
 })
