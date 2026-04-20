@@ -109,7 +109,7 @@ Agents have two tiers of memory injected into their system prompt:
 
 **Working memory** (automatic) — the 5 most recent completed tasks for this `(agent, project)` pair, formatted as a bullet list. No action needed; it's always injected when the agent's system prompt contains `{{memory.recent}}`.
 
-**Persistent memory** (opt-in) — agents write durable facts, decisions, preferences, and patterns. Retrieval uses embedding similarity against the current task (Postgres + pgvector) or text match (SQLite).
+**Persistent memory** (opt-in) — agents write durable facts, decisions, preferences, and patterns. Retrieval uses embedding similarity against the current task when both `DATABASE_URL` points at Postgres with the `pgvector` extension (see `scripts/init-pgvector.sql`) AND `OPENAI_API_KEY` is set. Falls back to substring match otherwise — this is also the default on SQLite.
 
 ```bash
 # Write a memory
@@ -178,6 +178,10 @@ AGENTBOARD_WS_URL="http://127.0.0.1:3003"
 NEXT_PUBLIC_AGENTBOARD_WS_URL="http://127.0.0.1:3003"
 # Optional comma-separated allowlist for websocket origins
 AGENTBOARD_WS_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+# Optional: semantic retrieval for memory and skill search
+OPENAI_API_KEY=""
+# Optional: override the default embedding model
+EMBEDDING_MODEL="text-embedding-3-small"
 ```
 
 The board UI now requires the admin password before it can access project management routes.
