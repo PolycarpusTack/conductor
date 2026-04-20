@@ -27,6 +27,7 @@ model Project {
   runtimes           ProjectRuntime[]
   mcpConnections     ProjectMcpConnection[]
   chainTemplates     ChainTemplate[]
+  memories           AgentMemory[]
   // Automation scheduler config
   automationMode     String                 @default("manual") // manual, always, scheduled, startup
   automationSchedule String? // JSON: { startDay, startTime, endDay, endTime }
@@ -66,6 +67,7 @@ model Agent {
   systemPrompt     String?
   mcpConnectionIds String?
   taskSteps        TaskStep[]          @relation("TaskStepAgent")
+  memories         AgentMemory[]
   // HTTP = legacy polling agent; DAEMON = launched by conductor-daemon
   invocationMode   AgentInvocationMode @default(HTTP)
 }
@@ -337,4 +339,24 @@ model Skill {
   updatedAt    DateTime  @updatedAt
 
   @@index([workspaceId])
+}
+
+model AgentMemory {
+  id            String    @id @default(cuid())
+  agentId       String
+  agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category      String    // fact | decision | preference | pattern
+  content       String
+  sourceTaskId  String?   // task that produced this memory, if any
+  confidence    Float     @default(0.8)
+  reinforcement Int       @default(1)
+  lastAccessed  DateTime?
+  embedding     String?   // JSON float array on SQLite; cast to vector(1536) via raw SQL on Postgres
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([agentId, projectId])
+  @@index([projectId])
 }

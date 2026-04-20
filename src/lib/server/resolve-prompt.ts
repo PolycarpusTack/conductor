@@ -3,6 +3,7 @@ type ResolveContext = {
   step: { mode: string; instructions?: string | null; previousOutput?: string | null }
   mode: { label: string; instructions?: string | null }
   agent: { name: string; role?: string | null; capabilities?: string | null }
+  memory?: { recent?: string | null; relevant?: string | null }
 }
 
 export function resolvePrompt(template: string, ctx: ResolveContext): string {
@@ -17,6 +18,11 @@ export function resolvePrompt(template: string, ctx: ResolveContext): string {
     'agent.name': ctx.agent.name,
     'agent.role': ctx.agent.role || '',
     'agent.capabilities': ctx.agent.capabilities || '',
+  }
+
+  if (ctx.memory) {
+    variables['memory.recent'] = ctx.memory.recent || ''
+    variables['memory.relevant'] = ctx.memory.relevant || ''
   }
 
   return template.replace(/\{\{(\w+\.\w+)\}\}/g, (match, key) => {

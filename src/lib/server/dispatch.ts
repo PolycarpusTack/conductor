@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { getAdapter } from '@/lib/server/adapters/registry'
+import { buildWorkingMemory, buildRelevantMemory } from '@/lib/server/memory'
 import { resolvePrompt } from '@/lib/server/resolve-prompt'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
@@ -146,7 +147,10 @@ function hasDagEdges(steps: Array<{ nextSteps?: string | null; prevSteps?: strin
   return steps.some(s => s.nextSteps || s.prevSteps)
 }
 
-async function leaseStep(stepId: string): Promise<{ taken: boolean; evictedFrom: string | null }> {
+// Exported for direct unit testing — see lease-step.test.ts. Callers should
+// normally go through dispatchStep(); leaseStep on its own doesn't run the
+// step, just marks it.
+export async function leaseStep(stepId: string): Promise<{ taken: boolean; evictedFrom: string | null }> {
   // Capture the prior lease holder so we can record eviction on a successful
   // steal. The read-then-updateMany pair is not atomic, but the updateMany's
   // `where` still enforces correctness — the prior field is only used for the
@@ -265,11 +269,29 @@ export async function dispatchStep(stepId: string) {
     ? safeJsonParse<string[]>(agent.capabilities, []).join(', ')
     : ''
 
+  const memoryQuery = [step.task.title, step.task.description, step.instructions]
+    .filter(Boolean)
+    .join('\n')
+
+  const [workingMemory, relevantMemory] = await Promise.all([
+    buildWorkingMemory({
+      agentId: agent.id,
+      projectId: step.task.projectId,
+    }),
+    buildRelevantMemory({
+      agentId: agent.id,
+      projectId: step.task.projectId,
+      query: memoryQuery,
+      limit: 5,
+    }),
+  ])
+
   const systemPrompt = resolvePrompt(agent.systemPrompt || '', {
     task: { title: step.task.title, description: step.task.description },
     step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
     mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
     agent: { name: agent.name, role: agent.role, capabilities },
+    memory: { recent: workingMemory, relevant: relevantMemory },
   })
 
   const taskContext = [

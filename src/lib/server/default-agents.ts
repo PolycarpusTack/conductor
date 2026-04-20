@@ -50,7 +50,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Architect',
@@ -95,7 +99,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Sentinel',
@@ -141,7 +149,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Inspector',
@@ -190,7 +202,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Tester',
@@ -238,7 +254,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Scout',
@@ -286,7 +306,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Scribe',
@@ -329,7 +353,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Red Team',
@@ -370,7 +398,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'FinOps',
@@ -411,7 +443,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Data Engineer',
@@ -454,7 +490,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
   {
     name: 'Compliance',
@@ -500,7 +540,11 @@ Task: {{task.title}}
 {{mode.instructions}}
 
 ## Step instructions
-{{step.instructions}}`,
+{{step.instructions}}
+
+{{memory.recent}}
+
+{{memory.relevant}}`,
   },
 ]
 

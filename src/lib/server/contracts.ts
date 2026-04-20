@@ -274,3 +274,20 @@ export const stepArtifactSchema = z.object({
   mimeType: z.string().max(120).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 })
+
+// ── Agent Memory ─────────────────────────────────────────────────────────────
+
+export const memoryCategorySchema = z.enum(['fact', 'decision', 'preference', 'pattern'])
+
+export const createMemorySchema = z.object({
+  category: memoryCategorySchema,
+  content: z.string().min(1).max(2000),
+  sourceTaskId: z.string().optional(),
+  confidence: z.number().min(0).max(1).default(0.8),
+})
+
+export const listMemoriesSchema = z.object({
+  projectId: z.string().optional(),
+  category: memoryCategorySchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+})

@@ -103,6 +103,37 @@ curl -X PUT "http://localhost:3000/api/agent/tasks/TASK_ID" \
   -d '{"action":"complete", "output":"Done!"}'
 ```
 
+### Agent Memory
+
+Agents have two tiers of memory injected into their system prompt:
+
+**Working memory** (automatic) — the 5 most recent completed tasks for this `(agent, project)` pair, formatted as a bullet list. No action needed; it's always injected when the agent's system prompt contains `{{memory.recent}}`.
+
+**Persistent memory** (opt-in) — agents write durable facts, decisions, preferences, and patterns. Retrieval uses embedding similarity against the current task when both `DATABASE_URL` points at Postgres with the `pgvector` extension (see `scripts/init-pgvector.sql`) AND `OPENAI_API_KEY` is set. Falls back to substring match otherwise — this is also the default on SQLite.
+
+```bash
+# Write a memory
+curl -X POST http://localhost:3000/api/agents/YOUR_AGENT_ID/memories \
+  -H "Authorization: Bearer YOUR_AGENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"category":"fact", "content":"Prod DB is at 10.0.0.5"}'
+
+# List your memories
+curl http://localhost:3000/api/agents/YOUR_AGENT_ID/memories \
+  -H "Authorization: Bearer YOUR_AGENT_KEY"
+
+# Delete a memory
+curl -X DELETE http://localhost:3000/api/agents/YOUR_AGENT_ID/memories/MEMORY_ID \
+  -H "Authorization: Bearer YOUR_AGENT_KEY"
+```
+
+Categories: `fact | decision | preference | pattern`.
+System prompt slots: `{{memory.recent}}` (working) and `{{memory.relevant}}` (top-5 persistent matches against task title/description).
+
+Memories are scoped to `(agent, project)` — an agent can't read/write another agent's memories, and a memory is deleted with its owning agent or project.
+
+Default agents shipped with new projects already reference these slots. **Existing agents from before this feature are not auto-migrated** — edit the agent's system prompt to add `{{memory.recent}}` / `{{memory.relevant}}` to opt in.
+
 ## Project Structure
 
 ```
@@ -147,6 +178,10 @@ AGENTBOARD_WS_URL="http://127.0.0.1:3003"
 NEXT_PUBLIC_AGENTBOARD_WS_URL="http://127.0.0.1:3003"
 # Optional comma-separated allowlist for websocket origins
 AGENTBOARD_WS_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+# Optional: semantic retrieval for memory and skill search
+OPENAI_API_KEY=""
+# Optional: override the default embedding model
+EMBEDDING_MODEL="text-embedding-3-small"
 ```
 
 The board UI now requires the admin password before it can access project management routes.

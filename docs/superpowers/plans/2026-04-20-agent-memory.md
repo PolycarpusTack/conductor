@@ -367,7 +367,7 @@ Replace it with:
     step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
     mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
     agent: { name: agent.name, role: agent.role, capabilities },
-    memory: { recent: workingMemory, relevant: '' }, // Task 6 fills `relevant`
+    memory: { recent: workingMemory, relevant: '' },
   })
 ```
 
@@ -832,6 +832,7 @@ git commit -m "feat(memory): saveMemory, searchMemories, reinforceMemory + relev
 
 **Files:**
 - Create: `src/app/api/agents/[id]/memories/route.ts`
+- Create: `src/app/api/agents/[id]/memories/[memoryId]/route.ts`
 
 - [ ] **Step 1: Create the route file**
 
@@ -939,32 +940,33 @@ export const POST = withErrorHandling(
   },
 )
 
+// In src/app/api/agents/[id]/memories/[memoryId]/route.ts:
+
 /**
- * DELETE /api/agents/:id/memories?memoryId=xxx
- * Admin-only (via session) OR the owning agent.
+ * DELETE /api/agents/:id/memories/:memoryId
+ * Agent deletes its own memory.
  */
 export const DELETE = withErrorHandling(
-  'api/agents/[id]/memories',
-  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
+  'api/agents/[id]/memories/[memoryId]',
+  async (
+    request: Request,
+    { params }: { params: Promise<{ id: string; memoryId: string }> },
+  ) => {
     const apiKey = extractAgentApiKey(request)
     if (!apiKey) throw unauthorized('Missing agent API key')
 
     const agent = await resolveAgentByApiKey(apiKey)
     if (!agent) throw unauthorized('Invalid API key')
 
-    const { id } = await params
-    if (agent.id !== id) throw forbidden('Cannot delete another agent\'s memories')
-
-    const { searchParams } = new URL(request.url)
-    const memoryId = searchParams.get('memoryId')
-    if (!memoryId) throw badRequest('Missing memoryId')
+    const { id, memoryId } = await params
+    if (agent.id !== id) throw forbidden("Cannot delete another agent's memories")
 
     const memory = await db.agentMemory.findUnique({ where: { id: memoryId } })
     if (!memory) throw notFound('Memory not found')
     if (memory.agentId !== agent.id) throw forbidden('Not your memory')
 
     await db.agentMemory.delete({ where: { id: memoryId } })
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ success: true })
   },
 )
 ```
@@ -994,8 +996,9 @@ Expected: POST returns the memory record; GET lists it; cross-agent GET returns 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/app/api/agents/\[id\]/memories/route.ts
-git commit -m "feat(memory): POST/GET/DELETE /api/agents/:id/memories"
+git add src/app/api/agents/\[id\]/memories/route.ts \
+        src/app/api/agents/\[id\]/memories/\[memoryId\]/route.ts
+git commit -m "feat(memory): POST/GET /api/agents/:id/memories + DELETE /api/agents/:id/memories/:memoryId"
 ```
 
 ---
@@ -1262,7 +1265,7 @@ export function AgentMemoryPanel({
   const remove = async (memoryId: string) => {
     if (!agentApiKey) return
     if (!confirm('Delete this memory?')) return
-    const res = await fetch(`/api/agents/${agentId}/memories?memoryId=${memoryId}`, {
+    const res = await fetch(`/api/agents/${agentId}/memories/${memoryId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${agentApiKey}` },
     })
