@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { getAdapter } from '@/lib/server/adapters/registry'
+import { buildWorkingMemory } from '@/lib/server/memory'
 import { resolvePrompt } from '@/lib/server/resolve-prompt'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
@@ -265,11 +266,17 @@ export async function dispatchStep(stepId: string) {
     ? safeJsonParse<string[]>(agent.capabilities, []).join(', ')
     : ''
 
+  const workingMemory = await buildWorkingMemory({
+    agentId: agent.id,
+    projectId: step.task.projectId,
+  })
+
   const systemPrompt = resolvePrompt(agent.systemPrompt || '', {
     task: { title: step.task.title, description: step.task.description },
     step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
     mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
     agent: { name: agent.name, role: agent.role, capabilities },
+    memory: { recent: workingMemory, relevant: '' }, // Task 6 fills `relevant`
   })
 
   const taskContext = [
