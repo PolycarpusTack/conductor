@@ -7,6 +7,7 @@ import { updateAgentHeartbeat, toRealtimeActivity, claimOrStartTask } from '@/li
 import { agentTaskActionSchema, taskStatusSchema, stepArtifactSchema } from '@/lib/server/contracts'
 import { advanceChain } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
+import { buildWorkingMemory } from '@/lib/server/memory'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
 
@@ -54,7 +55,11 @@ export const GET = withErrorHandling(
     if (task.projectId !== agent.projectId) throw forbidden('Task not in your project')
 
     await updateAgentHeartbeat(agent.id)
-    return NextResponse.json(task)
+    const memoryContext = await buildWorkingMemory({
+      agentId: agent.id,
+      projectId: agent.projectId,
+    })
+    return NextResponse.json({ ...task, memoryContext })
   },
 )
 

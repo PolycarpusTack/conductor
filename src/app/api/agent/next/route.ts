@@ -5,6 +5,7 @@ import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractAgentApiKey, resolveAgentByApiKey } from '@/lib/server/api-keys'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { updateAgentHeartbeat } from '@/lib/server/agent-helpers'
+import { buildWorkingMemory } from '@/lib/server/memory'
 
 /**
  * Agent HTTP API - Get next available task
@@ -22,6 +23,11 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
   const agent = await resolveAgentByApiKey(apiKey)
 
   if (!agent) throw unauthorized('Invalid API key')
+
+  const memoryContext = await buildWorkingMemory({
+    agentId: agent.id,
+    projectId: agent.projectId,
+  })
 
     // Update agent last seen (debounced — at most one DB write per 30s per agent)
     const didWrite = await updateAgentHeartbeat(agent.id)
@@ -53,6 +59,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
       return NextResponse.json({
         message: 'You have a task in progress',
         task: inProgressTask,
+        memoryContext,
         suggestion: 'Complete or update the in-progress task before claiming new ones',
       })
     }
@@ -74,6 +81,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
       return NextResponse.json({
         message: 'You have an assigned task waiting',
         task: assignedBacklogTask,
+        memoryContext,
         suggestion: 'Start this task when ready using action=start',
       })
     }
@@ -96,6 +104,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
       return NextResponse.json({
         message: 'Unassigned task available',
         task: unassignedTask,
+        memoryContext,
         suggestion: 'Claim this task using action=claim',
       })
     }
