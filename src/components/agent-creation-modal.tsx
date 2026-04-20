@@ -220,7 +220,7 @@ export function AgentCreationModal({
       emoji,
       color,
       description: description.trim() || undefined,
-      personality: personality.trim() || undefined,
+      personality: isEditing ? (personality.trim() || null) : (personality.trim() || undefined),
       role: role || undefined,
       capabilities: capabilities.length > 0 ? capabilities : undefined,
       maxConcurrent,
