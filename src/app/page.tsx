@@ -2544,6 +2544,33 @@ export default function Home() {
               {/* Agents Tab */}
               <TabsContent value="agents" className="mt-0">
                 <div className="space-y-3">
+                  {projectRuntimes.length === 0 && (
+                    <div className="rounded-lg border border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)] p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="text-[var(--op-amber)] mt-0.5">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-[var(--op-amber)] mb-1">
+                            Add a runtime first
+                          </div>
+                          <p className="text-xs text-foreground/75 leading-relaxed mb-3">
+                            Agents need a runtime (an AI provider like Anthropic or OpenAI, plus an API key)
+                            before they can run. Without one, agents you create will be silently skipped
+                            by the dispatcher.
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs border-[var(--op-amber-dim)] hover:bg-[var(--op-amber)]/10"
+                            onClick={() => setSettingsTab('runtimes')}
+                          >
+                            Go to Runtimes →
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {currentProject?.agents.map((agent) => (
                     <div key={agent.id} className="rounded-lg border border-border/30">
                       <div className="flex items-center justify-between p-3">
@@ -2581,7 +2608,13 @@ export default function Home() {
                     </div>
                   ))}
                   
-                  <Button variant="outline" className="w-full" onClick={() => { resetAgentForm(); setAgentDialogOpen(true) }}>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => { resetAgentForm(); setAgentDialogOpen(true) }}
+                    disabled={projectRuntimes.length === 0}
+                    title={projectRuntimes.length === 0 ? 'Add a runtime first — agents need one to dispatch' : undefined}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Agent
                   </Button>

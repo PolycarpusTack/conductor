@@ -493,7 +493,13 @@ export function AgentCreationModal({
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Runtime</label>
                 {runtimes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Configure runtimes in Settings first.</p>
+                  <div className="rounded-md border border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)] p-3">
+                    <p className="text-xs text-[var(--op-amber)] font-medium mb-1">No runtime configured</p>
+                    <p className="text-xs text-foreground/75 leading-relaxed">
+                      Close this dialog and open the <strong>Runtimes</strong> tab to add one. An agent
+                      without a runtime can&apos;t dispatch.
+                    </p>
+                  </div>
                 ) : (
                   <Select
                     value={runtimeId || ''}
@@ -605,7 +611,11 @@ export function AgentCreationModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim() || saving}>
+          <Button
+            onClick={handleSave}
+            disabled={!name.trim() || saving || (!isEditing && runtimes.length === 0)}
+            title={!isEditing && runtimes.length === 0 ? 'Add a runtime first — agents need one to dispatch' : undefined}
+          >
             {saving ? 'Saving...' : isEditing ? 'Update Agent' : 'Create Agent'}
           </Button>
         </DialogFooter>
