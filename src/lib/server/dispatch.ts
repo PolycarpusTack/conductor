@@ -276,7 +276,7 @@ export async function dispatchStep(stepId: string) {
     step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
     mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
     agent: { name: agent.name, role: agent.role, capabilities },
-    memory: { recent: workingMemory, relevant: '' }, // Task 6 fills `relevant`
+    memory: { recent: workingMemory, relevant: '' },
   })
 
   const taskContext = [
