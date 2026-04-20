@@ -1,9 +1,12 @@
-// SECURITY NOTE: The webhook adapter sends task data (system prompt, context,
-// previous outputs) to an admin-configured URL. Only trusted administrators
-// should be allowed to create runtime configurations. The endpoint URL is not
-// validated against private network ranges — consider adding SSRF protection
-// (e.g., blocking 169.254.x.x, 10.x.x.x, 127.x.x.x) in production.
+// SECURITY: The webhook adapter sends task data (system prompt, context,
+// previous outputs) to an admin-configured URL. To prevent an admin from
+// pointing a runtime at internal infrastructure (AWS IMDS at
+// 169.254.169.254, localhost services, RFC1918 ranges) we run the endpoint
+// through isSafeExternalUrl before dispatching. See url-safety.ts for the
+// known gaps — most notably DNS rebinding, which this literal-URL check
+// doesn't cover.
 import type { RuntimeAdapter, DispatchParams, DispatchResult } from './types'
+import { isSafeExternalUrl } from '@/lib/server/url-safety'
 
 export const webhookAdapter: RuntimeAdapter = {
   id: 'webhook',
@@ -14,6 +17,11 @@ export const webhookAdapter: RuntimeAdapter = {
     const endpoint = params.runtimeConfig.endpoint
     if (!endpoint || typeof endpoint !== 'string') {
       throw new Error('Webhook endpoint not configured')
+    }
+
+    const safety = isSafeExternalUrl(endpoint)
+    if (!safety.ok) {
+      throw new Error(`Webhook endpoint rejected: ${safety.reason}`)
     }
 
     const response = await fetch(endpoint, {
