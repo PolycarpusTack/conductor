@@ -501,7 +501,7 @@ export function WorkflowEditor({ agents, modes, steps, onStepsChange }: Workflow
                   <SelectItem value="__human__" className="text-xs">Human</SelectItem>
                   {agents.map(a => (
                     <SelectItem key={a.id} value={a.id} className="text-xs">
-                      {a.emoji} {a.name}
+                      <AgentBadge agent={a} size="card" />
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -562,7 +562,7 @@ export function WorkflowEditor({ agents, modes, steps, onStepsChange }: Workflow
                 <SelectItem value="__none__" className="text-xs">None</SelectItem>
                 {agents.map(a => (
                   <SelectItem key={a.id} value={a.id} className="text-xs">
-                    {a.emoji} {a.name}
+                    <AgentBadge agent={a} size="card" />
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -581,8 +581,9 @@ export function WorkflowEditor({ agents, modes, steps, onStepsChange }: Workflow
                   <div key={edge.targetStepId} className="flex items-center gap-2 mb-2 p-2 rounded bg-muted/20 border border-border/20">
                     <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {targetAgent ? `${targetAgent.emoji} ${targetAgent.name}` : target.humanLabel || 'Human'} ({target.mode})
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        {targetAgent ? <AgentBadge agent={targetAgent} size="card" /> : <span className="truncate">{target.humanLabel || 'Human'}</span>}
+                        <span>({target.mode})</span>
                       </div>
                       <Input
                         value={edge.label || ''}

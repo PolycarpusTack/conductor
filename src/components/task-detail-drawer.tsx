@@ -263,7 +263,7 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
                             <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${MODE_COLORS[step.mode] || MODE_COLORS.human}`}>
                               {step.mode}
                             </span>
-                            <span className="text-xs text-muted-foreground truncate">
+                            <span className="text-xs text-muted-foreground">
                               {step.agent ? <AgentBadge agent={step.agent} size="card" /> : (step.humanLabel || 'Human')}
                             </span>
                             {step.attempts && step.attempts > 0 && (
