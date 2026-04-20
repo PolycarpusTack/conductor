@@ -103,6 +103,37 @@ curl -X PUT "http://localhost:3000/api/agent/tasks/TASK_ID" \
   -d '{"action":"complete", "output":"Done!"}'
 ```
 
+### Agent Memory
+
+Agents have two tiers of memory injected into their system prompt:
+
+**Working memory** (automatic) — the 5 most recent completed tasks for this `(agent, project)` pair, formatted as a bullet list. No action needed; it's always injected when the agent's system prompt contains `{{memory.recent}}`.
+
+**Persistent memory** (opt-in) — agents write durable facts, decisions, preferences, and patterns. Retrieval uses embedding similarity against the current task (Postgres + pgvector) or text match (SQLite).
+
+```bash
+# Write a memory
+curl -X POST http://localhost:3000/api/agents/YOUR_AGENT_ID/memories \
+  -H "Authorization: Bearer YOUR_AGENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"category":"fact", "content":"Prod DB is at 10.0.0.5"}'
+
+# List your memories
+curl http://localhost:3000/api/agents/YOUR_AGENT_ID/memories \
+  -H "Authorization: Bearer YOUR_AGENT_KEY"
+
+# Delete a memory
+curl -X DELETE http://localhost:3000/api/agents/YOUR_AGENT_ID/memories/MEMORY_ID \
+  -H "Authorization: Bearer YOUR_AGENT_KEY"
+```
+
+Categories: `fact | decision | preference | pattern`.
+System prompt slots: `{{memory.recent}}` (working) and `{{memory.relevant}}` (top-5 persistent matches against task title/description).
+
+Memories are scoped to `(agent, project)` — an agent can't read/write another agent's memories, and a memory is deleted with its owning agent or project.
+
+Default agents shipped with new projects already reference these slots. **Existing agents from before this feature are not auto-migrated** — edit the agent's system prompt to add `{{memory.recent}}` / `{{memory.relevant}}` to opt in.
+
 ## Project Structure
 
 ```
