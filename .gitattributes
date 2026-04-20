@@ -1,0 +1,31 @@
+# Normalize all text files to LF on checkin; let git auto-detect text vs binary.
+# This is the single source of truth that keeps Windows/WSL co-edits from
+# producing noisy CRLF↔LF diffs on every touched file.
+* text=auto eol=lf
+
+# Common binary formats — never transform these.
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.avif binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.tar binary
+*.gz binary
+
+# Lockfiles are text (LF).
+bun.lock text eol=lf
+package-lock.json text eol=lf
+yarn.lock text eol=lf
+pnpm-lock.yaml text eol=lf
