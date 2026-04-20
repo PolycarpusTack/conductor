@@ -2301,7 +2301,7 @@ export default function Home() {
                   <SelectItem value="none">Use agent default</SelectItem>
                   <SelectItem value="claude-code">Claude Code</SelectItem>
                   <SelectItem value="codex">Codex</SelectItem>
-                  <SelectItem value="copilot">GitHub Copilot</SelectItem>
+                  {/* GitHub Copilot is registered as an unavailable adapter (adapters/registry.ts:25). Add back once the adapter lands. */}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">Override the runtime for this specific task (daemon mode only).</p>
