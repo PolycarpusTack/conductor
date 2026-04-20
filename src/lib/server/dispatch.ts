@@ -147,9 +147,7 @@ function hasDagEdges(steps: Array<{ nextSteps?: string | null; prevSteps?: strin
   return steps.some(s => s.nextSteps || s.prevSteps)
 }
 
-// Exported for direct unit testing. Callers should normally go through
-// dispatchStep() — leaseStep on its own doesn't run the step, just marks it.
-export async function leaseStep(stepId: string): Promise<{ taken: boolean; evictedFrom: string | null }> {
+async function leaseStep(stepId: string): Promise<{ taken: boolean; evictedFrom: string | null }> {
   // Capture the prior lease holder so we can record eviction on a successful
   // steal. The read-then-updateMany pair is not atomic, but the updateMany's
   // `where` still enforces correctness — the prior field is only used for the
