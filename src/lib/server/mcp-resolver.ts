@@ -74,7 +74,10 @@ async function fetchToolsFromMcp(connection: McpConnection): Promise<McpTool[]> 
   const endpoint = connection.endpoint.replace(/\/$/, '')
 
   try {
-    // MCP protocol: POST to the server with a tools/list request
+    // MCP protocol: POST to the server with a tools/list request.
+    // A slow MCP server would otherwise stall every dispatch — tool discovery
+    // runs on each step that uses MCP. 5s is generous; healthy servers reply
+    // in milliseconds.
     const res = await fetch(`${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,6 +86,7 @@ async function fetchToolsFromMcp(connection: McpConnection): Promise<McpTool[]> 
         id: 1,
         method: 'tools/list',
       }),
+      signal: AbortSignal.timeout(5000),
     })
 
     if (!res.ok) {
@@ -143,6 +147,10 @@ export async function executeMcpTool(
   const endpoint = connection.endpoint.replace(/\/$/, '')
 
   try {
+    // Tool execution can legitimately do real work (DB queries, HTTP calls,
+    // file ops) — give it a longer ceiling than tool discovery. 30s caps a
+    // wedged tool without killing normal ones. The step-level timeout
+    // (agent.timeoutMs, default 5 min) still governs the outer dispatch.
     const res = await fetch(`${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -155,6 +163,7 @@ export async function executeMcpTool(
           arguments: args,
         },
       }),
+      signal: AbortSignal.timeout(30000),
     })
 
     if (!res.ok) {
