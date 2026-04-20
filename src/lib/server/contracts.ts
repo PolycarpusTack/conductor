@@ -283,7 +283,7 @@ export const createMemorySchema = z.object({
   category: memoryCategorySchema,
   content: z.string().min(1).max(2000),
   sourceTaskId: z.string().optional(),
-  confidence: z.number().min(0).max(1).optional(),
+  confidence: z.number().min(0).max(1).default(0.8),
 })
 
 export const listMemoriesSchema = z.object({
