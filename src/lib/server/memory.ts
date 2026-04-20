@@ -66,16 +66,13 @@ export async function saveMemory(input: SaveMemoryInput) {
     },
     select: {
       id: true,
-      agentId: true,
-      projectId: true,
       category: true,
       content: true,
-      sourceTaskId: true,
       confidence: true,
       reinforcement: true,
+      sourceTaskId: true,
       lastAccessed: true,
       createdAt: true,
-      updatedAt: true,
     },
   })
 }

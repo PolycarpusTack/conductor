@@ -101,32 +101,3 @@ export const POST = withErrorHandling(
     return NextResponse.json(memory)
   },
 )
-
-/**
- * DELETE /api/agents/:id/memories?memoryId=xxx
- * Agent deletes its own memory.
- */
-export const DELETE = withErrorHandling(
-  'api/agents/[id]/memories',
-  async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
-    const apiKey = extractAgentApiKey(request)
-    if (!apiKey) throw unauthorized('Missing agent API key')
-
-    const agent = await resolveAgentByApiKey(apiKey)
-    if (!agent) throw unauthorized('Invalid API key')
-
-    const { id } = await params
-    if (agent.id !== id) throw forbidden("Cannot delete another agent's memories")
-
-    const { searchParams } = new URL(request.url)
-    const memoryId = searchParams.get('memoryId')
-    if (!memoryId) throw badRequest('Missing memoryId')
-
-    const memory = await db.agentMemory.findUnique({ where: { id: memoryId } })
-    if (!memory) throw notFound('Memory not found')
-    if (memory.agentId !== agent.id) throw forbidden('Not your memory')
-
-    await db.agentMemory.delete({ where: { id: memoryId } })
-    return NextResponse.json({ ok: true })
-  },
-)
