@@ -1,102 +1,101 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { db } from '@/lib/db'
-import { buildWorkingMemory } from '@/lib/server/memory'
+import { describe, test, expect, mock, beforeEach } from 'bun:test'
+
+// ---------------------------------------------------------------------------
+// Mock @/lib/db before importing the module under test
+// ---------------------------------------------------------------------------
+
+const mockTaskFindMany = mock(() => Promise.resolve([])) as any
+
+mock.module('@/lib/db', () => ({
+  db: {
+    task: {
+      findMany: mockTaskFindMany,
+    },
+  },
+}))
+
+// Import AFTER mocking
+import { buildWorkingMemory } from '../memory'
+
+// ---------------------------------------------------------------------------
+// Reset mocks before each test
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  mockTaskFindMany.mockReset()
+  mockTaskFindMany.mockImplementation(() => Promise.resolve([]))
+})
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('buildWorkingMemory', () => {
-  let projectId: string
-  let agentId: string
-
-  beforeEach(async () => {
-    const project = await db.project.create({ data: { name: 'mem-test' } })
-    projectId = project.id
-    const agent = await db.agent.create({
-      data: { name: 'memtest-agent', projectId },
-    })
-    agentId = agent.id
-  })
-
-  afterEach(async () => {
-    await db.project.delete({ where: { id: projectId } }).catch(() => {})
-  })
-
-  test('returns empty string when agent has no completed tasks', async () => {
-    const result = await buildWorkingMemory({ agentId, projectId })
+  test('returns empty string when no completed tasks', async () => {
+    const result = await buildWorkingMemory({ agentId: 'a1', projectId: 'p1' })
     expect(result).toBe('')
   })
 
-  test('formats recent completed tasks with title and output', async () => {
-    await db.task.create({
-      data: {
-        title: 'Fix login bug',
-        status: 'DONE',
-        output: 'Root cause: timeout in auth.ts. Fixed by bumping to 60s.',
-        completedAt: new Date(),
-        projectId,
-        agentId,
-      },
-    })
-
-    const result = await buildWorkingMemory({ agentId, projectId })
+  test('formats task with title and output', async () => {
+    mockTaskFindMany.mockImplementationOnce(() =>
+      Promise.resolve([
+        { title: 'Fix login bug', output: 'Root cause: timeout in auth.ts. Fixed by bumping to 60s.', completedAt: new Date() },
+      ])
+    )
+    const result = await buildWorkingMemory({ agentId: 'a1', projectId: 'p1' })
     expect(result).toContain('Fix login bug')
     expect(result).toContain('Root cause: timeout')
   })
 
-  test('limits to most recent N tasks (default 5)', async () => {
-    for (let i = 0; i < 8; i++) {
-      await db.task.create({
-        data: {
-          title: `Task ${i}`,
-          status: 'DONE',
-          output: `output-${i}`,
-          completedAt: new Date(Date.now() + i * 1000),
-          projectId,
-          agentId,
-        },
+  test('passes agentId, projectId, and status DONE in Prisma where clause', async () => {
+    await buildWorkingMemory({ agentId: 'a1', projectId: 'p1' })
+    expect(mockTaskFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ agentId: 'a1', projectId: 'p1', status: 'DONE' }),
       })
-    }
-    const result = await buildWorkingMemory({ agentId, projectId, maxRecent: 5 })
-    expect(result).toContain('Task 7')
-    expect(result).toContain('Task 3')
-    expect(result).not.toContain('Task 2')
+    )
   })
 
-  test('truncates each task output to maxCharsPerEntry', async () => {
-    await db.task.create({
-      data: {
-        title: 'Big task',
-        status: 'DONE',
-        output: 'x'.repeat(5000),
-        completedAt: new Date(),
-        projectId,
-        agentId,
-      },
-    })
-    const result = await buildWorkingMemory({ agentId, projectId, maxCharsPerEntry: 200 })
+  test('uses maxRecent as Prisma `take`', async () => {
+    await buildWorkingMemory({ agentId: 'a1', projectId: 'p1', maxRecent: 3 })
+    expect(mockTaskFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 3 }))
+  })
+
+  test('defaults maxRecent to 5', async () => {
+    await buildWorkingMemory({ agentId: 'a1', projectId: 'p1' })
+    expect(mockTaskFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
+  })
+
+  test('truncates each entry to maxCharsPerEntry', async () => {
+    mockTaskFindMany.mockImplementationOnce(() =>
+      Promise.resolve([
+        { title: 'Big task', output: 'x'.repeat(5000), completedAt: new Date() },
+      ])
+    )
+    const result = await buildWorkingMemory({ agentId: 'a1', projectId: 'p1', maxCharsPerEntry: 200 })
+    // The formatted entry should be well under 600 chars (title + 200 chars of output + header)
     expect(result.length).toBeLessThan(600)
     expect(result).toContain('Big task')
   })
 
-  test('only includes DONE tasks, not IN_PROGRESS or BACKLOG', async () => {
-    await db.task.create({
-      data: { title: 'In-progress task', status: 'IN_PROGRESS', projectId, agentId },
-    })
-    const result = await buildWorkingMemory({ agentId, projectId })
-    expect(result).not.toContain('In-progress task')
+  test('orders by completedAt desc', async () => {
+    await buildWorkingMemory({ agentId: 'a1', projectId: 'p1' })
+    expect(mockTaskFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { completedAt: 'desc' } })
+    )
   })
 
-  test('only includes tasks for the given (agent, project) pair', async () => {
-    const otherAgent = await db.agent.create({ data: { name: 'other', projectId } })
-    await db.task.create({
-      data: {
-        title: "Other agent's task",
-        status: 'DONE',
-        output: 'should not appear',
-        completedAt: new Date(),
-        projectId,
-        agentId: otherAgent.id,
-      },
-    })
-    const result = await buildWorkingMemory({ agentId, projectId })
-    expect(result).not.toContain("Other agent's task")
+  test('formats multiple tasks — all returned rows appear in output', async () => {
+    mockTaskFindMany.mockImplementationOnce(() =>
+      Promise.resolve([
+        { title: 'Task Alpha', output: 'output-alpha', completedAt: new Date() },
+        { title: 'Task Beta', output: 'output-beta', completedAt: new Date() },
+      ])
+    )
+    const result = await buildWorkingMemory({ agentId: 'a1', projectId: 'p1', maxRecent: 5 })
+    expect(result).toContain('Task Alpha')
+    expect(result).toContain('Task Beta')
+    expect(result).toContain('output-alpha')
+    expect(result).toContain('output-beta')
   })
 })
