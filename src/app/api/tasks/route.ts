@@ -4,9 +4,12 @@ import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createTaskSchema } from '@/lib/server/contracts'
-import { normalizeDagEdges } from '@/lib/server/dispatch'
+import { normalizeDagEdges, startChain } from '@/lib/server/dispatch'
+import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { taskBoardInclude } from '@/lib/server/selects'
+
+const log = getLogger('api/tasks')
 
 export const GET = withErrorHandling('api/tasks', async (request: Request) => {
   const unauthorized = await requireAdminSession()
@@ -76,10 +79,16 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
     }
   }
 
+    // A task created with a chain (steps[] non-empty) and no explicit status
+    // starts IN_PROGRESS so the user doesn't have to hunt for a trigger to
+    // kick off the workflow they just built. Plain tasks (no steps) keep the
+    // BACKLOG default so they don't dispatch accidentally.
+    const effectiveStatus = status || (steps && steps.length > 0 ? 'IN_PROGRESS' : 'BACKLOG')
+
     // Create task and steps atomically
     const task = await db.$transaction(async (tx) => {
       const maxOrderTask = await tx.task.findFirst({
-        where: { projectId, status: status || 'BACKLOG' },
+        where: { projectId, status: effectiveStatus },
         orderBy: { order: 'desc' },
       })
 
@@ -89,7 +98,7 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
         data: {
           title,
           description,
-          status: status || 'BACKLOG',
+          status: effectiveStatus,
           priority: priority || 'MEDIUM',
           tag,
           projectId,
@@ -223,6 +232,19 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
 
   // Normalize DAG edge symmetry (synthesize missing nextSteps from prevSteps and vice versa)
   await normalizeDagEdges(task.id)
+
+  // Auto-start chain when a task was created IN_PROGRESS with steps. The PUT
+  // handler fires startChain on a BACKLOG→IN_PROGRESS transition, but POST
+  // didn't have the matching hook, so chain tasks created via "Create Task"
+  // used to sit inert. Failures are logged rather than failing the request —
+  // the task exists, worst case the user drags it to In Progress by hand.
+  if (effectiveStatus === 'IN_PROGRESS' && steps && steps.length > 0) {
+    try {
+      await startChain(task.id, projectId)
+    } catch (err) {
+      log.error('startChain failed on task creation', err, { taskId: task.id })
+    }
+  }
 
   broadcastProjectEvent(projectId, 'task-created', task)
   return NextResponse.json(task)

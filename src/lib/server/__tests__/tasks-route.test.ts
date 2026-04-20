@@ -57,11 +57,14 @@ mock.module('@/lib/server/admin-session', () => ({
   requireAdminSession: mock(() => Promise.resolve(null)) as any,
 }))
 
-// `normalizeDagEdges` is called after the transaction commits. Our test
-// throws badRequest *inside* the transaction, so it never runs — but mock
-// it anyway so the module resolution succeeds.
+// `normalizeDagEdges` is called after the transaction commits. `startChain`
+// fires when a task is created with non-empty steps (auto-start) — mock it
+// so the happy-path tests exercise the call without needing the full
+// dispatch stack behind it.
+const mockStartChain = mock(() => Promise.resolve()) as any
 mock.module('@/lib/server/dispatch', () => ({
   normalizeDagEdges: mock(() => Promise.resolve()) as any,
+  startChain: mockStartChain,
 }))
 
 mock.module('@/lib/server/realtime', () => ({
@@ -100,6 +103,8 @@ beforeEach(() => {
   mockTxTaskFindUniqueOrThrow.mockResolvedValue({ id: 'task-new' })
   mockTransaction.mockImplementation((cb: (tx: typeof txShape) => unknown) => cb(txShape))
   mockAgentFindMany.mockResolvedValue([])
+  mockStartChain.mockReset()
+  mockStartChain.mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -177,5 +182,52 @@ describe('POST /api/tasks — DAG edge remap', () => {
     const nextStepsJson = updateCall![0].data.nextSteps as string
     expect(nextStepsJson).toContain('db-step-1')
     expect(nextStepsJson).not.toContain('step_1')
+  })
+
+  test('auto-starts the chain when a task is created with steps', async () => {
+    // A chain task (steps[] non-empty, no explicit status) defaults to
+    // IN_PROGRESS and fires startChain — otherwise the user's new chain sits
+    // inert in BACKLOG and they have to hunt for the trigger.
+    const req = makeRequest({
+      title: 'auto-start',
+      projectId: 'proj-1',
+      steps: [
+        { mode: 'analyze' },
+        { mode: 'develop' },
+      ],
+    })
+
+    mockTxTaskStepFindMany.mockResolvedValue([
+      { id: 'db-step-0', order: 1 },
+      { id: 'db-step-1', order: 2 },
+    ])
+
+    const res = await POST(req, { params: Promise.resolve({}) } as any)
+
+    expect(res.status).toBe(200)
+    expect(mockStartChain).toHaveBeenCalledTimes(1)
+    expect(mockStartChain).toHaveBeenCalledWith('task-new', 'proj-1')
+
+    // The created task should have been marked IN_PROGRESS, not BACKLOG.
+    const createCall = mockTxTaskCreate.mock.calls[0][0]
+    expect(createCall.data.status).toBe('IN_PROGRESS')
+  })
+
+  test('does not auto-start when the task has no steps', async () => {
+    // Plain tasks (no chain) keep the BACKLOG default and startChain is
+    // never called — auto-dispatching a task the user hasn't committed to
+    // running would be surprising.
+    const req = makeRequest({
+      title: 'plain',
+      projectId: 'proj-1',
+    })
+
+    const res = await POST(req, { params: Promise.resolve({}) } as any)
+
+    expect(res.status).toBe(200)
+    expect(mockStartChain).not.toHaveBeenCalled()
+
+    const createCall = mockTxTaskCreate.mock.calls[0][0]
+    expect(createCall.data.status).toBe('BACKLOG')
   })
 })
