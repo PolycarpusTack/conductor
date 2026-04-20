@@ -98,8 +98,8 @@ export async function searchMemories(opts: SearchMemoriesOpts): Promise<MemoryHi
 
   if (isPostgresDb) {
     const vec = await generateEmbedding(opts.query)
-    // If embedding unavailable (no key, API error), fall through to text search.
-    if (vec) {
+    // If embedding unavailable (no key, API error, or malformed) fall through to text search.
+    if (vec && vec.every(Number.isFinite)) {
       const vectorStr = `[${vec.join(',')}]`
       const rows = await db.$queryRawUnsafe<Array<{
         id: string; category: string; content: string
