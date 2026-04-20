@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { X } from 'lucide-react'
+import { AgentMemoryPanel } from '@/components/agent-memory-panel'
 
 interface Agent {
   id: string
@@ -271,6 +272,7 @@ export function AgentCreationModal({
             <TabsTrigger value="identity" className="flex-1">Identity</TabsTrigger>
             <TabsTrigger value="runtime" className="flex-1">Runtime</TabsTrigger>
             <TabsTrigger value="connections" className="flex-1">Connections</TabsTrigger>
+            {isEditing && <TabsTrigger value="memory" className="flex-1">Memory</TabsTrigger>}
           </TabsList>
 
           <div className="flex-1 overflow-y-auto py-4">
@@ -563,6 +565,13 @@ export function AgentCreationModal({
                 Connections are optional. MCPs expand what the agent can access.
               </p>
             </TabsContent>
+
+            {/* Tab 4: Memory (edit only) */}
+            {isEditing && (
+              <TabsContent value="memory" className="mt-0 space-y-4">
+                <AgentMemoryPanel agentId={editingAgent!.id} agentApiKey={null} />
+              </TabsContent>
+            )}
           </div>
         </Tabs>
 
