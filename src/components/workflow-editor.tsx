@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { X, Plus, GitBranch, GitMerge, ArrowRight, Trash2, Zap } from 'lucide-react'
+import { AgentBadge } from '@/components/agent-badge'
 
 export type { StepCondition, StepEdge }
 
@@ -36,6 +37,9 @@ interface Agent {
   id: string
   name: string
   emoji: string
+  color?: string | null
+  role?: string | null
+  personality?: string | null
 }
 
 interface ProjectMode {
@@ -188,7 +192,7 @@ function StepNode({
 
       {/* Agent */}
       <div className="text-xs text-muted-foreground truncate">
-        {agent ? `${agent.emoji} ${agent.name}` : step.humanLabel || 'Human'}
+        {agent ? <AgentBadge agent={agent} size="card" /> : (step.humanLabel || 'Human')}
       </div>
 
       {/* Connect button (output port) */}

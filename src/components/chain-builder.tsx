@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { X, Plus, Save, LayoutTemplate, GitBranch } from 'lucide-react'
+import { AgentBadge } from '@/components/agent-badge'
 import { WorkflowEditor, type DagStep, type StepEdge } from '@/components/workflow-editor'
 
 interface StepDraft {
@@ -35,7 +36,9 @@ interface Agent {
   id: string
   name: string
   emoji: string
+  color?: string | null
   role?: string | null
+  personality?: string | null
   supportedModes?: string | null
 }
 
@@ -363,9 +366,7 @@ export function ChainBuilder({
                       </SelectItem>
                       {agents.map((agent) => (
                         <SelectItem key={agent.id} value={agent.id}>
-                          <span className="flex items-center gap-2">
-                            {agent.emoji} {agent.name}
-                          </span>
+                          <AgentBadge agent={agent} size="card" />
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -9,6 +9,7 @@ import {
   X, Pencil, CheckCircle, RotateCcw,
   ChevronDown, ChevronUp,
 } from 'lucide-react'
+import { AgentBadge } from '@/components/agent-badge'
 
 interface TaskStep {
   id: string
@@ -24,7 +25,7 @@ interface TaskStep {
   attempts?: number
   startedAt?: string | null
   completedAt?: string | null
-  agent?: { id: string; name: string; emoji: string } | null
+  agent?: { id: string; name: string; emoji: string; color?: string | null; role?: string | null; personality?: string | null } | null
 }
 
 interface Task {
@@ -36,7 +37,7 @@ interface Task {
   tag?: string | null
   notes?: string | null
   output?: string | null
-  agent?: { id: string; name: string; emoji: string; color: string } | null
+  agent?: { id: string; name: string; emoji: string; color: string; role?: string | null; personality?: string | null } | null
   steps?: TaskStep[]
   startedAt?: string | null
   completedAt?: string | null
@@ -169,8 +170,7 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
           <h2 className="text-base font-semibold font-heading leading-tight">{task.title}</h2>
           {task.agent && (
             <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
-              <span>{task.agent.emoji}</span>
-              <span>{task.agent.name}</span>
+              <AgentBadge agent={task.agent} size="full" />
             </div>
           )}
         </div>
@@ -264,7 +264,7 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
                               {step.mode}
                             </span>
                             <span className="text-xs text-muted-foreground truncate">
-                              {step.agent ? `${step.agent.emoji} ${step.agent.name}` : step.humanLabel || 'Human'}
+                              {step.agent ? <AgentBadge agent={step.agent} size="card" /> : (step.humanLabel || 'Human')}
                             </span>
                             {step.attempts && step.attempts > 0 && (
                               <span className="text-[9px] font-mono text-[var(--op-amber)]/60">#{step.attempts + 1}</span>
