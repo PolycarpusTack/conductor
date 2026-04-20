@@ -290,7 +290,7 @@ export async function dispatchStep(stepId: string) {
     task: { title: step.task.title, description: step.task.description },
     step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
     mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
-    agent: { name: agent.name, role: agent.role, capabilities },
+    agent: { name: agent.name, role: agent.role, capabilities, personality: agent.personality },
     memory: { recent: workingMemory, relevant: relevantMemory },
   })
 

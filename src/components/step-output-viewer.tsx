@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Clock, RotateCcw } from 'lucide-react'
 import { ArtifactViewer } from '@/components/artifact-viewer'
+import { AgentBadge } from '@/components/agent-badge'
 
 interface TaskStep {
   id: string
@@ -21,7 +22,7 @@ interface TaskStep {
   attempts?: number
   startedAt?: string | null
   completedAt?: string | null
-  agent?: { id: string; name: string; emoji: string } | null
+  agent?: { id: string; name: string; emoji: string; color?: string | null; role?: string | null; personality?: string | null } | null
 }
 
 interface StepExecutionSummary {
@@ -272,7 +273,7 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
                           {step.mode}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {step.agent ? `${step.agent.emoji} ${step.agent.name}` : step.humanLabel || 'Human'}
+                          {step.agent ? <AgentBadge agent={step.agent} size="card" /> : (step.humanLabel || 'Human')}
                         </span>
                         {step.attempts && step.attempts > 0 && (
                           <span className="text-[9px] font-mono text-muted-foreground/60">

@@ -6,6 +6,7 @@ interface DefaultAgent {
   color: string
   role: string
   description: string
+  personality: string
   capabilities: string[]
   supportedModes: string[]
   modeInstructions: Record<string, string>
@@ -19,6 +20,7 @@ const DEFAULT_AGENTS: DefaultAgent[] = [
     color: '#4ADE80',
     role: 'developer',
     description: 'Implementation specialist — writes production-grade code following project conventions',
+    personality: 'Pragmatic implementer — matches existing patterns, ships small, asks before assuming.',
     capabilities: ['code-generation', 'refactoring', 'bug-fixing', 'testing', 'documentation'],
     supportedModes: ['develop', 'analyze'],
     modeInstructions: {
@@ -28,6 +30,7 @@ const DEFAULT_AGENTS: DefaultAgent[] = [
     systemPrompt: `You are {{agent.name}}, a production code implementation specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Principles
@@ -62,6 +65,7 @@ Task: {{task.title}}
     color: '#60A5FA',
     role: 'architect',
     description: 'System design specialist — evaluates architecture, selects technologies, designs for scale',
+    personality: 'Systems thinker — maps boundaries before writing code; prefers explicit over clever.',
     capabilities: ['system-design', 'technology-selection', 'scalability-analysis', 'integration-patterns', 'api-design'],
     supportedModes: ['analyze', 'draft'],
     modeInstructions: {
@@ -71,6 +75,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a system architecture specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Design principles
@@ -111,6 +116,7 @@ Task: {{task.title}}
     color: '#F87171',
     role: 'security',
     description: 'Security specialist — vulnerability scanning, zero-trust architecture, compliance verification',
+    personality: 'Adversarial reviewer — looks for what breaks under load, under attack, under wrong inputs.',
     capabilities: ['vulnerability-scanning', 'threat-modeling', 'compliance-checking', 'access-control-review', 'dependency-audit'],
     supportedModes: ['analyze', 'verify'],
     modeInstructions: {
@@ -120,6 +126,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a security analysis and verification specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Zero-trust principles
@@ -161,6 +168,7 @@ Task: {{task.title}}
     color: '#2DD4BF',
     role: 'reviewer',
     description: 'Code review specialist — quality, patterns, correctness, and maintainability analysis',
+    personality: 'Detail-oriented — reads every diff line; catches mistakes the author\'s eyes skipped.',
     capabilities: ['code-review', 'pattern-analysis', 'complexity-assessment', 'best-practices', 'refactoring-suggestions'],
     supportedModes: ['review', 'verify'],
     modeInstructions: {
@@ -170,6 +178,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a code review and quality assurance specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Review principles
@@ -214,6 +223,7 @@ Task: {{task.title}}
     color: '#F59E0B',
     role: 'qa',
     description: 'Test specialist — systematic test design, edge case discovery, coverage analysis',
+    personality: 'Coverage-minded — writes the test that would have caught the bug; values determinism.',
     capabilities: ['test-generation', 'edge-case-discovery', 'coverage-analysis', 'regression-testing', 'performance-testing'],
     supportedModes: ['verify', 'develop'],
     modeInstructions: {
@@ -223,6 +233,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a test design and quality verification specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Testing principles
@@ -266,6 +277,7 @@ Task: {{task.title}}
     color: '#A78BFA',
     role: 'analyst',
     description: 'Codebase analyst — architecture discovery, dependency mapping, technical debt assessment',
+    personality: 'Explorer — probes unknowns first; reports back with findings before proposing changes.',
     capabilities: ['codebase-analysis', 'dependency-mapping', 'technical-debt-assessment', 'pattern-recognition', 'risk-assessment'],
     supportedModes: ['analyze', 'review'],
     modeInstructions: {
@@ -275,6 +287,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a codebase analysis and technical intelligence specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Analysis principles
@@ -318,6 +331,7 @@ Task: {{task.title}}
     color: '#EC4899',
     role: 'writer',
     description: 'Documentation specialist — technical docs, API references, changelogs, READMEs',
+    personality: 'Clarifying writer — turns scattered context into readable prose; leads with why.',
     capabilities: ['technical-writing', 'api-documentation', 'changelog-generation', 'readme-creation', 'architecture-docs'],
     supportedModes: ['draft', 'review'],
     modeInstructions: {
@@ -327,6 +341,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a technical documentation specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Writing principles
@@ -365,6 +380,7 @@ Task: {{task.title}}
     color: '#EF4444',
     role: 'adversarial-tester',
     description: 'Adversarial testing specialist — probes for jailbreaks, prompt injection, data leaks, and safety boundary failures',
+    personality: 'Hostile imagination — enumerates misuse, abuse, and attack surface before defenders notice.',
     capabilities: ['adversarial-testing', 'prompt-injection', 'jailbreak-probing', 'safety-boundary-testing', 'data-extraction-testing'],
     supportedModes: ['verify', 'analyze'],
     modeInstructions: {
@@ -374,6 +390,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, an adversarial testing and red team specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Red team principles
@@ -410,6 +427,7 @@ Task: {{task.title}}
     color: '#FBBF24',
     role: 'cost-analyst',
     description: 'AI cost analysis specialist — budget enforcement, model tier optimization, spend forecasting, anomaly detection',
+    personality: 'Cost-aware — quantifies spend impact; prefers measurable wins over vibes-based optimization.',
     capabilities: ['cost-tracking', 'budget-analysis', 'model-optimization', 'spend-forecasting', 'anomaly-detection'],
     supportedModes: ['analyze', 'review'],
     modeInstructions: {
@@ -419,6 +437,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, an AI FinOps and cost optimization specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## FinOps principles
@@ -455,6 +474,7 @@ Task: {{task.title}}
     color: '#06B6D4',
     role: 'data-engineer',
     description: 'Data pipeline specialist — data quality, RAG evaluation, ingestion pipelines, retrieval optimization',
+    personality: 'Pipeline-minded — treats schema and provenance as first-class; distrusts silent data drift.',
     capabilities: ['data-quality', 'rag-evaluation', 'pipeline-design', 'retrieval-optimization', 'embedding-analysis'],
     supportedModes: ['analyze', 'develop', 'verify'],
     modeInstructions: {
@@ -465,6 +485,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a data pipeline and retrieval quality specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Data engineering principles
@@ -502,6 +523,7 @@ Task: {{task.title}}
     color: '#8B5CF6',
     role: 'compliance-officer',
     description: 'Compliance and governance specialist — privacy regulations, safety policies, audit trails, data subject rights',
+    personality: 'Evidence-driven — maps each control to an artifact; traceability over narrative.',
     capabilities: ['privacy-compliance', 'safety-policy', 'audit-trail', 'regulatory-assessment', 'data-governance'],
     supportedModes: ['analyze', 'verify', 'review'],
     modeInstructions: {
@@ -512,6 +534,7 @@ Task: {{task.title}}
     systemPrompt: `You are {{agent.name}}, a compliance and data governance specialist.
 
 Your role: {{agent.role}}
+Your voice: {{agent.personality}}
 Your capabilities: {{agent.capabilities}}
 
 ## Compliance principles
@@ -567,6 +590,7 @@ export async function seedProjectAgents(projectId: string) {
         color: agent.color,
         role: agent.role,
         description: agent.description,
+        personality: agent.personality,
         capabilities: JSON.stringify(agent.capabilities),
         supportedModes: JSON.stringify(agent.supportedModes),
         modeInstructions: JSON.stringify(agent.modeInstructions),

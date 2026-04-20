@@ -18,6 +18,7 @@ interface Agent {
   emoji: string
   color: string
   description?: string | null
+  personality?: string | null
   role?: string | null
   capabilities?: string | null
   maxConcurrent: number
@@ -117,6 +118,7 @@ export function AgentCreationModal({
   const [emoji, setEmoji] = useState('🤖')
   const [role, setRole] = useState<string | null>(null)
   const [description, setDescription] = useState('')
+  const [personality, setPersonality] = useState('')
   const [capabilities, setCapabilities] = useState<string[]>([])
   const [capabilityInput, setCapabilityInput] = useState('')
   const [selectedModes, setSelectedModes] = useState<string[]>([])
@@ -142,6 +144,7 @@ export function AgentCreationModal({
       setEmoji(editingAgent.emoji || '🤖')
       setRole(editingAgent.role || null)
       setDescription(editingAgent.description || '')
+      setPersonality(editingAgent.personality || '')
       setCapabilities(parseJsonSafe<string[]>(editingAgent.capabilities, []))
       setSelectedModes(parseJsonSafe<string[]>(editingAgent.supportedModes, []))
       setModeInstructions(parseJsonSafe<Record<string, string>>(editingAgent.modeInstructions, {}))
@@ -157,6 +160,7 @@ export function AgentCreationModal({
       setEmoji('🤖')
       setRole(null)
       setDescription('')
+      setPersonality('')
       setCapabilities([])
       setCapabilityInput('')
       setSelectedModes([])
@@ -216,6 +220,7 @@ export function AgentCreationModal({
       emoji,
       color,
       description: description.trim() || undefined,
+      personality: isEditing ? (personality.trim() || null) : (personality.trim() || undefined),
       role: role || undefined,
       capabilities: capabilities.length > 0 ? capabilities : undefined,
       maxConcurrent,
@@ -328,6 +333,26 @@ export function AgentCreationModal({
                   placeholder="What does this agent do?"
                   rows={2}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="personality" className="text-sm font-medium">
+                  Personality
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    One sentence. How does this agent write and reason?
+                  </span>
+                </label>
+                <Textarea
+                  id="personality"
+                  value={personality}
+                  onChange={(e) => setPersonality(e.target.value)}
+                  placeholder="e.g. Pragmatic implementer — matches existing patterns, ships small, asks before assuming."
+                  maxLength={280}
+                  rows={2}
+                />
+                <div className="text-xs text-muted-foreground text-right">
+                  {personality.length}/280
+                </div>
               </div>
 
               <div>

@@ -68,6 +68,7 @@ import { AgentCreationModal } from '@/components/agent-creation-modal'
 import { ChainBuilder } from '@/components/chain-builder'
 import { StepOutputViewer } from '@/components/step-output-viewer'
 import { TaskDetailDrawer } from '@/components/task-detail-drawer'
+import { AgentBadge } from '@/components/agent-badge'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import { HelpPage } from '@/components/help-page'
 import { APP_VERSION_SHORT } from '@/lib/version'
@@ -94,6 +95,7 @@ interface Agent {
   runtimeModel?: string | null
   systemPrompt?: string | null
   mcpConnectionIds?: string | null
+  personality?: string | null
 }
 
 interface TaskStepSummary {
@@ -2019,12 +2021,10 @@ export default function Home() {
                                       <span className="text-[13px] font-medium leading-tight text-foreground/90">{task.title}</span>
                                     </div>
                                     {task.agent && (
-                                      <span className="text-[11px] shrink-0" title={task.agent.name}>
-                                        {task.agent.emoji}
-                                      </span>
+                                      <AgentBadge agent={task.agent} size="compact" className="shrink-0" />
                                     )}
                                   </div>
-                                  
+
                                   {task.steps && task.steps.length > 0 && (() => {
                                     const activeStep = task.steps.find((s) => s.status === 'active')
                                     const doneCount = task.steps.filter((s) => s.status === 'done' || s.status === 'skipped').length
@@ -2125,9 +2125,7 @@ export default function Home() {
                                       <span className="text-[13px] font-medium leading-tight text-foreground/90">{task.title}</span>
                                     </div>
                                     {task.agent && (
-                                      <span className="text-[11px] shrink-0" title={task.agent.name}>
-                                        {task.agent.emoji}
-                                      </span>
+                                      <AgentBadge agent={task.agent} size="compact" className="shrink-0" />
                                     )}
                                   </div>
 
@@ -2285,7 +2283,7 @@ export default function Home() {
                   <SelectContent>
                     {currentProject?.agents.map((agent) => (
                       <SelectItem key={agent.id} value={agent.id}>
-                        {agent.emoji} {agent.name}
+                        <AgentBadge agent={agent} size="card" />
                       </SelectItem>
                     ))}
                   </SelectContent>

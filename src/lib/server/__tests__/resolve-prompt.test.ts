@@ -129,4 +129,27 @@ describe('resolvePrompt', () => {
     const ctx = { ...baseCtx, memory: { recent: '', relevant: '' } }
     expect(resolvePrompt('a{{memory.recent}}b{{memory.relevant}}c', ctx)).toBe('abc')
   })
+
+  test('replaces agent.personality', () => {
+    const ctx = {
+      ...baseCtx,
+      agent: { ...baseCtx.agent, personality: 'Cautious senior engineer who double-checks edge cases' },
+    }
+    expect(resolvePrompt('Voice: {{agent.personality}}', ctx)).toBe(
+      'Voice: Cautious senior engineer who double-checks edge cases'
+    )
+  })
+
+  test('agent.personality renders empty when null', () => {
+    const ctx = {
+      ...baseCtx,
+      agent: { ...baseCtx.agent, personality: null },
+    }
+    expect(resolvePrompt('a{{agent.personality}}b', ctx)).toBe('ab')
+  })
+
+  test('agent.personality renders empty when absent on ctx', () => {
+    // baseCtx.agent has no personality field — placeholder resolves to ''
+    expect(resolvePrompt('a{{agent.personality}}b', baseCtx)).toBe('ab')
+  })
 })
