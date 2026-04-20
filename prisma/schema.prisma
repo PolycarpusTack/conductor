@@ -45,6 +45,7 @@ model Agent {
   emoji            String              @default("🤖")
   color            String              @default("#3b82f6")
   description      String?
+  personality      String?
   apiKey           String?             @unique
   apiKeyHash       String?             @unique
   apiKeyPreview    String?
