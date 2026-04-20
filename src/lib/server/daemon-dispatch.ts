@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { LEASE_TIMEOUT_MS } from '@/lib/server/step-queue'
 
 interface DaemonMatch {
   daemonId: string
@@ -119,6 +120,7 @@ export async function dispatchStepToDaemon(
       agentId: true,
       status: true,
       leasedBy: true,
+      leasedAt: true,
       agent: {
         select: {
           runtime: { select: { adapter: true } },
@@ -136,9 +138,14 @@ export async function dispatchStepToDaemon(
   if (!step || !step.agentId) {
     return { dispatched: false, error: 'Step not found or has no agent' }
   }
-  if (step.leasedBy) {
+
+  // If the step carries a lease, only reject when it's still fresh. An expired
+  // lease means the previous daemon died mid-step; allow a retake.
+  const leaseExpiry = new Date(Date.now() - LEASE_TIMEOUT_MS)
+  if (step.leasedBy && (!step.leasedAt || step.leasedAt >= leaseExpiry)) {
     return { dispatched: false, error: 'Step already leased' }
   }
+  const previousLeaseholder = step.leasedBy ?? null
 
   const runtime = await resolveRuntime(step.taskId, step.agent?.runtime?.adapter)
   if (!runtime) {
@@ -151,14 +158,37 @@ export async function dispatchStepToDaemon(
     return { dispatched: false, error: `No online daemon with ${runtime} capability` }
   }
 
-  // Atomically lease the step to this daemon. Guard on leasedBy: null to
-  // prevent races with a concurrent dispatcher.
+  // Atomically lease the step to this daemon. Accept an unleased step or one
+  // whose prior lease has expired — the `where` guard keeps races safe even
+  // if two dispatchers race on a newly-expired lease.
   const leased = await db.taskStep.updateMany({
-    where: { id: stepId, leasedBy: null },
+    where: {
+      id: stepId,
+      OR: [
+        { leasedBy: null },
+        { leasedAt: { lt: leaseExpiry } },
+      ],
+    },
     data: { leasedBy: daemon.daemonId, leasedAt: new Date() },
   })
   if (leased.count !== 1) {
     return { dispatched: false, error: 'Step lease contended' }
+  }
+
+  if (previousLeaseholder) {
+    await db.activityLog.create({
+      data: {
+        action: 'lease_reclaimed',
+        taskId: step.taskId,
+        agentId: step.agentId,
+        projectId: step.task.projectId,
+        details: JSON.stringify({
+          stepId,
+          previousLeaseholder,
+          newLeaseholder: daemon.daemonId,
+        }),
+      },
+    })
   }
 
   broadcastProjectEvent(step.task.projectId, 'daemon-task-assigned', {

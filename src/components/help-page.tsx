@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Search, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { APP_VERSION_SHORT } from '@/lib/version'
+
+type Tone = 'cobalt' | 'teal' | 'amber' | 'purple' | 'neon'
 
 // =============================================================================
 // Help & User Guide
@@ -200,7 +203,7 @@ const TOC: TocGroup[] = [
 // Primitive building blocks
 // =============================================================================
 
-function Section({ id, title, subtitle, children }: { id: string; title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({ id, title, subtitle, children }: { id: string; title: React.ReactNode; subtitle?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-24 pb-12 mb-12 border-b border-border/20 last:border-0">
       <h2 className="text-2xl font-semibold font-heading tracking-tight mb-1">{title}</h2>
@@ -220,19 +223,15 @@ function H3({ id, children }: { id?: string; children: React.ReactNode }) {
   )
 }
 
-function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-foreground/85">{children}</p>
-}
-
-function Callout({ tone = 'cobalt', title, children }: { tone?: 'cobalt' | 'teal' | 'amber' | 'purple' | 'neon'; title?: string; children: React.ReactNode }) {
-  const palette: Record<string, string> = {
+function Callout({ tone = 'cobalt', title, children }: { tone?: Tone; title?: React.ReactNode; children: React.ReactNode }) {
+  const palette: Record<Tone, string> = {
     cobalt: 'border-[var(--cobalt)]/30 bg-[var(--cobalt)]/5',
     teal: 'border-[var(--op-teal-dim)] bg-[var(--op-teal-bg)]',
     amber: 'border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)]',
     purple: 'border-[var(--op-purple-dim)] bg-[var(--op-purple-bg)]',
     neon: 'border-[var(--neon-green)]/30 bg-[var(--neon-green)]/5',
   }
-  const titleColor: Record<string, string> = {
+  const titleColor: Record<Tone, string> = {
     cobalt: 'text-[var(--cobalt-mid)]',
     teal: 'text-[var(--op-teal)]',
     amber: 'text-[var(--op-amber)]',
@@ -251,7 +250,7 @@ function Steps({ children }: { children: React.ReactNode }) {
   return <ol className="list-decimal space-y-3 pl-5 marker:text-muted-foreground/50 marker:font-semibold">{children}</ol>
 }
 
-function Step({ title, children }: { title: string; children?: React.ReactNode }) {
+function Step({ title, children }: { title: React.ReactNode; children?: React.ReactNode }) {
   return (
     <li className="pl-1">
       <span className="font-semibold text-foreground">{title}</span>
@@ -280,7 +279,7 @@ function Ref({ href, children }: { href: string; children: React.ReactNode }) {
   )
 }
 
-function Table({ head, rows }: { head: string[]; rows: (string | React.ReactNode)[][] }) {
+function Table({ head, rows }: { head: React.ReactNode[]; rows: React.ReactNode[][] }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-border/30 bg-card/40">
       <table className="w-full text-xs">
@@ -311,26 +310,51 @@ function Table({ head, rows }: { head: string[]; rows: (string | React.ReactNode
 
 export function HelpPage({ onBack }: { onBack: () => void }) {
   const [query, setQuery] = useState('')
-  const [activeId, setActiveId] = useState<string>('help-release-0-3')
+  const [activeId, setActiveId] = useState<string>(() => TOC[0]?.items[0]?.id ?? '')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const filterRef = useRef<HTMLInputElement>(null)
 
-  // Scroll-spy: mark the section closest to the top of the viewport as active
+  // Scroll-spy via IntersectionObserver, scoped to this page's scroll container.
+  // rootMargin puts the active zone at the top ~140px of the container and
+  // ignores the lower 60%, so the "active" item is whichever section has just
+  // crossed the top of the visible area.
   useEffect(() => {
+    const root = scrollRef.current
+    if (!root) return
     const allIds = TOC.flatMap((g) => g.items.map((it) => it.id))
-    const onScroll = () => {
-      let best: { id: string; top: number } | null = null
-      for (const id of allIds) {
-        const el = document.getElementById(id)
-        if (!el) continue
-        const top = el.getBoundingClientRect().top
-        if (top <= 140) {
-          if (!best || top > best.top) best = { id, top }
-        }
-      }
-      if (best) setActiveId(best.id)
+    const elements = allIds
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null)
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the topmost intersecting section each tick. If nothing is
+        // intersecting (e.g. a very long section that fills the viewport),
+        // keep the previous activeId.
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        if (visible[0]) setActiveId(visible[0].target.id)
+      },
+      { root, rootMargin: '-140px 0px -60% 0px', threshold: 0 }
+    )
+
+    elements.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
+  // `/` focuses the filter input when the help page has focus (ignored inside
+  // text fields so users can type slashes in search itself).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/') return
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      e.preventDefault()
+      filterRef.current?.focus()
     }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   const visibleTOC = useMemo(() => {
@@ -338,18 +362,18 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
     if (!q) return TOC
     return TOC.map((g) => ({
       ...g,
-      items: g.items.filter((it) => it.title.toLowerCase().includes(q) || g.label.toLowerCase().includes(q) || it.id.toLowerCase().includes(q.replace(/\s+/g, '-'))),
+      items: g.items.filter((it) => it.title.toLowerCase().includes(q) || g.label.toLowerCase().includes(q)),
     })).filter((g) => g.items.length > 0)
   }, [query])
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] overflow-auto">
+    <div ref={scrollRef} className="h-[calc(100vh-3.5rem)] overflow-auto">
       <div className="mx-auto max-w-[1400px] px-6 py-8">
         {/* Page header */}
         <header className="mb-8 flex items-start justify-between gap-6 flex-wrap">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground/60 mb-1">
-              <span>Conductor v0.3</span>
+              <span>Conductor {APP_VERSION_SHORT}</span>
               <span className="text-muted-foreground/30">·</span>
               <span>Help &amp; User Guide</span>
             </div>
@@ -374,13 +398,15 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <div className="relative mb-4">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
               <Input
+                ref={filterRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter topics..."
+                placeholder="Filter topics... (/)"
+                aria-label="Filter help topics"
                 className="h-8 pl-8 text-xs bg-surface/40 border-border/30"
               />
             </div>
-            <nav className="space-y-5">
+            <nav aria-label="Help contents" className="space-y-5">
               {visibleTOC.length === 0 && (
                 <p className="text-xs text-muted-foreground/60 italic">No topics match &ldquo;{query}&rdquo;.</p>
               )}
@@ -396,6 +422,7 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                         <li key={item.id}>
                           <a
                             href={`#${item.id}`}
+                            aria-current={active ? 'location' : undefined}
                             className={`group flex items-center gap-1.5 px-2 py-1 rounded text-[12px] leading-tight transition-colors ${
                               active
                                 ? 'bg-[var(--cobalt)]/10 text-foreground'
@@ -435,28 +462,28 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Callout>
 
               <H3 id="help-release-0-3-triggers">Triggers &amp; Reactions (integrations)</H3>
-              <P>
+              <p>
                 You can now start chains from external events (a GitHub issue, a Slack message, a scheduled cron,
                 an inbound webhook) and push results back out (post a PR comment, send an email, update a Jira ticket).
                 Triggers and reactions share a single integration catalogue and can be mixed and matched on any chain.
                 See <Ref href="#help-triggers">Triggers &amp; Reactions</Ref> for the full walkthrough.
-              </P>
+              </p>
 
               <H3 id="help-release-0-3-gates">Human review gates</H3>
-              <P>
+              <p>
                 Any step in a chain can now be marked as &ldquo;requires human approval&rdquo;. When the workflow
                 reaches that step, the task moves to the <Term>REVIEW</Term> column and work pauses until a person
                 clicks <em>Approve</em> or <em>Reject</em>. Rejections carry feedback back to the previous agent so
                 it can try again. See <Ref href="#help-review-gates">Human review gates</Ref>.
-              </P>
+              </p>
 
               <H3 id="help-release-0-3-durable">Durable execution</H3>
-              <P>
+              <p>
                 Chains now use a durable step queue. If the app restarts mid-workflow, the state machine picks up
                 exactly where it left off — no lost work, no double-runs. Steps are idempotent by key, and each
                 attempt is logged so you can compare tries side-by-side in the
                 {' '}<Ref href="#help-obs-attempts">Attempt comparison</Ref> viewer.
-              </P>
+              </p>
 
               <H3 id="help-release-0-3-obs">Observability overhaul</H3>
               <Bullets>
@@ -468,10 +495,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3 id="help-release-0-3-help">In-app Help &amp; User Guide</H3>
-              <P>
+              <p>
                 The page you&apos;re reading. Opened from the <Kbd>?</Kbd> icon in the top bar. Searchable, anchor-linked,
                 and kept next to the product itself so what you read reflects what you&apos;re running.
-              </P>
+              </p>
 
               <H3 id="help-release-0-3-polish">Polish &amp; fixes</H3>
               <Bullets>
@@ -489,32 +516,32 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               subtitle="Chains, skills, MCP, and the daemon."
             >
               <H3>Workflow chains</H3>
-              <P>
+              <p>
                 Replaced ad-hoc agent handoffs with first-class <strong>chains</strong>: an ordered list of steps,
                 each bound to a mode and an agent, with explicit success and failure transitions. Chains can be saved
                 as <Ref href="#help-chain-templates">templates</Ref> and reused across projects.
-              </P>
+              </p>
 
               <H3>Skills library with semantic search</H3>
-              <P>
+              <p>
                 A shared library of reusable prompt fragments, code snippets, and playbooks. Agents can retrieve skills
                 by semantic similarity (via <code>pgvector</code> when PostgreSQL is configured) or by exact tag match
                 when running on SQLite.
-              </P>
+              </p>
 
               <H3>MCP tool execution loop</H3>
-              <P>
+              <p>
                 Agents can call tools exposed by <strong>MCP</strong> servers (Model Context Protocol — a standard way
                 for LLMs to invoke functions on external services). Each project picks which MCP connections its agents
                 can see.
-              </P>
+              </p>
 
               <H3>Daemon invocation mode</H3>
-              <P>
+              <p>
                 Besides being driven over HTTP, agents can now run as long-lived <strong>daemons</strong> that register
                 with the server, heartbeat, and pull work from a step queue. Daemons are better for CLI-backed agents
                 (Claude Code, OpenCode, Aider, etc.) that benefit from reusing a process.
-              </P>
+              </p>
             </Section>
 
             <Section
@@ -542,13 +569,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="What is Conductor?"
               subtitle="An orchestration platform for AI agents, built around a board you already know how to use."
             >
-              <P>
+              <p>
                 Conductor is a <strong>control room for AI agents</strong>. Instead of running one chatbot at a time
                 and pasting output into another tool, you define a cast of agents, give each one a role
                 (analyse, verify, develop, review, draft), and then chain them together into workflows. The platform
                 dispatches work to the right agent at the right time, pauses for a human whenever you want approval,
                 and keeps a full audit trail of what every agent did.
-              </P>
+              </p>
 
               <Callout tone="cobalt" title="The problem it solves">
                 <p>
@@ -577,9 +604,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-audience" title="Who is this for?">
-              <P>
+              <p>
                 The guide is written with three kinds of reader in mind:
-              </P>
+              </p>
               <Bullets>
                 <li><strong>Operators and project leads</strong> who set up projects, create agents, and approve work. Most of this guide is for you — stay on Getting Started, The Board, Agents, Modes, and Chains.</li>
                 <li><strong>Power users</strong> who want to plug Conductor into other tools. Read Triggers &amp; Reactions, Automation, and Templates.</li>
@@ -599,89 +626,89 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               subtitle="The nouns Conductor uses. Skim this now, come back when a term confuses you."
             >
               <H3>Workspace</H3>
-              <P>
+              <p>
                 The top-level container. A workspace is usually one team or one organisation. Switch workspaces from
                 the dropdown next to the Conductor logo. Everything below — projects, agents, chains, skills — lives
                 inside a workspace.
-              </P>
+              </p>
 
               <H3>Project</H3>
-              <P>
+              <p>
                 A bounded unit of work inside a workspace: one product, one codebase, one campaign. Each project has
                 its own board, its own agents, its own API keys, and its own MCP connections. You can have as many
                 projects as you like.
-              </P>
+              </p>
 
               <H3>Task</H3>
-              <P>
+              <p>
                 A single unit of work, shown as a card on the board. Tasks move through states (<Term>BACKLOG</Term>,
                 <Term>IN_PROGRESS</Term>, <Term>WAITING</Term>, <Term>REVIEW</Term>, <Term>DONE</Term>) as agents
                 and humans act on them. Every task has a title, an optional description, a priority, and an
                 optional agent assignment.
-              </P>
+              </p>
 
               <H3>Agent</H3>
-              <P>
+              <p>
                 A configured worker. An agent has a name, an emoji, a role, an AI provider (its <em>runtime</em>),
                 a system prompt, and a set of modes it supports. Agents come in two invocation flavours:
                 <Term>HTTP</Term> (the server calls the agent) and <Term>DAEMON</Term> (the agent calls the server
                 for work). More on this in <Ref href="#help-agent-invocation">HTTP vs. Daemon</Ref>.
-              </P>
+              </p>
 
               <H3>Mode</H3>
-              <P>
+              <p>
                 A role the agent is playing <em>right now</em>. Built-in modes are <Term>ANALYZE</Term>,
                 <Term>VERIFY</Term>, <Term>DEVELOP</Term>, <Term>REVIEW</Term>, and <Term>DRAFT</Term>. Modes
                 control the agent&apos;s system prompt, which tools it can use, and what kind of output it produces.
                 See <Ref href="#help-modes">Modes</Ref>.
-              </P>
+              </p>
 
               <H3>Chain</H3>
-              <P>
+              <p>
                 An ordered workflow of steps. Each step pairs a mode with an agent (&ldquo;analyse with Alice, then
                 develop with Bob, then have a human review&rdquo;). Chains can be saved as templates and re-used on
                 new tasks.
-              </P>
+              </p>
 
               <H3>Skill</H3>
-              <P>
+              <p>
                 A reusable fragment — a prompt, a snippet, a playbook — stored in the workspace-wide skills library.
                 Agents can retrieve skills by semantic similarity when answering a task. Think of it as long-term
                 memory shared across agents.
-              </P>
+              </p>
 
               <H3>Runtime</H3>
-              <P>
+              <p>
                 A credentialed connection to an AI provider: Anthropic, OpenAI, OpenRouter, Azure, local (Ollama),
                 etc. Agents pick a runtime when they&apos;re created; runtimes are managed in <em>Settings &rarr; Runtimes</em>.
-              </P>
+              </p>
 
               <H3>MCP connection</H3>
-              <P>
+              <p>
                 A link to a Model Context Protocol server. An MCP server exposes tools (functions) that an agent
                 can call during a step — read a file, query a database, open a ticket. Each project picks which
                 MCP connections its agents can see.
-              </P>
+              </p>
 
               <H3>Trigger &amp; Reaction</H3>
-              <P>
+              <p>
                 <strong>Triggers</strong> are external events that start a chain (a new GitHub issue, a Slack
                 mention, a cron tick). <strong>Reactions</strong> are outward actions fired when a chain finishes
                 (post a comment, send an email, open a PR). Both come from the same integration catalogue.
-              </P>
+              </p>
 
               <H3>Artifact</H3>
-              <P>
+              <p>
                 A file produced by an agent during a step — a diff, a document, a CSV, an image. Artifacts are
                 stored against the task and viewable from the task drawer.
-              </P>
+              </p>
 
               <H3>Activity</H3>
-              <P>
+              <p>
                 Every state change (task created, claimed, started, completed, approved, rejected) is written to
                 the activity log with a timestamp, an actor (agent or user), and any payload. Activity is your
                 audit trail.
-              </P>
+              </p>
             </Section>
 
             <Section
@@ -737,9 +764,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="Your first project, step by step"
               subtitle="A detailed walkthrough — click, what-you-see, why."
             >
-              <P>
+              <p>
                 The quick start above is terse. This section is for readers who want every click documented.
-              </P>
+              </p>
 
               <H3>Step 1 · Sign in</H3>
               <Bullets>
@@ -762,10 +789,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>Step 3 · Configure a runtime</H3>
-              <P>
+              <p>
                 A runtime is <em>how</em> an agent talks to an AI model. It holds the API key and any provider-specific
                 settings. You need at least one before agents can do anything.
-              </P>
+              </p>
               <Bullets>
                 <li>Click the <Kbd>⚙</Kbd> Settings icon in the top bar &rarr; <em>Runtimes</em> tab.</li>
                 <li>Click <em>+ Add Runtime</em>.</li>
@@ -824,9 +851,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-anatomy" title="Anatomy of the app">
-              <P>
+              <p>
                 A map of the UI so the rest of this guide can reference things by name.
-              </P>
+              </p>
 
               <H3>Top bar</H3>
               <Bullets>
@@ -838,21 +865,21 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>Left sidebar (desktop)</H3>
-              <P>
+              <p>
                 Holds the project list, quick filters, and (on mobile) the hamburger menu. The version badge (<em>Conductor v0.3</em>) sits at the bottom.
-              </P>
+              </p>
 
               <H3>Main area</H3>
-              <P>
+              <p>
                 Shows one of: the board (default), the runtime dashboard, the skills library, or this help page.
                 Views are exclusive — switching one closes the others.
-              </P>
+              </p>
 
               <H3>Task drawer</H3>
-              <P>
+              <p>
                 Slides in from the right when you click a card. Shows full details: description, activity,
                 assigned agent, current mode, steps, artifacts, and action buttons.
-              </P>
+              </p>
             </Section>
 
             {/* ════════════════════════════════════════════════════════════════
@@ -864,10 +891,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="The Kanban board"
               subtitle="Four columns, drag-and-drop, real-time updates. The main view."
             >
-              <P>
+              <p>
                 The board is deliberately familiar. If you&apos;ve used Trello, Jira, Linear, or any Kanban-style
                 tool, you already know most of it. Cards flow left to right. Columns are states.
-              </P>
+              </p>
 
               <H3>The four columns</H3>
               <Table
@@ -881,12 +908,12 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               />
 
               <H3>A hidden fifth state: WAITING</H3>
-              <P>
+              <p>
                 <Term>WAITING</Term> doesn&apos;t have its own column on the main board. It means the task is paused
                 for an external event — a webhook callback, a scheduled delay, or a slow tool call. Tasks in
                 <Term>WAITING</Term> stay in their original column (usually <Term>IN_PROGRESS</Term>) with a small
                 hourglass badge. They resume automatically when the event arrives.
-              </P>
+              </p>
 
               <H3>Drag-and-drop</H3>
               <Bullets>
@@ -914,30 +941,30 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Steps>
 
               <H3>Edit</H3>
-              <P>
+              <p>
                 Click the card. The drawer opens. Every field is editable in place. Hit <Kbd>⌘ / Ctrl</Kbd>+<Kbd>Enter</Kbd>
                 to save a text field without moving off it, or click outside to blur-save.
-              </P>
+              </p>
 
               <H3>Delete</H3>
-              <P>
+              <p>
                 <em>Drawer &rarr; ⋯ menu &rarr; Delete</em>. Tasks are soft-deleted and kept in the activity log for 30 days,
                 so you can resurrect them from <em>Settings &rarr; Activity</em>.
-              </P>
+              </p>
 
               <H3>Bulk operations</H3>
-              <P>
+              <p>
                 Shift-click cards to multi-select, then use the floating action bar at the bottom to reassign,
                 re-prioritise, or bulk-delete. Bulk moves respect the state machine — an illegal transition is
                 refused with a red toast.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-task-states" title="Task state machine">
-              <P>
+              <p>
                 Every transition is validated server-side. If an agent tries a transition that isn&apos;t allowed,
                 the API returns <code>409 Conflict</code> and the card doesn&apos;t move.
-              </P>
+              </p>
 
               <H3>Allowed transitions</H3>
               <Table
@@ -965,9 +992,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-task-drawer" title="Task detail drawer">
-              <P>
+              <p>
                 The drawer is where you spend most of your time once a task is flowing. It has five tabs.
-              </P>
+              </p>
 
               <Bullets>
                 <li><strong>Details</strong> — title, description, priority, tags, assignee, mode, chain.</li>
@@ -991,11 +1018,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="Human review gates"
               subtitle="The &ldquo;pause for approval&rdquo; checkpoint that makes AI work safe to ship."
             >
-              <P>
+              <p>
                 Any step in a chain can be marked as <em>requires human approval</em>. When that step finishes, the
                 task moves to <Term>REVIEW</Term> and the chain pauses. Nothing downstream runs until a human clicks
                 <em>Approve</em> or <em>Reject</em>.
-              </P>
+              </p>
 
               <H3>When to gate</H3>
               <Bullets>
@@ -1012,11 +1039,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>Rejection with feedback</H3>
-              <P>
+              <p>
                 When a reviewer rejects, they can type a short message. Conductor pushes that feedback back into the
                 agent&apos;s next attempt as a structured <code>&lt;human-feedback&gt;</code> block at the top of the
                 prompt. The task re-enters <Term>IN_PROGRESS</Term> and the step runs again.
-              </P>
+              </p>
 
               <Callout tone="purple" title="Budget limits">
                 <p>
@@ -1037,13 +1064,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="What is an agent?"
               subtitle="A configured worker that can claim tasks, run modes, and call tools."
             >
-              <P>
+              <p>
                 An agent in Conductor is not a process. It&apos;s a <em>record</em>: a name, an emoji, a runtime, a
                 set of supported modes, a system prompt, and an API key. The actual work runs either in
                 Conductor&apos;s own worker pool (for HTTP agents) or in a separate long-running process you start
                 yourself (for daemon agents). The record tells Conductor <em>who</em> the worker is and
                 <em>what</em> it&apos;s allowed to do.
-              </P>
+              </p>
 
               <Callout tone="teal" title="Mental model">
                 <p>
@@ -1069,10 +1096,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-agent-create" title="Creating an agent">
-              <P>
+              <p>
                 Agents are created per-project from <em>Settings &rarr; Agents &rarr; + New Agent</em>. The creation
                 modal is a guided flow: identity &rarr; capabilities &rarr; review.
-              </P>
+              </p>
 
               <H3>The creation wizard</H3>
               <Steps>
@@ -1107,11 +1134,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-agent-roles" title="Agent roles">
-              <P>
+              <p>
                 Role is a free-text tag, not an enum. Conductor doesn&apos;t enforce what a role means — it&apos;s
                 there so you can group and filter. That said, the following conventions are baked into the starter
                 agents and into most chain templates:
-              </P>
+              </p>
 
               <Table
                 head={['Role', 'Typical mode', 'What it does']}
@@ -1124,11 +1151,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 ]}
               />
 
-              <P>
+              <p>
                 Use whatever roles you like. A common pattern for larger teams: split <Term>developer</Term> into
                 <Term>frontend-dev</Term> / <Term>backend-dev</Term> / <Term>infra-dev</Term> and route tasks with
                 <Ref href="#help-automation-dispatch">auto-dispatch rules</Ref>.
-              </P>
+              </p>
             </Section>
 
             <Section
@@ -1136,9 +1163,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="HTTP vs. Daemon"
               subtitle="Two ways an agent can run work. Pick per-agent."
             >
-              <P>
+              <p>
                 Conductor supports two invocation models. Both can coexist in the same project.
-              </P>
+              </p>
 
               <Table
                 head={['Dimension', 'HTTP', 'Daemon']}
@@ -1176,10 +1203,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-agent-keys" title="Agent API keys">
-              <P>
+              <p>
                 Every agent has its own secret key. The key authenticates the agent to Conductor&apos;s APIs.
                 Keys are minted on creation and can be rotated from <em>Settings &rarr; Agents &rarr; [agent] &rarr; Rotate key</em>.
-              </P>
+              </p>
 
               <H3>Key lifecycle</H3>
               <Bullets>
@@ -1190,11 +1217,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>How to use a key</H3>
-              <P>
+              <p>
                 Every agent-side request carries <code>Authorization: Bearer &lt;agent-key&gt;</code>. Conductor looks
                 up the agent by the key and uses the agent&apos;s record (runtime, modes, permissions) to authorise
                 the request. See <Ref href="#help-api-auth">Authentication</Ref>.
-              </P>
+              </p>
 
               <Callout tone="amber" title="Don't share keys between agents">
                 <p>
@@ -1217,18 +1244,18 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>The active flag</H3>
-              <P>
+              <p>
                 <em>Settings &rarr; Agents &rarr; [agent] &rarr; Active</em> toggle. Turning this off is the cleanest
                 way to pause an agent without losing its config or key. Useful during deploys, quota exhaustion,
                 or when you&apos;re testing a replacement.
-              </P>
+              </p>
 
               <H3>Deactivating versus deleting</H3>
-              <P>
+              <p>
                 Deleting an agent is permanent. Any task that mentions the agent by ID will still render, but the
                 agent itself vanishes from pickers. Deactivate first, let anything in flight finish, <em>then</em>
                 delete.
-              </P>
+              </p>
             </Section>
 
             {/* ════════════════════════════════════════════════════════════════
@@ -1240,25 +1267,25 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="What are modes?"
               subtitle="Different hats an agent can wear. Changes the prompt, the toolset, and the output contract."
             >
-              <P>
+              <p>
                 A mode is a named <em>role</em> the agent is playing right now: analyst, verifier, developer,
                 reviewer, writer. Modes are important because the same agent often behaves very differently
                 depending on what you&apos;re asking it to do. <Term>DEVELOP</Term> mode can touch the filesystem;
                 <Term>REVIEW</Term> mode only reads.
-              </P>
+              </p>
 
-              <P>
+              <p>
                 When Conductor dispatches a task, it combines three prompt layers:
-              </P>
+              </p>
               <Steps>
                 <Step title="System prompt.">{' '}The agent&apos;s base prompt (from <em>Settings &rarr; Agents</em>).</Step>
                 <Step title="Mode instructions.">{' '}The agent&apos;s per-mode overrides, then the workspace-default mode instructions from <em>Settings &rarr; Modes</em>.</Step>
                 <Step title="Task prompt.">{' '}The task&apos;s own description, plus any step-level input from a chain.</Step>
               </Steps>
-              <P>
+              <p>
                 Tool permissions are evaluated the same way — a tool is allowed only if both the mode and the agent
                 allow it.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-modes-builtin" title="Built-in modes">
@@ -1274,11 +1301,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               />
 
               <H3>Why they exist</H3>
-              <P>
+              <p>
                 A raw LLM will happily conflate these. Ask it to &ldquo;fix this bug&rdquo; and it will sometimes
                 plan, sometimes code, sometimes review its own code — all mixed. Splitting the work into modes
                 gives you three practical wins:
-              </P>
+              </p>
               <Bullets>
                 <li><strong>Predictable outputs</strong> — each mode has a stable output contract the next step can parse.</li>
                 <li><strong>Scoped permissions</strong> — read-only modes can&apos;t write; writing modes can&apos;t push.</li>
@@ -1287,10 +1314,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-modes-custom" title="Custom modes">
-              <P>
+              <p>
                 Built-in modes are just defaults. Create your own in <em>Settings &rarr; Modes &rarr; + New Mode</em>.
                 A custom mode has:
-              </P>
+              </p>
               <Bullets>
                 <li>A name and a short description.</li>
                 <li>Default instructions (markdown) that are merged into the prompt.</li>
@@ -1299,9 +1326,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li>An output-format hint (<em>markdown</em>, <em>json</em>, <em>diff</em>, <em>plain</em>).</li>
               </Bullets>
 
-              <P>
+              <p>
                 Examples of custom modes teams have built:
-              </P>
+              </p>
               <Bullets>
                 <li><Term>TRIAGE</Term> — reads a bug report and classifies severity and component.</li>
                 <li><Term>SUMMARIZE</Term> — condenses a long thread into a 5-bullet TL;DR.</li>
@@ -1311,16 +1338,16 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-modes-permissions" title="Scoped tool permissions">
-              <P>
+              <p>
                 Every agent has a set of tools it <em>could</em> call (its runtime + any MCP connections it can see).
                 Modes narrow that further. The effective permission is the intersection.
-              </P>
+              </p>
 
               <H3>Allowlist model</H3>
-              <P>
+              <p>
                 Modes are deny-by-default. If the allowlist is empty, the agent has no tools. Common allowlist
                 patterns:
-              </P>
+              </p>
               <Bullets>
                 <li><strong>Read-only</strong> — <code>fs.read</code>, <code>http.get</code>, <code>search.*</code>.</li>
                 <li><strong>Author</strong> — read-only plus <code>fs.write</code>.</li>
@@ -1329,11 +1356,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>Wildcards</H3>
-              <P>
+              <p>
                 Tool names are hierarchical (<code>namespace.name</code>). The allowlist supports <code>*</code> and
                 <code>namespace.*</code>. For example, <code>github.*</code> lets the agent call any GitHub MCP tool
                 but nothing else.
-              </P>
+              </p>
 
               <Callout tone="amber" title="Validate before shipping">
                 <p>
@@ -1353,11 +1380,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="What is a chain?"
               subtitle="An ordered workflow of steps. The unit of automation above a single dispatch."
             >
-              <P>
+              <p>
                 A chain is a list of steps, each paired with a mode and an agent, plus success/failure transitions.
                 Chains are how Conductor does real work — single dispatches are fine for smoke tests, but any task
                 worth automating is usually two or three steps minimum: <em>analyse &rarr; develop &rarr; review</em>.
-              </P>
+              </p>
 
               <Callout tone="cobalt" title="The smallest useful chain">
                 <p>
@@ -1378,10 +1405,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-chain-templates" title="Chain templates">
-              <P>
+              <p>
                 A chain template is a saved, reusable chain definition. Stored per-project; shareable across
                 projects via the template library.
-              </P>
+              </p>
 
               <H3>Starter templates</H3>
               <Bullets>
@@ -1392,17 +1419,17 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li><strong>Oncall triage</strong> — classify alert &rarr; propose fix &rarr; gate on human &rarr; apply.</li>
               </Bullets>
 
-              <P>
+              <p>
                 These are copied into your project when you first create it (if you tick the starter-agents option)
                 and can be freely edited. The originals stay read-only in the template library.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-chain-builder" title="Using the chain builder">
-              <P>
+              <p>
                 The chain builder is the visual editor for chains. Open it from <em>Settings &rarr; Templates &rarr;
                 + New Chain</em> or from the task drawer (<em>Attach chain &rarr; Build new</em>).
-              </P>
+              </p>
 
               <H3>The canvas</H3>
               <Bullets>
@@ -1412,43 +1439,43 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>Validation on save</H3>
-              <P>
+              <p>
                 Saving validates the chain end-to-end:
-              </P>
+              </p>
               <Bullets>
                 <li>Every step has a mode and at least one eligible agent (or a role that resolves to one).</li>
                 <li>Input templates reference only variables that exist at that point in the chain.</li>
                 <li>Every branch reaches a terminal state (no orphaned steps).</li>
                 <li>No step&apos;s allowlist is inconsistent with its agent&apos;s supported modes.</li>
               </Bullets>
-              <P>
+              <p>
                 Failed validation blocks save and shows a red banner with the offending step highlighted. This is
                 intentional — half-baked chains fail noisily at run time in ways that are hard to debug.
-              </P>
+              </p>
 
               <H3>Dry-run</H3>
-              <P>
+              <p>
                 Click <em>Test run</em> to execute the chain against a synthetic task without dispatching any agent.
                 Each step&apos;s prompt is rendered but not sent. Good for catching template errors.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-workflow-editor" title="Workflow editor">
-              <P>
+              <p>
                 For chains that branch (A &rarr; B if success, A &rarr; C if failure; A &rarr; B &amp; D in parallel),
                 the linear chain builder isn&apos;t enough. The workflow editor is a node-graph view of the same
                 model, optimised for non-linear flows.
-              </P>
+              </p>
 
               <H3>When to use which</H3>
               <Bullets>
                 <li><strong>Chain builder</strong> — linear workflows with at most one gate. 80% of cases.</li>
                 <li><strong>Workflow editor</strong> — branching, fan-out/fan-in, loops, sub-workflows.</li>
               </Bullets>
-              <P>
+              <p>
                 Both save to the same underlying format, so you can start in the chain builder and upgrade to the
                 workflow editor when you need to branch.
-              </P>
+              </p>
 
               <H3>Workflow primitives</H3>
               <Bullets>
@@ -1461,9 +1488,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-handoffs" title="Automatic handoffs">
-              <P>
+              <p>
                 Handoffs are what makes a chain feel fluid. When step N finishes, Conductor automatically:
-              </P>
+              </p>
               <Steps>
                 <Step title="Renders step N+1's input template.">{' '}Substituting <code>{`{{ prev.output }}`}</code> with step N&apos;s result.</Step>
                 <Step title="Resolves the agent for step N+1.">{' '}Either the configured agent, or the best-match for the role.</Step>
@@ -1472,11 +1499,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Steps>
 
               <H3>Role-based handoffs</H3>
-              <P>
+              <p>
                 If step N+1 is bound to a role (<Term>developer</Term>) instead of a specific agent, Conductor picks
                 the best-match agent at dispatch time. &ldquo;Best match&rdquo; = active + supports the mode +
                 fewest tasks currently in flight. Ties are broken by the agent&apos;s priority score.
-              </P>
+              </p>
 
               <Callout tone="teal" title="Role-based is usually the right call">
                 <p>
@@ -1496,11 +1523,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="Skills overview"
               subtitle="Reusable prompt fragments and playbooks, shared across agents and projects."
             >
-              <P>
+              <p>
                 A <strong>skill</strong> in Conductor is a named, versioned piece of knowledge an agent can pull in
                 when it needs it — a prompt fragment, a checklist, a code snippet, a company-specific playbook.
                 The skills library is per-workspace, so every project in a workspace shares the same pool.
-              </P>
+              </p>
 
               <Callout tone="cobalt" title="Why a library instead of giant prompts">
                 <p>
@@ -1521,11 +1548,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-skills-search" title="Semantic search">
-              <P>
+              <p>
                 When an agent starts a step, Conductor runs a similarity search over the skills library using the
                 task description as the query. The top-N hits (configurable, default 5) are injected into the
                 agent&apos;s prompt as a <code>&lt;skills&gt;</code> block.
-              </P>
+              </p>
 
               <H3>How the search works</H3>
               <Bullets>
@@ -1541,9 +1568,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-skills-create" title="Creating skills">
-              <P>
+              <p>
                 Open the Skills library from the <Kbd>📖</Kbd> icon in the top bar. Click <em>+ New Skill</em>.
-              </P>
+              </p>
 
               <H3>A good skill is short and specific</H3>
               <Bullets>
@@ -1571,16 +1598,16 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="What is MCP?"
               subtitle="Model Context Protocol — a standard for letting LLMs call external tools."
             >
-              <P>
+              <p>
                 MCP (Model Context Protocol) is an open standard for connecting LLMs to tools. An MCP server
                 exposes a set of named functions with typed parameters; an MCP client (Conductor, in this case)
                 discovers them, passes their schemas to the model, and executes the ones the model calls.
-              </P>
+              </p>
 
-              <P>
+              <p>
                 Think of MCP as the &ldquo;USB-C for LLM tools&rdquo;. Instead of writing one integration per agent
                 and per provider, you write one MCP server and every MCP-capable client can use it.
-              </P>
+              </p>
 
               <H3>Why Conductor uses it</H3>
               <Bullets>
@@ -1601,9 +1628,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-mcp-connect" title="Connecting a server">
-              <P>
+              <p>
                 Connections are per-project. <em>Settings &rarr; MCP &rarr; + Add Connection</em>.
-              </P>
+              </p>
 
               <Steps>
                 <Step title="Pick transport.">
@@ -1634,9 +1661,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-mcp-tools" title="Tool execution loop">
-              <P>
+              <p>
                 When an agent is running a step and the model decides to call a tool, Conductor runs this loop:
-              </P>
+              </p>
               <Steps>
                 <Step title="Receive the tool call.">{' '}The model emits a tool-call message with name and arguments.</Step>
                 <Step title="Check permissions.">{' '}The tool must be in the mode&apos;s allowlist AND the agent&apos;s allowlist AND the project&apos;s MCP connection allowlist. Any layer can veto.</Step>
@@ -1658,11 +1685,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                ════════════════════════════════════════════════════════════════ */}
 
             <Section id="help-runtimes" title="What is a runtime?">
-              <P>
+              <p>
                 A runtime is a credentialed connection to an AI provider. &ldquo;Alice talks to Claude&rdquo;
                 is really &ldquo;Alice&apos;s runtime points to the Anthropic API, using this key, with this default
                 model&rdquo;. Runtimes are workspace-level: once you add one, any project in the workspace can pick it.
-              </P>
+              </p>
 
               <H3>Supported providers</H3>
               <Bullets>
@@ -1701,11 +1728,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                ════════════════════════════════════════════════════════════════ */}
 
             <Section id="help-templates" title="Task templates">
-              <P>
+              <p>
                 A task template is a saved form for a recurring kind of task: the title pattern, the default
                 description, the default chain, the default priority, and any default tags. When you dispatch
                 from a template, Conductor pre-fills the task drawer so you only change what&apos;s different.
-              </P>
+              </p>
 
               <H3>Creating a template</H3>
               <Bullets>
@@ -1723,11 +1750,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-chain-templates-ref" title="Chain templates reference">
-              <P>
+              <p>
                 Chain templates live alongside task templates in <em>Settings &rarr; Templates</em>. A chain template
                 is the <em>workflow</em>; a task template is the <em>form</em> for creating a task. They pair up:
                 a task template usually attaches a chain template.
-              </P>
+              </p>
 
               <H3>Managing chain templates</H3>
               <Bullets>
@@ -1747,11 +1774,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="Automation overview"
               subtitle="Rules that turn events into dispatches. Not the same as triggers."
             >
-              <P>
+              <p>
                 Automation rules are <em>internal</em>: they react to things that happen on the Conductor board —
                 a task entering a column, a label being added, an agent going idle — and dispatch work accordingly.
                 Triggers and reactions, covered next, handle <em>external</em> events (webhooks, schedules, integrations).
-              </P>
+              </p>
 
               <Callout tone="purple" title="Rule of thumb">
                 <p>
@@ -1772,10 +1799,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-automation-dispatch" title="Auto-dispatch rules">
-              <P>
+              <p>
                 The single most-used automation: &ldquo;when a task enters <Term>BACKLOG</Term>, if it matches X,
                 dispatch to Y&rdquo;. Configured in <em>Settings &rarr; Automation &rarr; + New Dispatch Rule</em>.
-              </P>
+              </p>
 
               <H3>Rule anatomy</H3>
               <Bullets>
@@ -1786,11 +1813,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>Rule ordering and conflicts</H3>
-              <P>
+              <p>
                 Rules are evaluated top-to-bottom. The first matching rule wins unless it&apos;s marked
                 &ldquo;continue after match&rdquo; (for rules that add a tag but don&apos;t dispatch). Reorder rules
                 by dragging the handle on the left.
-              </P>
+              </p>
 
               <Callout tone="amber" title="Test before you ship">
                 <p>
@@ -1810,12 +1837,12 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="What are triggers & reactions?"
               subtitle="The integration layer. Events in, actions out."
             >
-              <P>
+              <p>
                 Triggers and reactions are how Conductor connects to the outside world. A <strong>trigger</strong>
                 starts a chain when something happens somewhere else. A <strong>reaction</strong> pushes a result
                 from Conductor back out when something happens here. Both draw from the same integration catalogue —
                 if there&apos;s a trigger for GitHub, there&apos;s a reaction for GitHub too.
-              </P>
+              </p>
 
               <Callout tone="neon" title="New in 0.3">
                 <p>
@@ -1835,11 +1862,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-triggers-catalog" title="Integration catalog">
-              <P>
+              <p>
                 The catalogue is the set of services Conductor knows how to talk to. Open it from
                 <em> Settings &rarr; Integrations</em>. Each integration offers some combination of triggers and
                 reactions.
-              </P>
+              </p>
 
               <Table
                 head={['Integration', 'Triggers', 'Reactions']}
@@ -1856,16 +1883,16 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 ]}
               />
 
-              <P>
+              <p>
                 New integrations land as add-on packages. Check <em>Settings &rarr; Integrations &rarr; Catalog</em>
                 for whatever is bundled with your version.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-triggers-configure" title="Configuring a trigger">
-              <P>
+              <p>
                 Triggers are attached to a chain. &ldquo;When this event happens, run this chain.&rdquo;
-              </P>
+              </p>
               <Steps>
                 <Step title="Open the chain or task template.">{' '}<em>Settings &rarr; Templates &rarr; [template] &rarr; Triggers</em>.</Step>
                 <Step title="Add a trigger.">{' '}Pick the integration and the event type (e.g. GitHub &rarr; issue opened).</Step>
@@ -1886,11 +1913,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Steps>
 
               <H3>Webhook authentication</H3>
-              <P>
+              <p>
                 Inbound webhooks authenticate via a signing secret. Each trigger exposes a stable URL and a secret;
                 if the source service supports signed webhooks (GitHub, GitLab, most SaaS), configure the secret on
                 both sides so Conductor rejects unsigned payloads.
-              </P>
+              </p>
 
               <Callout tone="amber" title="Rate-limit inbound triggers">
                 <p>
@@ -1902,10 +1929,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-reactions" title="Configuring a reaction">
-              <P>
+              <p>
                 Reactions run at the end of a step (or at the end of a chain). &ldquo;When this step finishes, do
                 this thing somewhere else.&rdquo;
-              </P>
+              </p>
               <Steps>
                 <Step title="Pick the step.">{' '}In the chain editor, open the step&apos;s settings and find the <em>Reactions</em> section.</Step>
                 <Step title="Add a reaction.">{' '}Pick an integration and an action (GitHub &rarr; comment, Slack &rarr; post).</Step>
@@ -1916,12 +1943,12 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Steps>
 
               <H3>Conditional reactions</H3>
-              <P>
+              <p>
                 Every reaction has an optional condition expression. Example: only post a Slack message if the
                 task has the <code>urgent</code> tag, or only comment on the PR if the review came back with
                 &ldquo;changes requested&rdquo;. Syntax is a small expression language with
                 <code>task.tags</code>, <code>step.output</code>, <code>prev.*</code>, and the usual comparison operators.
-              </P>
+              </p>
 
               <Callout tone="teal" title="Reactions are idempotent by default">
                 <p>
@@ -1941,10 +1968,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="Runtime dashboard"
               subtitle="The live operations view."
             >
-              <P>
+              <p>
                 Open it from the <Kbd>📈</Kbd> icon in the top bar. The runtime dashboard is where you look when
                 something feels slow or stuck.
-              </P>
+              </p>
 
               <H3>What it shows</H3>
               <Bullets>
@@ -1964,10 +1991,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-obs-agent" title="Agent activity dashboard">
-              <P>
+              <p>
                 Per-agent view. Open from <em>Settings &rarr; Agents &rarr; [agent] &rarr; Activity</em>. Drills
                 into one agent&apos;s history.
-              </P>
+              </p>
 
               <Bullets>
                 <li><strong>Tasks claimed / completed / failed</strong> — counts over a selectable window.</li>
@@ -1978,10 +2005,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-obs-overview" title="Observability dashboard">
-              <P>
+              <p>
                 Cross-project view aimed at whoever operates Conductor for the team. KPIs a non-technical lead can
                 skim:
-              </P>
+              </p>
 
               <Bullets>
                 <li><strong>Tasks completed / week</strong> — the throughput measure.</li>
@@ -1993,11 +2020,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-obs-daemon-log" title="Daemon log viewer">
-              <P>
+              <p>
                 For agents running in daemon mode, Conductor streams stdout and stderr from the daemon process
                 over its WebSocket back into the browser. Open <em>Runtime dashboard &rarr; [daemon agent] &rarr;
                 Logs</em>.
-              </P>
+              </p>
 
               <H3>What you can do</H3>
               <Bullets>
@@ -2009,10 +2036,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-obs-step-output" title="Step output viewer">
-              <P>
+              <p>
                 The deepest view into a single step. Open by clicking the step row in the task drawer&apos;s
                 <em> Steps</em> tab.
-              </P>
+              </p>
 
               <H3>What&apos;s on the pane</H3>
               <Bullets>
@@ -2033,10 +2060,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-obs-attempts" title="Attempt comparison">
-              <P>
+              <p>
                 When a step is retried — after a failure, after a human rejection, after a chain re-run — each
                 attempt is recorded independently. The attempt comparison viewer puts two or more side-by-side.
-              </P>
+              </p>
 
               <H3>Use it to</H3>
               <Bullets>
@@ -2046,18 +2073,18 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>How to open</H3>
-              <P>
+              <p>
                 <em>Task drawer &rarr; Steps tab &rarr; [step] &rarr; Compare attempts</em>. Tick two or more, click
                 <em> Compare</em>. Differences are highlighted inline.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-obs-artifacts" title="Artifacts">
-              <P>
+              <p>
                 An <strong>artifact</strong> is a file produced by an agent: a diff, a document, a screenshot, a
                 CSV, a zip. Artifacts live on the task; each step that produced any is listed in the drawer&apos;s
                 <em> Artifacts</em> tab.
-              </P>
+              </p>
 
               <H3>Supported previews</H3>
               <Bullets>
@@ -2069,11 +2096,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </Bullets>
 
               <H3>Retention</H3>
-              <P>
+              <p>
                 Artifacts are kept for the life of the task plus 30 days. After deletion, only the metadata
                 (name, size, SHA) remains in the activity log. Configure retention in
                 <em> Settings &rarr; General &rarr; Retention</em>.
-              </P>
+              </p>
             </Section>
 
             {/* ════════════════════════════════════════════════════════════════
@@ -2095,11 +2122,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-settings-agents" title="Settings · Agents">
-              <P>
+              <p>
                 Manage the cast of agents for this project. Covered in detail in
                 <Ref href="#help-agent-create"> Creating an agent</Ref> and <Ref href="#help-agent-status">Active,
                 idle, and muted</Ref>.
-              </P>
+              </p>
               <Bullets>
                 <li>Table of agents with status dot, active toggle, current task count.</li>
                 <li>Row click opens the agent editor.</li>
@@ -2110,31 +2137,31 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
             <Section id="help-settings-api" title="Settings · API keys">
               <H3>Project API key</H3>
-              <P>
+              <p>
                 A single key used by external callers to talk to this project&apos;s REST API without impersonating
                 a specific agent. Useful for scripts and bridges. Rotation invalidates all old tokens atomically.
-              </P>
+              </p>
 
               <H3>Agent keys</H3>
-              <P>
+              <p>
                 The table shows a preview of every agent&apos;s key (<code>ab_1234…abcd</code>) and a rotate
                 button. Full keys are shown exactly once, at rotation time.
-              </P>
+              </p>
 
               <H3>Admin session</H3>
-              <P>
+              <p>
                 A session cookie issued when you sign in with the admin password. Expires after the configured
                 timeout (<em>Settings &rarr; General &rarr; Admin session timeout</em>). Rotating the admin password
                 invalidates all existing sessions.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-settings-activity" title="Settings · Activity">
-              <P>
+              <p>
                 The full activity log for the project, searchable and exportable. Each row is an event:
                 <Term>task.created</Term>, <Term>step.completed</Term>, <Term>task.approved</Term>,
                 <Term>agent.registered</Term>, etc.
-              </P>
+              </p>
 
               <H3>Features</H3>
               <Bullets>
@@ -2146,10 +2173,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-settings-modes" title="Settings · Modes">
-              <P>
+              <p>
                 Manage built-in mode defaults and create custom modes. Built-in modes can&apos;t be deleted; you can
                 only override their defaults.
-              </P>
+              </p>
               <Bullets>
                 <li>Default instructions (markdown) merged into every prompt that uses this mode.</li>
                 <li>Tool allowlist shared by all agents when running in this mode.</li>
@@ -2159,9 +2186,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-settings-runtimes" title="Settings · Runtimes">
-              <P>
+              <p>
                 Covered in <Ref href="#help-runtimes-add">Adding a runtime</Ref>. Same page lets you:
-              </P>
+              </p>
               <Bullets>
                 <li>Rotate keys.</li>
                 <li>See recent usage (calls, tokens, cost if the provider reports it).</li>
@@ -2171,10 +2198,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-settings-mcp" title="Settings · MCP">
-              <P>
+              <p>
                 Manage MCP connections. Covered in <Ref href="#help-mcp-connect">Connecting a server</Ref>. Also on
                 this page:
-              </P>
+              </p>
               <Bullets>
                 <li>Discover refresh — re-fetch the tool list from the server (run after server-side updates).</li>
                 <li>Per-tool usage stats — how often each tool has been called, from which agent.</li>
@@ -2183,26 +2210,26 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-settings-templates" title="Settings · Templates">
-              <P>
+              <p>
                 The one-stop shop for task templates and chain templates. See
                 <Ref href="#help-templates"> Task templates</Ref> and
                 <Ref href="#help-chain-templates"> Chain templates</Ref>.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-settings-analytics" title="Settings · Analytics">
-              <P>
+              <p>
                 A smaller, project-scoped version of the <Ref href="#help-obs-overview">Observability dashboard</Ref>.
                 KPI tiles plus a 30-day chart of completed tasks and average cycle time. Use this when you want to
                 answer &ldquo;how is this project doing?&rdquo; without leaving settings.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-settings-automation" title="Settings · Automation">
-              <P>
+              <p>
                 Where auto-dispatch rules live. See <Ref href="#help-automation-dispatch">Auto-dispatch rules</Ref>.
                 Also on this page:
-              </P>
+              </p>
               <Bullets>
                 <li><strong>Escalation rules</strong> — notify a channel if a <Term>REVIEW</Term> task ages past a threshold.</li>
                 <li><strong>Archive rules</strong> — auto-archive <Term>DONE</Term> tasks after N days.</li>
@@ -2219,13 +2246,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="Daemon mode overview"
               subtitle="Long-lived agent processes that pull work. For CLI-backed and stateful agents."
             >
-              <P>
+              <p>
                 A daemon-mode agent is a process you run yourself — on your laptop, in a VM, or in a container.
                 It registers with Conductor on startup, heartbeats periodically, and pulls steps from a queue when
                 it&apos;s idle. This is the right fit when your agent is a CLI tool (Claude Code, Aider, OpenCode,
                 Codex) that benefits from process reuse or needs local state (a checked-out repository, a warm
                 local model).
-              </P>
+              </p>
 
               <H3>How it differs from HTTP mode</H3>
               <Bullets>
@@ -2271,26 +2298,26 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
             <Section id="help-daemon-heartbeat" title="Heartbeat & registration">
               <H3>Registration</H3>
-              <P>
+              <p>
                 On startup the daemon POSTs to <code>/api/daemon/register</code> with its agent key. Conductor
                 returns a daemon ID and an initial poll token. The agent record&apos;s <em>last seen</em> timestamp
                 updates.
-              </P>
+              </p>
 
               <H3>Heartbeat</H3>
-              <P>
+              <p>
                 The daemon calls <code>/api/daemon/heartbeat</code> every 30 seconds (configurable). Each heartbeat
                 carries the daemon&apos;s current in-flight step count, CPU/memory metrics (optional), and a
                 &ldquo;ready for more work&rdquo; flag.
-              </P>
+              </p>
 
               <H3>Timeouts</H3>
-              <P>
+              <p>
                 If a daemon misses three heartbeats (90 seconds default), Conductor marks it
                 <em> red/disconnected</em>. Any steps it had claimed are returned to the queue after the same
                 timeout so another agent can pick them up. When the daemon eventually reconnects, it is told to
                 drop any ghost state and start fresh.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-daemon-steps" title="Claiming steps">
@@ -2323,10 +2350,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="CLI-style API"
               subtitle="A simple text-based endpoint for shell-script agents."
             >
-              <P>
+              <p>
                 The CLI API is the smallest possible surface for an agent: one endpoint, four verbs, text bodies.
                 Good for quick scripts and for wrapping non-HTTP tools.
-              </P>
+              </p>
 
               <H3>Endpoint</H3>
               <Bullets>
@@ -2367,10 +2394,10 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
             </Section>
 
             <Section id="help-api-http" title="HTTP agent API">
-              <P>
+              <p>
                 The full agent REST API sits under <code>/api/agent/*</code> and <code>/api/agents/*</code>. Use
                 this when you&apos;re writing a real SDK-backed agent. The endpoints map 1:1 to the UI operations:
-              </P>
+              </p>
               <Bullets>
                 <li><code>GET /api/agent/next</code> — poll for the next eligible task for this agent.</li>
                 <li><code>POST /api/agent/tasks</code> — update the status of a task (started, completed, failed).</li>
@@ -2379,52 +2406,52 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
               </Bullets>
 
               <H3>Task shape</H3>
-              <P>
+              <p>
                 A task response includes the fully-rendered prompt (with system, mode, and skill blocks already
                 merged), the mode name, the chain step ID (if any), and any tool allowlist the agent needs to
                 respect. This lets a thin agent runtime just forward the prompt to the model without reassembling
                 context.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-api-auth" title="Authentication">
-              <P>
+              <p>
                 Every agent-side request carries:
-              </P>
+              </p>
               <Callout tone="cobalt">
                 <pre className="text-[11px] font-mono bg-surface/40 p-3 rounded border border-border/30 overflow-x-auto">
 {`Authorization: Bearer <key>`}
                 </pre>
               </Callout>
-              <P>
+              <p>
                 The key is the agent&apos;s API key. Conductor looks it up, resolves the agent record, and uses that
                 to authorise the call. There&apos;s no separate &ldquo;scope&rdquo; system — the agent record itself
                 carries the scope (supported modes, tool allowlist, MCP connections).
-              </P>
+              </p>
 
               <H3>Admin-only endpoints</H3>
-              <P>
+              <p>
                 Endpoints under <code>/api/admin/*</code> require a valid admin session cookie, not an agent key.
                 These are the ones the UI hits when you&apos;re signed in.
-              </P>
+              </p>
 
               <H3>Project-scoped endpoints</H3>
-              <P>
+              <p>
                 A small set of endpoints (<code>/api/projects/:id/*</code>) accept a project-level API key. Use this
                 for glue scripts that should act on behalf of the project rather than a specific agent.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-api-webhooks" title="Webhooks">
-              <P>
+              <p>
                 Conductor offers webhooks in both directions:
-              </P>
+              </p>
 
               <H3>Inbound webhooks (triggers)</H3>
-              <P>
+              <p>
                 Each trigger exposes a stable URL at <code>/api/triggers/:id/webhook</code>. Configure the sending
                 service to POST to that URL and include the signing header:
-              </P>
+              </p>
               <Callout tone="cobalt">
                 <pre className="text-[11px] font-mono bg-surface/40 p-3 rounded border border-border/30 overflow-x-auto">
 {`POST /api/triggers/trg_abc/webhook
@@ -2436,11 +2463,11 @@ X-Conductor-Signature: sha256=<hmac-of-body>
               </Callout>
 
               <H3>Outbound webhooks (reactions)</H3>
-              <P>
+              <p>
                 The generic <em>Webhook</em> integration in the catalogue lets a reaction POST arbitrary JSON to a
                 URL you provide. Requests carry an <code>X-Conductor-Signature</code> header for your own
                 verification, and retry with exponential backoff on non-2xx responses.
-              </P>
+              </p>
             </Section>
 
             {/* ════════════════════════════════════════════════════════════════
@@ -2452,11 +2479,11 @@ X-Conductor-Signature: sha256=<hmac-of-body>
               title="Admin login & session"
               subtitle="How authentication works in the browser."
             >
-              <P>
+              <p>
                 Conductor is admin-password protected. The password is set during installation and changed from
                 <em> Settings &rarr; Security &rarr; Change password</em>. After signing in, your browser carries a
                 session cookie; the cookie is HttpOnly and SameSite=Lax.
-              </P>
+              </p>
 
               <H3>Session lifetime</H3>
               <Bullets>
@@ -2475,11 +2502,11 @@ X-Conductor-Signature: sha256=<hmac-of-body>
             </Section>
 
             <Section id="help-security-keys" title="Key storage">
-              <P>
+              <p>
                 All sensitive values — runtime API keys, agent keys, MCP connection tokens, trigger signing
                 secrets — are encrypted at rest. Conductor uses a server-side encryption key stored in an
                 environment variable (<code>CONDUCTOR_ENCRYPTION_KEY</code>) or a local KMS endpoint.
-              </P>
+              </p>
 
               <H3>What you see vs. what&apos;s stored</H3>
               <Bullets>
@@ -2490,16 +2517,16 @@ X-Conductor-Signature: sha256=<hmac-of-body>
               </Bullets>
 
               <H3>Where the encryption key lives</H3>
-              <P>
+              <p>
                 Not in the database. If you redeploy with a new encryption key, all stored secrets become
                 unrecoverable and must be re-entered. Back up the key whenever you back up the database.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-security-rotation" title="Key rotation">
-              <P>
+              <p>
                 Rotate early, rotate often.
-              </P>
+              </p>
               <Bullets>
                 <li><strong>Agent keys</strong> — <em>Settings &rarr; Agents &rarr; [agent] &rarr; Rotate key</em>. The old key becomes invalid the moment the new one is issued — there is no overlap window, so update the agent&apos;s config before you rotate.</li>
                 <li><strong>Runtime keys</strong> — <em>Settings &rarr; Runtimes &rarr; [runtime] &rarr; Edit &rarr; Paste new key</em>. Old key is discarded on save.</li>
@@ -2514,10 +2541,10 @@ X-Conductor-Signature: sha256=<hmac-of-body>
                ════════════════════════════════════════════════════════════════ */}
 
             <Section id="help-trouble-ws" title="WebSocket shows Offline">
-              <P>
+              <p>
                 Symptom: the <Term>Live</Term> badge is grey, board doesn&apos;t update in real time. Tasks still
                 dispatch, but you have to refresh to see new cards.
-              </P>
+              </p>
               <H3>Checks</H3>
               <Bullets>
                 <li>Is <code>board-ws</code> running? <em>Runtime dashboard &rarr; Services</em>. If it says <em>not running</em>, restart it.</li>
@@ -2528,9 +2555,9 @@ X-Conductor-Signature: sha256=<hmac-of-body>
             </Section>
 
             <Section id="help-trouble-stuck" title="A task is stuck">
-              <P>
+              <p>
                 Symptom: a task sits in <Term>IN_PROGRESS</Term> for hours, no activity, no completion.
-              </P>
+              </p>
               <H3>Diagnosis</H3>
               <Bullets>
                 <li>Open the task drawer &rarr; <em>Steps</em> tab. Which step is current?</li>
@@ -2548,9 +2575,9 @@ X-Conductor-Signature: sha256=<hmac-of-body>
             </Section>
 
             <Section id="help-trouble-agent" title="An agent won't claim">
-              <P>
+              <p>
                 Symptom: task is in <Term>BACKLOG</Term>, agent shows green/idle, but nothing happens.
-              </P>
+              </p>
               <H3>Checks</H3>
               <Bullets>
                 <li>Does the agent support the task&apos;s mode? (<em>Settings &rarr; Agents &rarr; [agent] &rarr; Supported modes</em>.) A mode-mismatched task won&apos;t be offered.</li>
@@ -2561,10 +2588,10 @@ X-Conductor-Signature: sha256=<hmac-of-body>
             </Section>
 
             <Section id="help-trouble-daemon" title="Daemon keeps disconnecting">
-              <P>
+              <p>
                 Symptom: daemon agent&apos;s status dot flickers red/green. Heartbeats miss. Steps land back in the
                 queue.
-              </P>
+              </p>
               <H3>Common causes</H3>
               <Bullets>
                 <li><strong>Network flap</strong> — daemon&apos;s uplink is unreliable. Run it closer to Conductor, or raise the heartbeat timeout.</li>
@@ -2582,11 +2609,11 @@ X-Conductor-Signature: sha256=<hmac-of-body>
                 <li>Delete individual tasks or agents from their respective tables.</li>
               </Bullets>
               <H3>Hard reset</H3>
-              <P>
+              <p>
                 To wipe everything: stop the server, delete the database file (SQLite) or drop the schema
                 (Postgres), run <code>bun run db:push</code>, and start again. The workspace, projects, agents,
                 tasks, activity, skills — all gone.
-              </P>
+              </p>
               <Callout tone="amber" title="Back up first">
                 <p>
                   Conductor doesn&apos;t have a &ldquo;soft reset&rdquo;. If the database looks corrupt and you want
@@ -2602,59 +2629,59 @@ X-Conductor-Signature: sha256=<hmac-of-body>
 
             <Section id="help-faq" title="FAQ">
               <H3>Is Conductor a chat UI?</H3>
-              <P>
+              <p>
                 No. Conductor dispatches work to agents and tracks the outcomes. If you want to chat with a model
                 directly, use that provider&apos;s own client.
-              </P>
+              </p>
 
               <H3>Do I need Docker / Postgres?</H3>
-              <P>
+              <p>
                 No. Conductor ships with SQLite as the default — zero config. You gain semantic skill search and
                 better concurrency with Postgres + pgvector, but everything else works on SQLite.
-              </P>
+              </p>
 
               <H3>Can I run it on my laptop?</H3>
-              <P>
+              <p>
                 Yes. <code>bun install &amp;&amp; bun run db:push &amp;&amp; bun run dev</code>. You&apos;ll need an
                 API key for at least one runtime (Anthropic, OpenAI, OpenRouter, or local Ollama).
-              </P>
+              </p>
 
               <H3>Can multiple people use the same Conductor at the same time?</H3>
-              <P>
+              <p>
                 Yes. The activity log records who did what, and the WebSocket pushes changes to every open
                 browser instantly. There&apos;s one shared admin password today — per-user accounts land in 0.4.
-              </P>
+              </p>
 
               <H3>Does Conductor train the models?</H3>
-              <P>
+              <p>
                 No. Conductor is a dispatcher. It sends prompts to whatever model your runtime points at. The
                 models themselves are run and maintained by their providers (Anthropic, OpenAI, you on Ollama, etc.).
-              </P>
+              </p>
 
               <H3>Can an agent talk to another agent directly?</H3>
-              <P>
+              <p>
                 Not directly — always through Conductor. This is intentional: having agents communicate only via
                 tasks and the chain keeps every hand-off auditable. If you want an agent&apos;s output to feed
                 another&apos;s input, build a chain.
-              </P>
+              </p>
 
               <H3>Can I self-host the triggers/reactions?</H3>
-              <P>
+              <p>
                 Yes. Conductor itself is self-hosted; triggers and reactions run in-process. Inbound webhooks need
                 your Conductor to be reachable from the event source (GitHub, Slack, etc.). For internal-only
                 deployments, use the generic webhook integration with a tunnel like Cloudflare Tunnel or tailscale.
-              </P>
+              </p>
 
               <H3>How much does it cost to run?</H3>
-              <P>
+              <p>
                 Infrastructure: small. A single server and a database. The AI provider bills are the dominant cost;
                 set <em>Max cost per step</em> and keep an eye on the Observability dashboard&apos;s cost tile.
-              </P>
+              </p>
             </Section>
 
             <Section id="help-glossary" title="Glossary">
               <dl className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-x-6 gap-y-3 text-sm">
-                {[
+                {([
                   ['Activity', 'An append-only log of every state change in a project. The audit trail.'],
                   ['Agent', 'A configured worker record — name, runtime, modes, key. Can be HTTP-invoked or run as a daemon.'],
                   ['Artifact', 'A file produced by an agent during a step. Kept against the task.'],
@@ -2681,59 +2708,56 @@ X-Conductor-Signature: sha256=<hmac-of-body>
                   ['WAITING', 'A transient state where a task is paused for an external event.'],
                   ['Workflow', 'An alias for a chain, sometimes used to emphasise branching/parallel flows.'],
                   ['Workspace', 'The top-level container. Holds projects, agents, runtimes, skills.'],
-                ].map(([term, def]) => (
-                  <div key={term as string} className="contents">
+                ] as const).map(([term, def]) => (
+                  <Fragment key={term}>
                     <dt className="font-semibold text-foreground">{term}</dt>
                     <dd className="text-foreground/75 leading-[1.55]">{def}</dd>
-                  </div>
+                  </Fragment>
                 ))}
               </dl>
             </Section>
 
             <Section id="help-shortcuts" title="Keyboard shortcuts">
+              <p>
+                Conductor is still mostly driven by mouse and touch. The shortcuts below are the ones that are
+                wired today. When typing into a text field they&apos;re suppressed, so <Kbd>?</Kbd> and <Kbd>/</Kbd>
+                won&apos;t fire while you&apos;re writing a task description.
+              </p>
               <Table
                 head={['Shortcut', 'What it does', 'Where it works']}
                 rows={[
-                  [<Kbd key="a">N</Kbd>, 'New task', 'Board'],
-                  [<Kbd key="b">/</Kbd>, 'Focus the search box', 'Board, Help'],
-                  [<Kbd key="c">Esc</Kbd>, 'Close the current drawer or dialog', 'Anywhere'],
-                  [<><Kbd key="da">⌘</Kbd> <Kbd key="db">Enter</Kbd></>, 'Save the current text field', 'Any editor'],
-                  [<Kbd key="e">J</Kbd>, 'Move focus to the next card', 'Board'],
-                  [<Kbd key="f">K</Kbd>, 'Move focus to the previous card', 'Board'],
-                  [<Kbd key="g">A</Kbd>, 'Approve selected REVIEW task', 'Task drawer'],
-                  [<Kbd key="h">R</Kbd>, 'Reject selected REVIEW task', 'Task drawer'],
-                  [<Kbd key="i">?</Kbd>, 'Open this help page', 'Anywhere'],
-                  [<><Kbd key="ja">Shift</Kbd> + <Kbd key="jb">click</Kbd></>, 'Add the clicked card to the multi-select', 'Board'],
+                  [<Kbd key="qmark">?</Kbd>, 'Open (or close) this help page', 'Anywhere'],
+                  [<Kbd key="slash">/</Kbd>, 'Focus the topic filter', 'Help page'],
                 ]}
               />
             </Section>
 
             <Section id="help-storage" title="Where data is stored">
               <H3>SQLite (default)</H3>
-              <P>
+              <p>
                 A single file at <code>prisma/dev.db</code>. Everything lives in here: workspaces, projects,
                 agents, tasks, steps, activity, skills, MCP connections, artifacts metadata. Artifacts themselves
                 live on disk under <code>storage/artifacts/</code>.
-              </P>
+              </p>
 
               <H3>PostgreSQL (recommended for teams)</H3>
-              <P>
+              <p>
                 Connection string in <code>DATABASE_URL</code>. The <code>pgvector</code> extension powers semantic
                 skill search. Run <code>scripts/init-pgvector.sql</code> once to create the extension.
-              </P>
+              </p>
 
               <H3>Logs</H3>
-              <P>
+              <p>
                 Server logs go to stdout (and <code>server.log</code> in production mode). Daemon logs are streamed
                 from the daemon process itself and captured in the browser&apos;s Daemon log viewer; they are
                 <em> not</em> persisted long-term by default.
-              </P>
+              </p>
 
               <H3>Backups</H3>
-              <P>
+              <p>
                 Back up the database file (or use <code>pg_dump</code>), the artifacts directory, and the
                 encryption key. Those three are enough to restore a Conductor from scratch.
-              </P>
+              </p>
             </Section>
 
             {/* END-OF-CONTENT-MARKER */}

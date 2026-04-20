@@ -160,7 +160,7 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
             if (hasCycle) break
           }
           if (hasCycle) {
-            throw new Error('DAG edges contain a cycle — circular references are not allowed')
+            throw badRequest('DAG edges contain a cycle — circular references are not allowed')
           }
           const createdSteps = await tx.taskStep.findMany({
             where: { taskId: created.id },
@@ -178,6 +178,18 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
             }
           }
 
+          // Remap client step IDs (step_N) to real DB IDs. Reject any edge
+          // that references a client ID we never created — silently preserving
+          // the raw string would persist a dangling edge that the runtime
+          // can't satisfy, and the task would never advance past that step.
+          const remapOrFail = (raw: string): string => {
+            const mapped = idMap.get(raw)
+            if (!mapped) {
+              throw badRequest(`Unknown step reference: ${raw}`)
+            }
+            return mapped
+          }
+
           // Update each step's edges with remapped IDs
           for (let i = 0; i < steps.length; i++) {
             const step = steps[i]
@@ -186,9 +198,9 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
 
             const remappedNext = step.nextSteps?.map(edge => ({
               ...edge,
-              targetStepId: idMap.get(edge.targetStepId) || edge.targetStepId,
+              targetStepId: remapOrFail(edge.targetStepId),
             }))
-            const remappedPrev = step.prevSteps?.map(id => idMap.get(id) || id)
+            const remappedPrev = step.prevSteps?.map(remapOrFail)
 
             if (remappedNext?.length || remappedPrev?.length) {
               await tx.taskStep.update({

@@ -70,6 +70,7 @@ import { StepOutputViewer } from '@/components/step-output-viewer'
 import { TaskDetailDrawer } from '@/components/task-detail-drawer'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import { HelpPage } from '@/components/help-page'
+import { APP_VERSION_SHORT } from '@/lib/version'
 
 // Types
 type TaskStatus = 'BACKLOG' | 'IN_PROGRESS' | 'WAITING' | 'REVIEW' | 'DONE'
@@ -673,6 +674,20 @@ export default function Home() {
       fetchLegacyKeyStatus()
     }
   }, [currentProject, fetchLegacyKeyStatus, loadApiKeys, settingsTab])
+
+  // `?` opens the help page from anywhere. Ignored inside text inputs so users
+  // can type `?` freely. Closes help if already open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '?') return
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      e.preventDefault()
+      setView((v) => (v === 'help' ? 'board' : 'help'))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const handleAdminLogin = async () => {
     setAuthError(null)
@@ -1767,7 +1782,7 @@ export default function Home() {
         <aside className="hidden md:block w-56 shrink-0 border-r border-border/15 p-3 min-h-[calc(100vh-3.5rem)]">
           <div className="mb-4 flex items-center gap-1.5">
             <div className="h-3 w-3 rounded bg-primary/60" />
-            <span className="text-[10px] font-medium text-foreground/50">Conductor v0.3</span>
+            <span className="text-[10px] font-medium text-foreground/50">Conductor {APP_VERSION_SHORT}</span>
           </div>
           
           <div className="mb-4">

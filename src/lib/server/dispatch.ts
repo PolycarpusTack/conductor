@@ -6,6 +6,7 @@ import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
 import { createExecution, succeedExecution, failExecution, timeoutExecution } from '@/lib/server/execution-log'
 import { resolveNextSteps, type StepEdge } from '@/lib/server/condition-evaluator'
 import { getLogger } from '@/lib/server/logger'
+import { LEASE_TIMEOUT_MS } from '@/lib/server/step-queue'
 import { safeJsonParse } from '@/lib/server/utils'
 import { randomBytes } from 'crypto'
 
@@ -145,7 +146,17 @@ function hasDagEdges(steps: Array<{ nextSteps?: string | null; prevSteps?: strin
   return steps.some(s => s.nextSteps || s.prevSteps)
 }
 
-async function leaseStep(stepId: string): Promise<boolean> {
+async function leaseStep(stepId: string): Promise<{ taken: boolean; evictedFrom: string | null }> {
+  // Capture the prior lease holder so we can record eviction on a successful
+  // steal. The read-then-updateMany pair is not atomic, but the updateMany's
+  // `where` still enforces correctness — the prior field is only used for the
+  // audit-log row, so a rare stale value is acceptable.
+  const prior = await db.taskStep.findUnique({
+    where: { id: stepId },
+    select: { leasedBy: true },
+  })
+
+  const leaseExpiry = new Date(Date.now() - LEASE_TIMEOUT_MS)
   const result = await db.taskStep.updateMany({
     where: {
       id: stepId,
@@ -153,6 +164,9 @@ async function leaseStep(stepId: string): Promise<boolean> {
       OR: [
         { leasedBy: null },
         { leasedBy: WORKER_ID },
+        // Steal a lease whose owner hasn't checked in within LEASE_TIMEOUT_MS.
+        // Without this, a worker crash strands the step forever.
+        { leasedAt: { lt: leaseExpiry } },
       ],
     },
     data: {
@@ -160,7 +174,12 @@ async function leaseStep(stepId: string): Promise<boolean> {
       leasedAt: new Date(),
     },
   })
-  return result.count > 0
+
+  if (result.count === 0) return { taken: false, evictedFrom: null }
+
+  const evictedFrom =
+    prior?.leasedBy && prior.leasedBy !== WORKER_ID ? prior.leasedBy : null
+  return { taken: true, evictedFrom }
 }
 
 export async function dispatchStep(stepId: string) {
@@ -279,7 +298,19 @@ export async function dispatchStep(stepId: string) {
 
   // Lease the step for idempotent execution
   const leased = await leaseStep(stepId)
-  if (!leased) return
+  if (!leased.taken) return
+  if (leased.evictedFrom) {
+    log.warn(`reclaimed expired lease from ${leased.evictedFrom} on step ${stepId}`)
+    await db.activityLog.create({
+      data: {
+        action: 'lease_reclaimed',
+        taskId: step.taskId,
+        agentId: step.agentId,
+        projectId: step.task.projectId,
+        details: JSON.stringify({ stepId, previousLeaseholder: leased.evictedFrom, newLeaseholder: WORKER_ID }),
+      },
+    })
+  }
 
   // Determine attempt number
   const previousExecutions = await db.stepExecution.count({ where: { stepId } })

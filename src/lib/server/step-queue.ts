@@ -4,7 +4,11 @@ import { dispatchStepToDaemon } from '@/lib/server/daemon-dispatch'
 import { dispatchStep } from '@/lib/server/dispatch'
 import { safeJsonParse } from '@/lib/server/utils'
 
-const LEASE_TIMEOUT_MS = 600000 // 10 min — if a worker hasn't finished, assume it died
+// Exported so dispatchers can steal leases older than this threshold when
+// a worker or daemon has died mid-step. Both the HTTP and daemon paths must
+// agree on this value — otherwise the queue surfaces a reclaimable step that
+// the dispatcher still refuses to take, and work gets stuck.
+export const LEASE_TIMEOUT_MS = 600000 // 10 min
 const POLL_BATCH_SIZE = 5
 
 export async function pollAndDispatch(projectId?: string) {
