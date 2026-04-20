@@ -4,17 +4,19 @@ const colorSchema = z
   .string()
   .regex(/^#(?:[0-9a-fA-F]{3}){1,2}$/, 'Expected a hex color like #3b82f6')
 
+// Three-state string field: undefined = "don't change on update", null = "clear
+// this column", string = "set to this value". Empty-after-trim is mapped to
+// null so an emptied UI field actually clears the DB column; before this
+// transform was introduced, "" silently collapsed to undefined and updates
+// could not clear the field.
 const trimmedOptionalString = z
   .string()
   .trim()
   .max(5000)
-  .optional()
   .nullable()
+  .optional()
   .transform((value) => {
-    if (!value) {
-      return undefined
-    }
-
+    if (value === '') return null
     return value
   })
 

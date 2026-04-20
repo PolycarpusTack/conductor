@@ -219,7 +219,7 @@ export function AgentCreationModal({
       name: name.trim(),
       emoji,
       color,
-      description: description.trim() || undefined,
+      description: description.trim(),
       personality: isEditing ? (personality.trim() || null) : (personality.trim() || undefined),
       role: role || undefined,
       capabilities: capabilities.length > 0 ? capabilities : undefined,
