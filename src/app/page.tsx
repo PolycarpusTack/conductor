@@ -49,6 +49,7 @@ import {
   Key,
   Activity,
   BookOpen,
+  HelpCircle,
   FolderPlus,
   RefreshCw,
   ExternalLink,
@@ -68,6 +69,7 @@ import { ChainBuilder } from '@/components/chain-builder'
 import { StepOutputViewer } from '@/components/step-output-viewer'
 import { TaskDetailDrawer } from '@/components/task-detail-drawer'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
+import { HelpPage } from '@/components/help-page'
 
 // Types
 type TaskStatus = 'BACKLOG' | 'IN_PROGRESS' | 'WAITING' | 'REVIEW' | 'DONE'
@@ -178,7 +180,7 @@ const realtimeSocketUrl = process.env.NEXT_PUBLIC_AGENTBOARD_WS_URL || '/?XTrans
 const showDemoSeed = process.env.NODE_ENV !== 'production'
 
 export default function Home() {
-  const [view, setView] = useState<'landing' | 'board' | 'runtime' | 'skills'>('landing')
+  const [view, setView] = useState<'landing' | 'board' | 'runtime' | 'skills' | 'help'>('landing')
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [projects, setProjects] = useState<ProjectListItem[]>([])
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
@@ -1719,6 +1721,15 @@ export default function Home() {
             <Button
               variant="ghost"
               size="icon"
+              className={`h-8 w-8 ${view === 'help' ? 'bg-accent' : ''}`}
+              onClick={() => setView(view === 'help' ? 'board' : 'help')}
+              title="Help & User Guide"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               className="h-8 w-8"
               onClick={handleAdminLogout}
             >
@@ -1756,7 +1767,7 @@ export default function Home() {
         <aside className="hidden md:block w-56 shrink-0 border-r border-border/15 p-3 min-h-[calc(100vh-3.5rem)]">
           <div className="mb-4 flex items-center gap-1.5">
             <div className="h-3 w-3 rounded bg-primary/60" />
-            <span className="text-[10px] font-medium text-foreground/50">Conductor v0.1</span>
+            <span className="text-[10px] font-medium text-foreground/50">Conductor v0.3</span>
           </div>
           
           <div className="mb-4">
@@ -1888,6 +1899,8 @@ export default function Home() {
               </div>
               <SkillsPage workspaceId={currentWorkspaceId} />
             </div>
+          ) : view === 'help' ? (
+            <HelpPage onBack={() => setView('board')} />
           ) : loading ? (
             <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
               <div className="flex flex-col items-center gap-3">
