@@ -22,6 +22,16 @@ type AgentBadgeProps = {
 }
 
 /**
+ * Append an alpha hex (default `22` ≈ 13%) to a 6-digit `#RRGGBB` color.
+ * Falls back to the raw color string when the format isn't safe to extend,
+ * so the browser at worst renders the solid color instead of dropping the style.
+ */
+function withAlpha(hex: string, alpha: string = '22'): string {
+  const h = hex.startsWith('#') ? hex : `#${hex}`
+  return /^#[0-9a-fA-F]{6}$/.test(h) ? `${h}${alpha}` : h
+}
+
+/**
  * Unified agent display.
  *
  * - `compact` — emoji only with a color dot; name in tooltip. Used in tight spaces like kanban card corners.
@@ -30,12 +40,14 @@ type AgentBadgeProps = {
  */
 export function AgentBadge({ agent, size = 'card', className, truncatePersonality }: AgentBadgeProps) {
   const color = agent.color || '#3b82f6'
-  const truncate = truncatePersonality ?? size === 'card'
+  const truncate = truncatePersonality ?? (size === 'card')
 
   if (size === 'compact') {
     return (
       <span
         className={cn('inline-flex items-center gap-1 text-[11px]', className)}
+        role="img"
+        aria-label={agent.name}
         title={agent.name}
       >
         <span
@@ -43,7 +55,7 @@ export function AgentBadge({ agent, size = 'card', className, truncatePersonalit
           className="h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: color }}
         />
-        <span>{agent.emoji}</span>
+        <span aria-hidden>{agent.emoji}</span>
       </span>
     )
   }
@@ -56,7 +68,7 @@ export function AgentBadge({ agent, size = 'card', className, truncatePersonalit
         {agent.role ? (
           <span
             className="rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
-            style={{ backgroundColor: `${color}22`, color }}
+            style={{ backgroundColor: withAlpha(color), color }}
           >
             {agent.role}
           </span>
