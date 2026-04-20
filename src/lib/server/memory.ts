@@ -1,5 +1,8 @@
 import { db, isPostgresDb } from '@/lib/db'
 import { generateEmbedding } from '@/lib/server/embeddings'
+import { getLogger } from '@/lib/server/logger'
+
+const log = getLogger('memory')
 
 // ─── Tier 1: working memory ──────────────────────────────────────────────
 
@@ -61,6 +64,19 @@ export async function saveMemory(input: SaveMemoryInput) {
       confidence: input.confidence ?? 0.8,
       embedding: embeddingVec ? JSON.stringify(embeddingVec) : null,
     },
+    select: {
+      id: true,
+      agentId: true,
+      projectId: true,
+      category: true,
+      content: true,
+      sourceTaskId: true,
+      confidence: true,
+      reinforcement: true,
+      lastAccessed: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   })
 }
 
@@ -85,6 +101,7 @@ export async function searchMemories(opts: SearchMemoriesOpts): Promise<MemoryHi
 
   if (isPostgresDb) {
     const vec = await generateEmbedding(opts.query)
+    // If embedding unavailable (no key, API error), fall through to text search.
     if (vec) {
       const vectorStr = `[${vec.join(',')}]`
       const rows = await db.$queryRawUnsafe<Array<{
@@ -148,8 +165,15 @@ export async function buildRelevantMemory(opts: {
   const hits = await searchMemories(opts)
   if (hits.length === 0) return ''
 
-  // Best-effort reinforcement — don't block on failures
-  await Promise.all(hits.map((h) => reinforceMemory(h.id).catch(() => null)))
+  // Fire-and-forget reinforcement: we don't need its result, and blocking on
+  // N Prisma updates would delay every dispatch. Failures are logged, not rethrown.
+  void Promise.all(
+    hits.map((h) =>
+      reinforceMemory(h.id).catch((err) =>
+        log.warn('reinforceMemory failed', { id: h.id, err: String(err) })
+      )
+    )
+  )
 
   const lines = hits.map((h) => `- [${h.category}] ${h.content}`)
   return `Persistent memory (things you've learned on this project):\n${lines.join('\n')}`
