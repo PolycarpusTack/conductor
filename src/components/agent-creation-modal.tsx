@@ -30,6 +30,7 @@ interface Agent {
   invocationMode?: string | null
   isActive: boolean
   lastSeen?: string | null
+  apiKey?: string | null
 }
 
 interface ProjectMode {
@@ -569,7 +570,7 @@ export function AgentCreationModal({
             {/* Tab 4: Memory (edit only) */}
             {isEditing && (
               <TabsContent value="memory" className="mt-0 space-y-4">
-                <AgentMemoryPanel agentId={editingAgent!.id} agentApiKey={null} />
+                <AgentMemoryPanel agentId={editingAgent!.id} agentApiKey={editingAgent?.apiKey ?? null} />
               </TabsContent>
             )}
           </div>

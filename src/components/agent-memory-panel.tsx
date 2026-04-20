@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -24,7 +24,7 @@ export function AgentMemoryPanel({
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!agentApiKey) return
     setLoading(true)
     try {
@@ -32,16 +32,16 @@ export function AgentMemoryPanel({
         headers: { Authorization: `Bearer ${agentApiKey}` },
       })
       if (!res.ok) throw new Error(await res.text())
-      const json = await res.json()
+      const json = (await res.json()) as { data: Memory[]; total: number }
       setMemories(json.data)
     } catch (err) {
       toast.error(`Load failed: ${err instanceof Error ? err.message : 'unknown'}`)
     } finally {
       setLoading(false)
     }
-  }
+  }, [agentId, agentApiKey])
 
-  useEffect(() => { void load() }, [agentId, agentApiKey])
+  useEffect(() => { void load() }, [load])
 
   const remove = async (memoryId: string) => {
     if (!agentApiKey) return
@@ -51,7 +51,8 @@ export function AgentMemoryPanel({
       headers: { Authorization: `Bearer ${agentApiKey}` },
     })
     if (!res.ok) {
-      toast.error('Delete failed')
+      const detail = await res.text().catch(() => 'unknown')
+      toast.error(`Delete failed: ${detail}`)
       return
     }
     setMemories((prev) => prev.filter((m) => m.id !== memoryId))
@@ -84,7 +85,7 @@ export function AgentMemoryPanel({
               reinforced {m.reinforcement}x · {new Date(m.createdAt).toLocaleDateString()}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => remove(m.id)}>×</Button>
+          <Button variant="ghost" size="sm" aria-label="Delete memory" onClick={() => remove(m.id)}>×</Button>
         </div>
       ))}
     </div>
