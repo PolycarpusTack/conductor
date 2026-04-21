@@ -117,6 +117,16 @@ const TOC: TocGroup[] = [
     ],
   },
   {
+    label: 'Integrations',
+    items: [
+      { id: 'help-integrations', title: 'Triggers & Reactions overview' },
+      { id: 'help-integrations-triggers', title: 'Triggers' },
+      { id: 'help-integrations-reactions', title: 'Reactions' },
+      { id: 'help-integrations-templates', title: 'Mustache templates' },
+      { id: 'help-integrations-failures', title: 'Failure handling' },
+    ],
+  },
+  {
     label: 'Observability',
     items: [
       { id: 'help-obs-runtime', title: 'Runtime dashboard' },
@@ -141,6 +151,7 @@ const TOC: TocGroup[] = [
       { id: 'help-settings-templates', title: 'Templates' },
       { id: 'help-settings-analytics', title: 'Analytics' },
       { id: 'help-settings-automation', title: 'Automation' },
+      { id: 'help-settings-integrations', title: 'Integrations' },
     ],
   },
   {
@@ -438,6 +449,36 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                ════════════════════════════════════════════════════════════════ */}
 
             <Section
+              id="help-release-0-4"
+              title="What's new in 0.4"
+              subtitle="Integrations: Triggers, Reactions, and external event automation."
+            >
+              <Callout tone="neon" title="The headline">
+                <p>
+                  0.4 ships the Triggers + Reactions system — project-scoped automation that connects AgentBoard
+                  to the outside world. Internal events (chain completed, step failed, task created) and Sentry
+                  alerts can now fire sequential chains of typed reactions: Slack messages, HTTP calls, Jira issue
+                  creation, and email.
+                </p>
+              </Callout>
+
+              <H3 id="help-release-0-4-integrations">Triggers &amp; Reactions</H3>
+              <p>
+                Configure Triggers in <em>Settings &rarr; Integrations</em>. Each Trigger listens for an event
+                (or polls Sentry on a 60-second interval) and runs one or more Reactions in order. Reaction outputs
+                are available as Mustache variables for the next step in the chain — so a Jira ticket created in
+                reaction 1 can be referenced as <code>{'{{reactions.create_jira.issueKey}}'}</code> in reaction 2&apos;s
+                Slack message. See <Ref href="#help-integrations">Triggers &amp; Reactions</Ref> for the full reference.
+              </p>
+
+              <H3 id="help-release-0-4-cleanup">Codebase cleanup</H3>
+              <Bullets>
+                <li>Removed orphaned dead code (prompt-templates module, unused constants, dead state in page).</li>
+                <li>Artifact saves in dispatch now use a single <code>createMany</code> instead of sequential writes.</li>
+              </Bullets>
+            </Section>
+
+            <Section
               id="help-release-0-3"
               title="What's new in 0.3"
               subtitle="Human review gates, durable execution, observability — plus a full in-app user guide."
@@ -490,12 +531,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li><strong>Route error handling</strong> — <Term>withErrorHandling</Term> is now compatible with Next.js route validators; expect fewer 500s with empty bodies.</li>
               </Bullets>
 
-              <H3 id="help-release-0-3-roadmap">On the roadmap (not shipped)</H3>
+              <H3 id="help-release-0-3-roadmap">What came next</H3>
               <p>
-                External-event integrations — starting chains from GitHub/Slack/Jira webhooks and pushing results
-                back — are designed but not yet built. The design doc lives at <code>docs/designs/integrations.md</code>.
-                For today, chains are kicked off either by a human dragging a task to In Progress or by the
-                project&apos;s automation poller.
+                External-event integrations shipped in 0.4 — see <Ref href="#help-release-0-4">What&apos;s new in 0.4</Ref>.
+                Chains can now be triggered by events and push results to Slack, Jira, HTTP endpoints, and email.
               </p>
             </Section>
 
@@ -1816,6 +1855,191 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 TRIGGERS & REACTIONS
                ════════════════════════════════════════════════════════════════ */}
 
+            <Section
+              id="help-integrations"
+              title="Triggers & Reactions overview"
+              subtitle="Connect AgentBoard events to the outside world."
+            >
+              <p>
+                Integrations let a project react automatically to what happens inside AgentBoard — or to events
+                from external services like Sentry. A <strong>Trigger</strong> watches for an event and fires a
+                chain of <strong>Reactions</strong> when its conditions are met.
+              </p>
+              <p>
+                Configure everything in <em>Settings &rarr; Integrations</em>. No code required — each Trigger
+                and its Reactions are created and edited entirely in the UI.
+              </p>
+
+              <H3>How it works end-to-end</H3>
+              <Bullets>
+                <li>An event fires inside Conductor (e.g. a chain completes) or a Sentry poll returns new issues.</li>
+                <li>Conductor checks whether any enabled Trigger for this project matches the event type and passes all its filters.</li>
+                <li>If matched, the Trigger&apos;s Reactions run <strong>in order</strong> (lowest <code>order</code> first).</li>
+                <li>Each Reaction&apos;s config is rendered through Mustache before execution — it can reference event fields and the outputs of previous Reactions.</li>
+                <li>If any Reaction fails, execution stops. The failure is written to the Reaction record and, if the Trigger was associated with a task, surfaced as a banner toast in the UI.</li>
+              </Bullets>
+            </Section>
+
+            <Section id="help-integrations-triggers" title="Triggers">
+              <p>
+                A Trigger is a project-scoped rule that decides <em>when</em> to act. There are two types:
+              </p>
+
+              <H3>Event triggers</H3>
+              <p>
+                Fire when a specific internal event is broadcast in the project. Supported event types:
+              </p>
+              <Bullets>
+                <li><strong>chain-completed</strong> — a chain ran to its final step successfully.</li>
+                <li><strong>step-failed</strong> — an agent step reached its retry ceiling and gave up.</li>
+                <li><strong>task-created</strong> — a new task was added to the board.</li>
+                <li><strong>step-reviewed</strong> — a human approved or rejected a review gate.</li>
+              </Bullets>
+
+              <H3>Sentry poll triggers</H3>
+              <p>
+                Poll the Sentry API every 60 seconds for new issues in a project. Each new issue fires the
+                Trigger&apos;s Reactions with the issue fields available as Mustache variables (<code>{'{{title}}'}</code>,
+                {' '}<code>{'{{level}}'}</code>, <code>{'{{url}}'}</code>, etc.).
+              </p>
+              <p>
+                Sentry poll config fields:
+              </p>
+              <Bullets>
+                <li><strong>apiTokenEnvVar</strong> — name of the env var holding your Sentry auth token.</li>
+                <li><strong>orgSlug</strong> — your Sentry organisation slug.</li>
+                <li><strong>projectSlug</strong> — the Sentry project slug to poll.</li>
+                <li><strong>environment</strong> (optional) — filter to a specific Sentry environment.</li>
+              </Bullets>
+
+              <H3>Filters</H3>
+              <p>
+                Event triggers can have one or more filters. All filters must pass for the Trigger to fire (AND logic).
+                Each filter targets a dot-path field in the event payload and tests it against a value:
+              </p>
+              <Bullets>
+                <li><code>equals</code> / <code>not_equals</code> — exact string match.</li>
+                <li><code>contains</code> / <code>not_contains</code> — substring match.</li>
+                <li><code>matches</code> — JavaScript regex match (e.g. <code>^sentry-</code>).</li>
+              </Bullets>
+
+              <Callout tone="blue" title="Enable/disable">
+                <p>
+                  Each Trigger has an enable/disable toggle. Disabled Triggers are skipped by the event evaluator
+                  and the Sentry poller — useful for temporarily pausing a rule without deleting it.
+                </p>
+              </Callout>
+            </Section>
+
+            <Section id="help-integrations-reactions" title="Reactions">
+              <p>
+                A Reaction is a typed action that executes when its parent Trigger fires. Reactions run
+                sequentially in ascending <code>order</code> number. Four types are supported:
+              </p>
+
+              <H3>post:slack</H3>
+              <p>Posts a message to a Slack incoming webhook.</p>
+              <Bullets>
+                <li><strong>webhookEnvVar</strong> — env var name holding the Slack webhook URL.</li>
+                <li><strong>text</strong> — message text (supports Mustache templates).</li>
+                <li><strong>blocks</strong> (optional) — Slack Block Kit array for rich formatting.</li>
+              </Bullets>
+
+              <H3>post:http</H3>
+              <p>Makes an outbound HTTPS request. Only <code>https://</code> URLs are allowed.</p>
+              <Bullets>
+                <li><strong>url</strong> — the target URL (must be https).</li>
+                <li><strong>method</strong> (optional, default <code>POST</code>) — HTTP verb.</li>
+                <li><strong>headers</strong> (optional) — additional request headers object.</li>
+                <li><strong>body</strong> (optional) — request body, JSON-serialised.</li>
+              </Bullets>
+
+              <H3>create:jira</H3>
+              <p>Creates a Jira issue via the Jira REST API v3.</p>
+              <Bullets>
+                <li><strong>domainEnvVar</strong> — env var for your Jira domain (e.g. <code>https://acme.atlassian.net</code>).</li>
+                <li><strong>emailEnvVar</strong> — env var for the Jira account email.</li>
+                <li><strong>apiTokenEnvVar</strong> — env var for the Jira API token.</li>
+                <li><strong>projectKey</strong> — Jira project key (e.g. <code>PROJ</code>).</li>
+                <li><strong>summary</strong> — issue title (supports Mustache).</li>
+                <li><strong>issueType</strong> (optional, default <code>Task</code>) — issue type name.</li>
+                <li><strong>description</strong> (optional) — issue body text.</li>
+              </Bullets>
+              <p>
+                The output of a successful <code>create:jira</code> reaction exposes <code>issueKey</code>,
+                {' '}<code>issueId</code>, and <code>issueUrl</code> to subsequent reactions via Mustache.
+              </p>
+
+              <H3>send:email</H3>
+              <p>Sends an email via SMTP (nodemailer).</p>
+              <Bullets>
+                <li><strong>smtpHostEnvVar</strong> — env var for the SMTP host.</li>
+                <li><strong>smtpPortEnvVar</strong> (optional, default 587) — env var for the SMTP port.</li>
+                <li><strong>smtpUserEnvVar</strong> / <strong>smtpPassEnvVar</strong> (optional) — SMTP credentials.</li>
+                <li><strong>from</strong>, <strong>to</strong>, <strong>subject</strong>, <strong>text</strong> — standard email fields.</li>
+                <li><strong>html</strong> (optional) — HTML body.</li>
+              </Bullets>
+
+              <Callout tone="blue" title="Credentials stay in env vars">
+                <p>
+                  All secrets (tokens, passwords, webhook URLs) are referenced by env var <em>name</em>, not stored
+                  as values. The reaction config stores the variable name; Conductor resolves the actual value at
+                  runtime from the server&apos;s environment. Never paste a token directly into the config JSON.
+                </p>
+              </Callout>
+            </Section>
+
+            <Section id="help-integrations-templates" title="Mustache templates">
+              <p>
+                Any string value in a Reaction&apos;s config can be a Mustache template. The template is rendered
+                at execution time with a context object containing:
+              </p>
+              <Bullets>
+                <li><code>{'{{event.*}}'}</code> — fields from the triggering event payload (e.g. <code>{'{{event.taskId}}'}</code>, <code>{'{{event.title}}'}</code>).</li>
+                <li><code>{'{{reactions.<name>.*}}'}</code> — the output of a previously executed reaction, keyed by its sanitised name. For example, if reaction 0 is named &ldquo;Create Jira&rdquo; and creates an issue, reaction 1 can reference <code>{'{{reactions.create_jira.issueKey}}'}</code>.</li>
+              </Bullets>
+              <p>
+                The sanitised name is computed as: lowercase, non-alphanumeric characters replaced with underscores, leading/trailing underscores stripped, prefixed with the reaction&apos;s <code>order</code> number to avoid collisions (e.g. order 0, name &ldquo;Notify Slack&rdquo; → <code>0_notify_slack</code>).
+              </p>
+
+              <Callout tone="amber" title="Arrays are not recursed">
+                <p>
+                  Mustache rendering recurses into nested objects but not into arrays. If your config has an array
+                  of strings with template tokens, those tokens will not be rendered. Use a flat string field instead
+                  and construct arrays in a <code>post:http</code> body if needed.
+                </p>
+              </Callout>
+            </Section>
+
+            <Section id="help-integrations-failures" title="Failure handling">
+              <p>
+                Reaction execution is fire-and-forget from the caller&apos;s perspective — it does not block the
+                event that triggered it. When a Reaction fails:
+              </p>
+              <Bullets>
+                <li>Execution of the remaining Reactions in the chain stops immediately.</li>
+                <li>The <code>consecutiveFailures</code> counter on the Reaction is incremented and the error message stored.</li>
+                <li>After <strong>5 consecutive failures</strong>, the Reaction is automatically disabled. Re-enable it from the Integrations UI once the underlying issue is fixed.</li>
+                <li>If the Trigger was associated with a board task, a <strong>destructive toast banner</strong> appears in the UI with the Reaction name and error message.</li>
+              </Bullets>
+
+              <H3>Test-firing a Trigger</H3>
+              <p>
+                Each Trigger card in <em>Settings &rarr; Integrations</em> has a <strong>Test</strong> button.
+                It fires the Trigger&apos;s enabled Reactions immediately with an empty payload. Reactions will fail
+                if the required env vars are not set — that&apos;s expected and harmless. Use it to verify your
+                config structure before waiting for a real event.
+              </p>
+
+              <Callout tone="amber" title="Sentry poll triggers and the failure toast">
+                <p>
+                  The failure toast only appears when the Trigger has a <code>taskId</code> — which event triggers
+                  do but Sentry poll triggers do not. Sentry poll failures are written to the Reaction record and
+                  visible in the Integrations UI, but do not generate a toast.
+                </p>
+              </Callout>
+            </Section>
+
             {/* ════════════════════════════════════════════════════════════════
                 OBSERVABILITY
                ════════════════════════════════════════════════════════════════ */}
@@ -2092,6 +2316,23 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li><strong>Archive rules</strong> — auto-archive <Term>DONE</Term> tasks after N days.</li>
                 <li><strong>Retry policy defaults</strong> — default backoff and max-attempts applied when chain steps don&apos;t override.</li>
               </Bullets>
+            </Section>
+
+            <Section id="help-settings-integrations" title="Settings · Integrations">
+              <p>
+                Where Triggers and Reactions are configured. See <Ref href="#help-integrations">Triggers &amp; Reactions</Ref> for the full reference.
+                Each Trigger card shows:
+              </p>
+              <Bullets>
+                <li>A status dot — green (enabled, no errors), yellow (enabled, has consecutive failures), grey (disabled).</li>
+                <li>The event type or &ldquo;Sentry poll&rdquo; badge.</li>
+                <li>A reaction count.</li>
+                <li>Enable/disable toggle and a <strong>Test</strong> button to fire manually.</li>
+              </Bullets>
+              <p>
+                Expand a Trigger card to see and manage its Reactions. Each Reaction shows its type badge, order,
+                consecutive failure count, and last error if any.
+              </p>
             </Section>
 
             {/* ════════════════════════════════════════════════════════════════
@@ -2508,6 +2749,7 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
                   ['Artifact', 'A file produced by an agent during a step. Kept against the task.'],
                   ['Attempt', 'One execution of a step. A step can have many attempts if retried.'],
                   ['Automation', 'Internal rules that react to Conductor events (task created, moved, tagged).'],
+                  ['Reaction', 'A typed action (Slack, HTTP, Jira, email) that fires when a Trigger matches. Reactions run sequentially.'],
                   ['Board', 'The Kanban view. Four columns: Backlog, In Progress, Review, Done.'],
                   ['Chain', 'An ordered workflow of steps.'],
                   ['Chain template', 'A saved, reusable chain definition.'],
@@ -2523,6 +2765,7 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
                   ['Skill', 'A reusable prompt fragment or playbook in the workspace-wide library.'],
                   ['Step', 'A single node in a chain. Pairs a mode with an agent and has attempts.'],
                   ['Task', 'A unit of work. A card on the board.'],
+                  ['Trigger', 'A project-scoped rule that watches for an event (or polls Sentry) and fires a chain of Reactions.'],
                   ['Template', 'A saved form — task template or chain template.'],
                   ['WAITING', 'A transient state where a task is paused for an external event.'],
                   ['Workflow', 'An alias for a chain, sometimes used to emphasise branching/parallel flows.'],
