@@ -210,7 +210,10 @@ export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
                       taskId={daemon.id}
                       // Intentional: filters to this daemon's entries only. HTTP-source events
                       // have daemonId: undefined and are naturally excluded from daemon-scoped views.
-                      entries={liveAgentLogs.filter((l) => l.daemonId === daemon.id)}
+                      entries={liveAgentLogs.filter(
+                        (l): l is LiveAgentLogEntry & { daemonId: string } =>
+                          l.daemonId === daemon.id,
+                      )}
                       isRunning={daemon.status === 'online'}
                     />
                   </CardContent>
