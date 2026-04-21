@@ -6,7 +6,7 @@ import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createTaskSchema } from '@/lib/server/contracts'
 import { normalizeDagEdges, startChain } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
-import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { fireProjectEvent as broadcastProjectEvent } from '@/lib/server/project-event'
 import { taskBoardInclude } from '@/lib/server/selects'
 
 const log = getLogger('api/tasks')

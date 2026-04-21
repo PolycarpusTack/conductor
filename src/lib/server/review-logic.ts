@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { advanceChain, rewindChain, findPreviousAgentStep } from '@/lib/server/dispatch'
-import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { fireProjectEvent as broadcastProjectEvent } from '@/lib/server/project-event'
 
 interface ReviewDecision {
   stepId: string

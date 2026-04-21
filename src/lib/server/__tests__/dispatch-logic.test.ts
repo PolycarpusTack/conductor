@@ -36,6 +36,10 @@ mock.module('@/lib/server/realtime', () => ({
   broadcastProjectEvent: mockBroadcastProjectEvent,
 }))
 
+mock.module('@/lib/server/project-event', () => ({
+  fireProjectEvent: mockBroadcastProjectEvent,
+}))
+
 // Note: advanceChain / rewindChain / closeChain / startChain don't call
 // dispatchStep directly, so we don't need to mock adapters/registry or
 // mcp-resolver here. Mocking those at the module level would leak into
