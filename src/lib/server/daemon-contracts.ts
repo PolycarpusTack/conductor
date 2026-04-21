@@ -22,7 +22,7 @@ export const daemonHealthSchema = z.object({
   runningTasks: z.number().int().min(0),
 })
 
-export const daemonEventSchema = z.discriminatedUnion('type', [
+export const liveAgentEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('thinking') }),
   z.object({
     type: z.literal('tool_call'),
@@ -48,3 +48,6 @@ export const daemonEventSchema = z.discriminatedUnion('type', [
     message: z.string().max(5000),
   }),
 ])
+
+/** @deprecated Use liveAgentEventSchema. Kept for one release cycle. */
+export const daemonEventSchema = liveAgentEventSchema

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { badRequest, forbidden, notFound, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
-import { daemonEventSchema } from '@/lib/server/daemon-contracts'
+import { liveAgentEventSchema } from '@/lib/server/daemon-contracts'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
 export const POST = withErrorHandling('api/daemon/events', async (request: Request) => {
@@ -22,7 +22,7 @@ export const POST = withErrorHandling('api/daemon/events', async (request: Reque
 
   if (!taskId || !event) throw badRequest('taskId and event are required')
 
-  const parsed = daemonEventSchema.safeParse(event)
+  const parsed = liveAgentEventSchema.safeParse(event)
   if (!parsed.success) throw badRequest('Invalid event shape')
 
   // Scope the task to the daemon's own workspace. Without this check, a daemon
@@ -38,10 +38,11 @@ export const POST = withErrorHandling('api/daemon/events', async (request: Reque
     throw forbidden('Task does not belong to this daemon\'s workspace')
   }
 
-  broadcastProjectEvent(task.projectId, 'daemon-agent-event', {
+  broadcastProjectEvent(task.projectId, 'agent-live-event', {
+    source: 'daemon' as const,
+    daemonId: daemon.id,
     taskId,
     stepId,
-    daemonId: daemon.id,
     event: parsed.data,
     timestamp: new Date().toISOString(),
   })

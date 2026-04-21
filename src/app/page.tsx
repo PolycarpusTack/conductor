@@ -237,7 +237,7 @@ export default function Home() {
   const [taskAgentId, setTaskAgentId] = useState<string>('')
   const [taskNotes, setTaskNotes] = useState('')
   const [taskRuntimeOverride, setTaskRuntimeOverride] = useState<string>('')
-  const [daemonLogs, setDaemonLogs] = useState<Array<{ taskId: string; stepId?: string; daemonId: string; event: { type: 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'completed' | 'error'; [key: string]: unknown }; timestamp: string }>>([])
+  const [liveAgentLogs, setLiveAgentLogs] = useState<Array<{ source: 'daemon' | 'http'; taskId: string; stepId?: string; daemonId?: string; agentId?: string; event: { type: 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'completed' | 'error'; [key: string]: unknown }; timestamp: string }>>([])
   
   // Form state for projects
   const [projectName, setProjectName] = useState('')
@@ -359,9 +359,9 @@ export default function Home() {
           })
         }
 
-        activeSocket.on('daemon-agent-event', (data: unknown) => {
-          const entry = data as typeof daemonLogs[number]
-          setDaemonLogs(prev => [...prev, entry].slice(-500))
+        activeSocket.on('agent-live-event', (data: unknown) => {
+          const entry = data as typeof liveAgentLogs[number]
+          setLiveAgentLogs(prev => [...prev, entry].slice(-500))
         })
 
         activeSocket.on('step-activated', refetchCurrentProject)
@@ -1904,7 +1904,7 @@ export default function Home() {
                   Back to Board
                 </Button>
               </div>
-              <RuntimeDashboard daemonLogs={daemonLogs} />
+              <RuntimeDashboard liveAgentLogs={liveAgentLogs} />
             </div>
           ) : view === 'skills' ? (
             <div className="p-6 max-w-6xl mx-auto">
