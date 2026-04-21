@@ -28,6 +28,7 @@ model Project {
   mcpConnections     ProjectMcpConnection[]
   chainTemplates     ChainTemplate[]
   memories           AgentMemory[]
+  triggers           Trigger[]
   // Automation scheduler config
   automationMode     String                 @default("manual") // manual, always, scheduled, startup
   automationSchedule String? // JSON: { startDay, startTime, endDay, endTime }
@@ -360,4 +361,43 @@ model AgentMemory {
 
   @@index([agentId, projectId])
   @@index([projectId])
+}
+
+model Trigger {
+  id          String     @id @default(cuid())
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  type        String     // "event" | "poll:sentry"
+  eventType   String?    // for type="event": "chain-completed" | "step-failed" | "task-created" | "step-reviewed"
+  eventFilters String    @default("[]")
+  pollConfig  String     @default("{}")
+  enabled     Boolean    @default(true)
+  lastFiredAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  reactions   Reaction[]
+
+  @@index([projectId])
+  @@index([projectId, type])
+  @@index([projectId, eventType])
+}
+
+model Reaction {
+  id                  String    @id @default(cuid())
+  triggerId           String
+  trigger             Trigger   @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  name                String
+  type                String    // "post:slack" | "post:http" | "create:jira" | "send:email"
+  config              String    @default("{}")
+  order               Int       @default(0)
+  enabled             Boolean   @default(true)
+  consecutiveFailures Int       @default(0)
+  lastError           String?
+  lastFiredAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([triggerId, order])
 }
