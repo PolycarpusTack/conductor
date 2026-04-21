@@ -72,6 +72,7 @@ import { AgentBadge } from '@/components/agent-badge'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import { HelpPage } from '@/components/help-page'
 import { APP_VERSION_SHORT } from '@/lib/version'
+import type { LiveAgentLogEntry } from '@/types/live-agent'
 
 // Types
 type TaskStatus = 'BACKLOG' | 'IN_PROGRESS' | 'WAITING' | 'REVIEW' | 'DONE'
@@ -237,7 +238,7 @@ export default function Home() {
   const [taskAgentId, setTaskAgentId] = useState<string>('')
   const [taskNotes, setTaskNotes] = useState('')
   const [taskRuntimeOverride, setTaskRuntimeOverride] = useState<string>('')
-  const [liveAgentLogs, setLiveAgentLogs] = useState<Array<{ source: 'daemon' | 'http'; taskId: string; stepId?: string; daemonId?: string; agentId?: string; event: { type: 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'completed' | 'error'; [key: string]: unknown }; timestamp: string }>>([])
+  const [liveAgentLogs, setLiveAgentLogs] = useState<LiveAgentLogEntry[]>([])
   
   // Form state for projects
   const [projectName, setProjectName] = useState('')
