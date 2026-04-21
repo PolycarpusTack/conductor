@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { RefreshCw, Server, Cpu, HardDrive, Activity, Wifi, WifiOff, AlertTriangle } from 'lucide-react'
 import { DaemonLogViewer } from '@/components/daemon-log-viewer'
+import type { LiveAgentLogEntry } from '@/types/live-agent'
 
 interface DaemonInfo {
   id: string
@@ -27,15 +28,6 @@ interface DaemonStatusResponse {
   summary: { total: number; online: number; stale: number; offline: number }
 }
 
-interface LiveAgentLogEntry {
-  source: 'daemon' | 'http'
-  taskId: string
-  stepId?: string
-  daemonId?: string
-  agentId?: string
-  event: { type: 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'completed' | 'error'; [key: string]: unknown }
-  timestamp: string
-}
 
 const STATUS_STYLES: Record<string, { icon: React.ReactNode; className: string }> = {
   online: { icon: <Wifi className="w-3.5 h-3.5" />, className: 'bg-green-500/15 text-green-600 border-green-500/30' },

@@ -64,6 +64,7 @@ import { SettingsMcp } from '@/components/settings-mcp'
 import { SettingsTemplates } from '@/components/settings-templates'
 import { ObservabilityDashboard } from '@/components/observability-dashboard'
 import { SettingsAutomation } from '@/components/settings-automation'
+import { ActivityTail } from '@/components/activity-tail'
 import { AgentCreationModal } from '@/components/agent-creation-modal'
 import { ChainBuilder } from '@/components/chain-builder'
 import { StepOutputViewer } from '@/components/step-output-viewer'
@@ -72,6 +73,7 @@ import { AgentBadge } from '@/components/agent-badge'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import { HelpPage } from '@/components/help-page'
 import { APP_VERSION_SHORT } from '@/lib/version'
+import type { LiveAgentLogEntry } from '@/types/live-agent'
 
 // Types
 type TaskStatus = 'BACKLOG' | 'IN_PROGRESS' | 'WAITING' | 'REVIEW' | 'DONE'
@@ -237,7 +239,7 @@ export default function Home() {
   const [taskAgentId, setTaskAgentId] = useState<string>('')
   const [taskNotes, setTaskNotes] = useState('')
   const [taskRuntimeOverride, setTaskRuntimeOverride] = useState<string>('')
-  const [liveAgentLogs, setLiveAgentLogs] = useState<Array<{ source: 'daemon' | 'http'; taskId: string; stepId?: string; daemonId?: string; agentId?: string; event: { type: 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'completed' | 'error'; [key: string]: unknown }; timestamp: string }>>([])
+  const [liveAgentLogs, setLiveAgentLogs] = useState<LiveAgentLogEntry[]>([])
   
   // Form state for projects
   const [projectName, setProjectName] = useState('')
@@ -2051,7 +2053,14 @@ export default function Home() {
                                       <p className="text-[10px] leading-snug text-muted-foreground line-clamp-2">{task.notes}</p>
                                     </div>
                                   )}
-                                  
+
+                                  {task.status === 'IN_PROGRESS' ? (
+                                    <ActivityTail
+                                      taskId={task.id}
+                                      events={liveAgentLogs.filter((l) => l.taskId === task.id)}
+                                    />
+                                  ) : null}
+
                                   <div className="mt-2 flex items-center justify-between">
                                     {task.tag ? (
                                       <span className={`rounded px-1.5 py-0.5 text-[9px] ${tagColors[task.tag] || 'bg-surface text-muted-foreground'}`}>
