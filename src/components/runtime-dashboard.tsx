@@ -27,10 +27,12 @@ interface DaemonStatusResponse {
   summary: { total: number; online: number; stale: number; offline: number }
 }
 
-interface DaemonLogEntry {
+interface LiveAgentLogEntry {
+  source: 'daemon' | 'http'
   taskId: string
   stepId?: string
-  daemonId: string
+  daemonId?: string
+  agentId?: string
   event: { type: 'thinking' | 'tool_call' | 'tool_result' | 'text' | 'completed' | 'error'; [key: string]: unknown }
   timestamp: string
 }
@@ -48,10 +50,10 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 
 interface RuntimeDashboardProps {
-  daemonLogs: DaemonLogEntry[]
+  liveAgentLogs: LiveAgentLogEntry[]
 }
 
-export function RuntimeDashboard({ daemonLogs }: RuntimeDashboardProps) {
+export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
   const [data, setData] = useState<DaemonStatusResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedDaemon, setExpandedDaemon] = useState<string | null>(null)
@@ -206,7 +208,7 @@ export function RuntimeDashboard({ daemonLogs }: RuntimeDashboardProps) {
 
                     <DaemonLogViewer
                       taskId={daemon.id}
-                      entries={daemonLogs.filter((l) => l.daemonId === daemon.id)}
+                      entries={liveAgentLogs.filter((l) => l.daemonId === daemon.id)}
                       isRunning={daemon.status === 'online'}
                     />
                   </CardContent>
