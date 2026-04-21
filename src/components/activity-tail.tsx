@@ -47,6 +47,7 @@ export function ActivityTail({ taskId, events }: ActivityTailProps) {
         )}
         <span>activity</span>
         {!expanded && events.length > 0 ? (
+          // Raw event count; expanded view shows fewer rows when text chunks coalesce.
           <span className="text-muted-foreground/60">({events.length})</span>
         ) : null}
       </button>
