@@ -64,6 +64,7 @@ import { SettingsMcp } from '@/components/settings-mcp'
 import { SettingsTemplates } from '@/components/settings-templates'
 import { ObservabilityDashboard } from '@/components/observability-dashboard'
 import { SettingsAutomation } from '@/components/settings-automation'
+import { SettingsIntegrations, type IntegrationTrigger } from '@/components/settings-integrations'
 import { ActivityTail } from '@/components/activity-tail'
 import { AgentCreationModal } from '@/components/agent-creation-modal'
 import { ChainBuilder } from '@/components/chain-builder'
@@ -73,6 +74,7 @@ import { AgentBadge } from '@/components/agent-badge'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import { HelpPage } from '@/components/help-page'
 import { APP_VERSION_SHORT } from '@/lib/version'
+import { useToast } from '@/hooks/use-toast'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
 
 // Types
@@ -185,6 +187,7 @@ const realtimeSocketUrl = process.env.NEXT_PUBLIC_AGENTBOARD_WS_URL || '/?XTrans
 const showDemoSeed = process.env.NODE_ENV !== 'production'
 
 export default function Home() {
+  const { toast } = useToast()
   const [view, setView] = useState<'landing' | 'board' | 'runtime' | 'skills' | 'help'>('landing')
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [projects, setProjects] = useState<ProjectListItem[]>([])
@@ -199,7 +202,7 @@ export default function Home() {
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
-  const [settingsTab, setSettingsTab] = useState<'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | null>(null)
+  const [settingsTab, setSettingsTab] = useState<'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null>(null)
   const [expandedAgentStats, setExpandedAgentStats] = useState<string | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
@@ -221,6 +224,7 @@ export default function Home() {
   const [projectRuntimes, setProjectRuntimes] = useState<any[]>([])
   const [projectMcpConnections, setProjectMcpConnections] = useState<any[]>([])
   const [chainTemplates, setChainTemplates] = useState<any[]>([])
+  const [triggers, setTriggers] = useState<IntegrationTrigger[]>([])
   const [taskSteps, setTaskSteps] = useState<any[]>([])
   const [viewingTaskSteps, setViewingTaskSteps] = useState<{ id: string; title: string; steps: TaskStepSummary[] } | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -372,6 +376,18 @@ export default function Home() {
         activeSocket.on('chain-advanced', refetchCurrentProject)
         activeSocket.on('chain-completed', refetchCurrentProject)
         activeSocket.on('chain-rewound', refetchCurrentProject)
+
+        activeSocket.on('reaction-failed', (data: {
+          taskId: string
+          reactionName: string
+          error: string
+        }) => {
+          toast({
+            title: `Reaction failed: ${data.reactionName}`,
+            description: data.error,
+            variant: 'destructive',
+          })
+        })
       } catch (error) {
         console.error('Error connecting realtime:', error)
         setWsConnected(false)
@@ -582,6 +598,8 @@ export default function Home() {
       if (runtimesRes.ok) setProjectRuntimes(await runtimesRes.json())
       if (mcpRes.ok) setProjectMcpConnections(await mcpRes.json())
       if (templatesRes.ok) setChainTemplates(await templatesRes.json())
+      const triggersRes = await fetch(`/api/projects/${projectId}/triggers`)
+      if (triggersRes.ok) setTriggers(await triggersRes.json())
     } catch (error) {
       console.error('Error fetching project settings:', error)
     }
@@ -2522,6 +2540,7 @@ export default function Home() {
               <TabsTrigger value="templates" className="text-xs">Templates</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
               <TabsTrigger value="automation" className="text-xs">Automation</TabsTrigger>
+              <TabsTrigger value="integrations" className="text-xs">Integrations</TabsTrigger>
             </TabsList>
             
             <div className="mt-4 overflow-y-auto max-h-[50vh]">
@@ -2823,6 +2842,16 @@ export default function Home() {
               <TabsContent value="automation" className="mt-0">
                 {currentProject && (
                   <SettingsAutomation projectId={currentProject.id} />
+                )}
+              </TabsContent>
+
+              <TabsContent value="integrations" className="mt-0">
+                {currentProject && (
+                  <SettingsIntegrations
+                    projectId={currentProject.id}
+                    triggers={triggers}
+                    onTriggersChange={setTriggers}
+                  />
                 )}
               </TabsContent>
             </div>
