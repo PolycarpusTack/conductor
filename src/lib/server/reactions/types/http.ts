@@ -4,13 +4,17 @@ export async function executeHttpReaction(
   const url = config.url as string
   if (!url) throw new Error('post:http reaction requires a "url" field')
 
+  const parsed = new URL(url)
+  if (parsed.protocol !== 'https:') throw new Error('post:http only allows https:// URLs')
+
   const method = (config.method as string) || 'POST'
   const headers = (config.headers as Record<string, string>) || {}
 
+  const hasBody = config.body !== undefined && method !== 'GET' && method !== 'HEAD'
   const res = await fetch(url, {
     method,
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: config.body !== undefined ? JSON.stringify(config.body) : undefined,
+    headers: { ...(hasBody ? { 'Content-Type': 'application/json' } : {}), ...headers },
+    body: hasBody ? JSON.stringify(config.body) : undefined,
   })
 
   if (!res.ok) throw new Error(`HTTP request to ${url} failed: ${res.status} ${res.statusText}`)

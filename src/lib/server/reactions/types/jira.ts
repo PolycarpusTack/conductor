@@ -41,7 +41,7 @@ export async function executeJiraReaction(
   })
 
   if (!res.ok) {
-    const body = await res.text()
+    const body = (await res.text()).slice(0, 500)
     throw new Error(`Jira API failed: ${res.status} — ${body}`)
   }
 

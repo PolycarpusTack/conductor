@@ -40,7 +40,7 @@ export async function executeReactions(
 
     try {
       const output = await dispatchReaction(reaction.type, renderedConfig)
-      ;(context.reactions as Record<string, unknown>)[sanitizeName(reaction.name)] = output
+      ;(context.reactions as Record<string, unknown>)[`${reaction.order}_${sanitizeName(reaction.name)}`] = output
 
       await db.reaction.update({
         where: { id: reaction.id },
@@ -49,6 +49,7 @@ export async function executeReactions(
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       const newFailures = reaction.consecutiveFailures + 1
+      console.error(`[reactions] ${reaction.type} "${reaction.name}" failed:`, errorMessage)
 
       await db.reaction.update({
         where: { id: reaction.id },

@@ -688,6 +688,7 @@ export default function Home() {
     setAgentApiKeys({})
     setAgentApiPreviews({})
     setLegacyKeyStatus(null)
+    setTriggers([])
   }, [currentProject?.id])
 
   useEffect(() => {
