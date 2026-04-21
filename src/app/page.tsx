@@ -64,6 +64,7 @@ import { SettingsMcp } from '@/components/settings-mcp'
 import { SettingsTemplates } from '@/components/settings-templates'
 import { ObservabilityDashboard } from '@/components/observability-dashboard'
 import { SettingsAutomation } from '@/components/settings-automation'
+import { ActivityTail } from '@/components/activity-tail'
 import { AgentCreationModal } from '@/components/agent-creation-modal'
 import { ChainBuilder } from '@/components/chain-builder'
 import { StepOutputViewer } from '@/components/step-output-viewer'
@@ -2052,7 +2053,14 @@ export default function Home() {
                                       <p className="text-[10px] leading-snug text-muted-foreground line-clamp-2">{task.notes}</p>
                                     </div>
                                   )}
-                                  
+
+                                  {task.status === 'IN_PROGRESS' ? (
+                                    <ActivityTail
+                                      taskId={task.id}
+                                      events={liveAgentLogs.filter((l) => l.taskId === task.id)}
+                                    />
+                                  ) : null}
+
                                   <div className="mt-2 flex items-center justify-between">
                                     {task.tag ? (
                                       <span className={`rounded px-1.5 py-0.5 text-[9px] ${tagColors[task.tag] || 'bg-surface text-muted-foreground'}`}>
