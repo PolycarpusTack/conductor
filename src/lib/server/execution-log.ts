@@ -83,17 +83,3 @@ export async function timeoutExecution(executionId: string) {
     },
   })
 }
-
-export async function getExecutionHistory(stepId: string) {
-  return db.stepExecution.findMany({
-    where: { stepId },
-    orderBy: { attempt: 'asc' },
-  })
-}
-
-export async function getLatestExecution(stepId: string) {
-  return db.stepExecution.findFirst({
-    where: { stepId },
-    orderBy: { attempt: 'desc' },
-  })
-}

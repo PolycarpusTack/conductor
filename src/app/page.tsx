@@ -39,7 +39,6 @@ import {
   Settings,
   Trash2,
   GripVertical,
-  UserPlus,
   Eye,
   Search,
   Pencil,
@@ -251,12 +250,6 @@ export default function Home() {
   const [projectColor, setProjectColor] = useState('#3b82f6')
   const [createStarterAgents, setCreateStarterAgents] = useState(true)
   
-  // Form state for agents
-  const [agentName, setAgentName] = useState('')
-  const [agentEmoji, setAgentEmoji] = useState('🤖')
-  const [agentColor, setAgentColor] = useState('#3b82f6')
-  const [agentDescription, setAgentDescription] = useState('')
-
   // Initialize WebSocket
   useEffect(() => {
     if (view !== 'board' || !currentProject || !isAdminAuthenticated) {
@@ -297,12 +290,10 @@ export default function Home() {
         socketRef.current = activeSocket
 
         activeSocket.on('connect', () => {
-          console.log('[WS] Connected')
           setWsConnected(true)
         })
 
         activeSocket.on('disconnect', () => {
-          console.log('[WS] Disconnected')
           setWsConnected(false)
         })
 
@@ -948,67 +939,6 @@ export default function Home() {
     }
   }
 
-  // Create/Update agent
-  const handleSaveAgent = async () => {
-    if (!agentName.trim() || !currentProject) return
-    setAuthError(null)
-    
-    try {
-      if (editingAgent) {
-        const res = await fetch(`/api/agents/${editingAgent.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: agentName,
-            emoji: agentEmoji,
-            color: agentColor,
-            description: agentDescription,
-          }),
-        })
-
-        if (!res.ok) {
-          throw new Error(await readApiError(res, 'Failed to update agent'))
-        }
-        
-        const updatedAgent = await res.json()
-        
-        setCurrentProject(prev => prev ? {
-          ...prev,
-          agents: prev.agents.map(a => a.id === updatedAgent.id ? updatedAgent : a),
-        } : null)
-      } else {
-        const res = await fetch('/api/agents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: agentName,
-            emoji: agentEmoji,
-            color: agentColor,
-            description: agentDescription,
-            projectId: currentProject.id,
-          }),
-        })
-
-        if (!res.ok) {
-          throw new Error(await readApiError(res, 'Failed to create agent'))
-        }
-        
-        const newAgent = await res.json()
-        
-        setCurrentProject(prev => prev ? {
-          ...prev,
-          agents: [...prev.agents, newAgent],
-        } : null)
-      }
-      
-      resetAgentForm()
-      setAgentDialogOpen(false)
-    } catch (error) {
-      console.error('Error saving agent:', error)
-      setAuthError(error instanceof Error ? error.message : 'Failed to save agent')
-    }
-  }
-
   // Delete agent
   const handleDeleteAgent = async (agentId: string) => {
     setAuthError(null)
@@ -1122,10 +1052,6 @@ export default function Home() {
     // modeInstructions, runtimeModel, systemPrompt, mcpConnectionIds).
     // Fetch the full record so the edit form doesn't populate defaults for
     // unseen fields and silently overwrite them on save.
-    setAgentName(agent.name)
-    setAgentEmoji(agent.emoji)
-    setAgentColor(agent.color)
-    setAgentDescription(agent.description || '')
     setAgentDialogOpen(true)
     try {
       const res = await fetch(`/api/agents/${agent.id}`, { cache: 'no-store' })
@@ -1140,10 +1066,6 @@ export default function Home() {
   }
 
   const resetAgentForm = () => {
-    setAgentName('')
-    setAgentEmoji('🤖')
-    setAgentColor('#3b82f6')
-    setAgentDescription('')
     setEditingAgent(null)
   }
 

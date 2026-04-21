@@ -254,19 +254,17 @@ export async function dispatchStep(stepId: string) {
 
     // Save MCP artifacts if any were collected during tool use
     if (result.artifacts && result.artifacts.length > 0) {
-      for (const artifact of result.artifacts) {
-        await db.stepArtifact.create({
-          data: {
-            stepId,
-            executionId: execution.id,
-            type: artifact.type,
-            label: artifact.label,
-            content: artifact.content || null,
-            url: artifact.url || null,
-            mimeType: artifact.mimeType || null,
-          },
-        })
-      }
+      await db.stepArtifact.createMany({
+        data: result.artifacts.map(artifact => ({
+          stepId,
+          executionId: execution.id,
+          type: artifact.type,
+          label: artifact.label,
+          content: artifact.content || null,
+          url: artifact.url || null,
+          mimeType: artifact.mimeType || null,
+        })),
+      })
     }
 
     broadcastProjectEvent(step.task.projectId, 'step-completed', {

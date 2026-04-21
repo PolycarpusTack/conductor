@@ -42,22 +42,3 @@ export const taskBoardInclude = {
     orderBy: { order: 'asc' as const },
   },
 } as const
-
-export const stepDetailInclude = {
-  agent: { select: { id: true, name: true, emoji: true } },
-  executions: {
-    select: {
-      id: true,
-      attempt: true,
-      status: true,
-      output: true,
-      error: true,
-      tokensUsed: true,
-      cost: true,
-      durationMs: true,
-      startedAt: true,
-      completedAt: true,
-    },
-    orderBy: { attempt: 'asc' as const },
-  },
-} as const
