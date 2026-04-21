@@ -295,3 +295,55 @@ export const listMemoriesSchema = z.object({
   category: memoryCategorySchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 })
+
+// ── Integrations ────────────────────────────────────────────────────────────
+
+export const triggerFilterSchema = z.object({
+  field: z.string().min(1),
+  operator: z.enum(['equals', 'not_equals', 'contains', 'not_contains', 'matches']),
+  value: z.string(),
+})
+
+export const triggerTypeSchema = z.enum(['event', 'poll:sentry'])
+
+export const eventTypeSchema = z.enum([
+  'chain-completed',
+  'step-failed',
+  'task-created',
+  'step-reviewed',
+])
+
+export const reactionTypeSchema = z.enum([
+  'post:slack',
+  'post:http',
+  'create:jira',
+  'send:email',
+])
+
+export const createTriggerSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).optional(),
+  type: triggerTypeSchema,
+  eventType: eventTypeSchema.optional(),
+  eventFilters: z.array(triggerFilterSchema).default([]),
+  pollConfig: z.record(z.string(), z.unknown()).default({}),
+  enabled: z.boolean().default(true),
+})
+
+export const updateTriggerSchema = createTriggerSchema.partial().refine(
+  (v) => Object.keys(v).length > 0,
+  'Provide at least one field to update',
+)
+
+export const createReactionSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  type: reactionTypeSchema,
+  config: z.record(z.string(), z.unknown()),
+  order: z.number().int().min(0),
+  enabled: z.boolean().default(true),
+})
+
+export const updateReactionSchema = createReactionSchema.partial().refine(
+  (v) => Object.keys(v).length > 0,
+  'Provide at least one field to update',
+)
