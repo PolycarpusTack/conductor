@@ -34,6 +34,7 @@ export async function findRelevantEntries(terms: string[], topN = 3): Promise<Pr
   return full.filter((e): e is PromptLibraryEntryFull => e !== null)
 }
 
+/** Input to the wizard composition step — collected from the Requirements form. */
 export interface ComposeRequest {
   purpose: string
   domain: string
@@ -41,6 +42,7 @@ export interface ComposeRequest {
   runtimeId: string
 }
 
+/** Agent fields produced by the LLM composition step, including the archive entries that informed it. */
 export interface ComposeResult {
   name: string
   role: string

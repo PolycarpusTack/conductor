@@ -244,6 +244,14 @@ The Agent Wizard creates a new agent from natural-language requirements. It sear
 
 **Usage:** Click the **✨ Wizard** button in the sidebar to open the wizard.
 
+### API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/prompt-library` | GET | List all archive entries grouped by category |
+| `/api/prompt-library/[entryId]` | GET | Get full content of one archive entry |
+| `/api/agent-wizard/compose` | POST | Compose agent fields from requirements using LLM |
+
 ## License
 
 MIT
