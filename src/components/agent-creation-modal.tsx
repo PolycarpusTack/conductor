@@ -103,6 +103,7 @@ function parseModels(models: string): { id: string, name: string, tier?: string 
   return []
 }
 
+/** Modal dialog for creating or editing a project agent, including identity, runtime, and connection configuration. */
 export function AgentCreationModal({
   open,
   onOpenChange,

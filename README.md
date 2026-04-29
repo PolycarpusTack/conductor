@@ -219,6 +219,20 @@ Set the same `AGENTBOARD_WS_SECRET` and `AGENTBOARD_WS_INTERNAL_SECRET` for both
 - **Real-time**: Socket.io
 - **Search**: Text search (SQLite) or pgvector cosine similarity (PostgreSQL)
 
+## Prompt Archive Browser
+
+AgentBoard can browse a local directory of markdown system prompt templates and use them as a base for new agents.
+
+**Setup:** Set `PROMPT_LIBRARY_PATH` in `.env` to the root of your prompt archive directory:
+
+```
+PROMPT_LIBRARY_PATH="/path/to/your/prompt/archive"
+```
+
+The archive should contain top-level subdirectory "categories" (e.g. `Anthropic/`, `agents/`, `Google/`), each containing `.md` files with the system prompt content. The first H1 heading becomes the entry title; the first paragraph becomes the description.
+
+**Usage:** In the agent creation modal, click **From Archive** on the Runtime tab to open the archive browser, preview entries, and use one as a base for your agent's system prompt.
+
 ## License
 
 MIT
