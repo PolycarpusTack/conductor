@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Input } from '@/components/ui/input'
 import { Loader2, FileText, AlertCircle } from 'lucide-react'
 import { MAX_PROMPT_CONTENT_CHARS } from '@/types/prompt-library'
 import type { PromptLibraryEntry, PromptLibraryListResponse, PromptLibraryEntryFull } from '@/types/prompt-library'
@@ -24,6 +25,21 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
   const [library, setLibrary] = useState<FetchState<PromptLibraryListResponse>>({ status: 'idle' })
   const [selected, setSelected] = useState<PromptLibraryEntry | null>(null)
   const [preview, setPreview] = useState<FetchState<PromptLibraryEntryFull>>({ status: 'idle' })
+  const [filter, setFilter] = useState('')
+
+  const filteredCategories = library.status === 'ok'
+    ? library.data.categories
+        .map((cat) => ({
+          ...cat,
+          entries: filter.trim()
+            ? cat.entries.filter((e) =>
+                e.title.toLowerCase().includes(filter.toLowerCase()) ||
+                e.description.toLowerCase().includes(filter.toLowerCase())
+              )
+            : cat.entries,
+        }))
+        .filter((cat) => cat.entries.length > 0)
+    : []
 
   useEffect(() => {
     if (!open) return
@@ -68,6 +84,16 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
         <div className="flex flex-1 overflow-hidden">
           {/* Left column — category & entry list */}
           <div className="w-72 border-r flex flex-col">
+            {library.status === 'ok' && (
+              <div className="px-3 py-2 border-b">
+                <Input
+                  placeholder="Filter prompts…"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            )}
             <ScrollArea className="flex-1">
               {library.status === 'loading' && (
                 <div className="flex items-center justify-center p-8">
@@ -81,7 +107,7 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
                 </div>
               )}
               {library.status === 'ok' &&
-                library.data.categories.map((cat) => (
+                filteredCategories.map((cat) => (
                   <div key={cat.name} className="py-2">
                     <p className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       {cat.name}
@@ -108,6 +134,11 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
                     ))}
                   </div>
                 ))}
+              {library.status === 'ok' && filter.trim() && filteredCategories.length === 0 && (
+                <p className="px-4 py-6 text-xs text-muted-foreground text-center">
+                  No prompts match &ldquo;{filter}&rdquo;
+                </p>
+              )}
             </ScrollArea>
           </div>
 
