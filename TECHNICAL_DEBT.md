@@ -15,3 +15,11 @@
 | TD-004 | No search/filter within the archive picker | prompt-archive-picker.tsx | Low | Add client-side filter in Epic 5 polish task |
 | TD-005 | No keyboard navigation for the entry list (accessibility gap) | prompt-archive-picker.tsx | Medium | Add aria-* attributes and keyboard handler in a follow-up |
 | TD-006 | Inline fetch logic in PromptArchivePicker could be extracted to a custom hook | prompt-archive-picker.tsx | Low | Extract to usePomptLibrary hook if component grows |
+
+## Epic 3 — Agent Wizard UI Shell (2026-04-29)
+
+| ID | Description | File | Severity | Resolution |
+|----|-------------|------|----------|------------|
+| TD-007 | `reviewForm` omitted from useEffect dependency array (stable ref — safe, but ESLint may warn) | agent-wizard-modal.tsx | Low | Add eslint-disable comment if lint baseline changes |
+| TD-008 | Review form uses getValues() — user edits on review step are read at save time, not watched | agent-wizard-modal.tsx | Low | Switch to watch() if live validation is needed |
+| TD-009 | Composing step (step 2) is a placeholder — wired in Epic 4 | agent-wizard-modal.tsx | High | Implement compose API call in Epic 4 |
