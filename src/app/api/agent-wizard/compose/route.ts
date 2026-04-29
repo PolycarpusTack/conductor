@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { requireAdminSession } from '@/lib/server/admin-session'
 import { composeAgent } from '@/lib/server/wizard-composer'
 import { validateLibraryPath } from '@/lib/server/prompt-library'
 
@@ -12,6 +13,9 @@ const composeRequestSchema = z.object({
 
 /** POST /api/agent-wizard/compose — searches archive and calls LLM to compose agent fields */
 export async function POST(req: Request) {
+  const unauthorized = await requireAdminSession()
+  if (unauthorized) return unauthorized
+
   const libraryError = validateLibraryPath()
   if (libraryError) {
     return NextResponse.json({ error: libraryError }, { status: 503 })

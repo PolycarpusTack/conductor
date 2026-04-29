@@ -1,9 +1,18 @@
+import { z } from 'zod'
 import { listEntries, getEntry } from './prompt-library'
 import type { PromptLibraryEntry, PromptLibraryEntryFull } from '@/types/prompt-library'
 import type { RuntimeAdapter } from '@/lib/server/adapters/types'
 import { db } from '@/lib/db'
 import { getAdapter } from '@/lib/server/adapters/registry'
 import { safeJsonParse } from '@/lib/server/utils'
+
+const composeResultSchema = z.object({
+  name:         z.string().min(1),
+  role:         z.string().min(1),
+  personality:  z.string(),
+  capabilities: z.array(z.string()),
+  systemPrompt: z.string(),
+})
 
 /** Scores an archive entry against a set of search terms (case-insensitive). Title matches score highest. */
 export function scoreEntry(entry: PromptLibraryEntry, terms: string[]): number {
@@ -109,8 +118,16 @@ async function dispatchCompose(
   })
 
   try {
-    return JSON.parse(result.output) as Omit<ComposeResult, 'sourcesUsed'>
-  } catch {
+    const raw = JSON.parse(result.output)
+    const validated = composeResultSchema.safeParse(raw)
+    if (!validated.success) {
+      const err = new Error('LLM_PARSE_FAILURE') as Error & { rawResponse?: string }
+      err.rawResponse = result.output
+      throw err
+    }
+    return validated.data
+  } catch (e) {
+    if ((e as Error).message === 'LLM_PARSE_FAILURE') throw e
     const err = new Error('LLM_PARSE_FAILURE') as Error & { rawResponse?: string }
     err.rawResponse = result.output
     throw err

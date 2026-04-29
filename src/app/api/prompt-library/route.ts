@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
+import { requireAdminSession } from '@/lib/server/admin-session'
 import { validateLibraryPath, listEntries } from '@/lib/server/prompt-library'
 
 /** GET /api/prompt-library — returns all archive entries grouped by category */
 export async function GET() {
+  const unauthorized = await requireAdminSession()
+  if (unauthorized) return unauthorized
+
   const error = validateLibraryPath()
   if (error) {
     return NextResponse.json({ error }, { status: 503 })
