@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +31,17 @@ const requirementsSchema = z.object({
 
 export type WizardRequirements = z.infer<typeof requirementsSchema>
 
+/** Shape of an agent composed by the LLM wizard. */
+export interface WizardComposedAgent {
+  name: string
+  role: string
+  personality: string
+  capabilities: string[]
+  systemPrompt: string
+  /** Archive entry IDs used as source material */
+  sourcesUsed: string[]
+}
+
 interface AgentWizardModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -41,10 +54,16 @@ interface AgentWizardModalProps {
 export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated }: AgentWizardModalProps) {
   const [step, setStep] = useState<WizardStep>('requirements')
   const [runtimes, setRuntimes] = useState<{ id: string; name: string }[]>([])
+  const [composed, setComposed] = useState<WizardComposedAgent | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const form = useForm<WizardRequirements>({
     resolver: zodResolver(requirementsSchema),
     defaultValues: { purpose: '', domain: '', goal: 'analysis', runtimeId: '' },
+  })
+
+  const reviewForm = useForm<WizardComposedAgent>({
+    defaultValues: { name: '', role: '', personality: '', capabilities: [], systemPrompt: '', sourcesUsed: [] },
   })
 
   useEffect(() => {
@@ -55,9 +74,47 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
       .catch(() => {})
   }, [open, projectId])
 
+  useEffect(() => {
+    if (composed) reviewForm.reset(composed)
+  }, [composed])
+
   function handleCancel() {
     setStep('requirements')
     onOpenChange(false)
+  }
+
+  /** Saves the composed agent via POST /api/agents. */
+  async function handleSaveAgent() {
+    const values = reviewForm.getValues()
+    if (!values.name?.trim()) {
+      toast.error('Agent name is required')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: values.name,
+          role: values.role,
+          personality: values.personality,
+          capabilities: values.capabilities ?? [],
+          systemPrompt: values.systemPrompt,
+          projectId,
+          runtimeId: form.getValues('runtimeId'),
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.error ?? 'Failed to create agent')
+        return
+      }
+      toast.success('Agent created!')
+      onAgentCreated()
+    } finally {
+      setSaving(false)
+    }
   }
 
   function stepIndex(s: WizardStep) {
@@ -162,7 +219,41 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
             </form>
           )}
           {step === 'composing'    && <p>Composing… (Epic 4)</p>}
-          {step === 'review'       && <p>Review form (Task 3.3)</p>}
+          {step === 'review' && (
+            <form className="space-y-3 w-full" onSubmit={(e) => e.preventDefault()}>
+              {!composed ? (
+                <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                  <Loader2 className="animate-spin h-4 w-4 mr-2" /> Waiting for composition…
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Name</Label>
+                      <Input {...reviewForm.register('name')} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Role</Label>
+                      <Input {...reviewForm.register('role')} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Personality</Label>
+                    <Input {...reviewForm.register('personality')} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>System Prompt</Label>
+                    <Textarea rows={8} className="font-mono text-xs" {...reviewForm.register('systemPrompt')} />
+                  </div>
+                  {composed.sourcesUsed.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Sources used: {composed.sourcesUsed.join(', ')}
+                    </p>
+                  )}
+                </>
+              )}
+            </form>
+          )}
         </div>
 
         {/* Navigation */}
@@ -180,7 +271,9 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
               </Button>
             )}
             {step === 'review' && (
-              <Button>Save Agent</Button>
+              <Button onClick={handleSaveAgent} disabled={saving || !composed}>
+                {saving ? <><Loader2 className="animate-spin h-4 w-4 mr-2" />Saving…</> : 'Save Agent'}
+              </Button>
             )}
           </div>
         </div>
