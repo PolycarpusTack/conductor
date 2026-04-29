@@ -12,12 +12,17 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error }, { status: 503 })
   }
 
-  const { entryId } = await params
-  const entry = getEntry(entryId)
+  try {
+    const { entryId } = await params
+    const entry = getEntry(entryId)
 
-  if (!entry) {
-    return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+    if (!entry) {
+      return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ entry })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unexpected error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-
-  return NextResponse.json({ entry })
 }

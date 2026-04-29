@@ -8,6 +8,11 @@ export async function GET() {
     return NextResponse.json({ error }, { status: 503 })
   }
 
-  const data = listEntries()
-  return NextResponse.json(data)
+  try {
+    const data = listEntries()
+    return NextResponse.json(data)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unexpected error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
