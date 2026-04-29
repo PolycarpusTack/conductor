@@ -24,3 +24,12 @@
 | TD-008 | Review form uses getValues() — user edits on review step are read at save time, not watched | agent-wizard-modal.tsx | Low | Switch to watch() if live validation is needed |
 | TD-009 | Composing step (step 2) is a placeholder — wired in Epic 4 | agent-wizard-modal.tsx | High | Implement compose API call in Epic 4 |
 | TD-010 | Runtimes API returned bare array not wrapped object — wizard adapted with Array.isArray guard | agent-wizard-modal.tsx | Low | Standardize API response shape in API review |
+
+## Epic 4 — Wizard LLM Composition (2026-04-29)
+
+| ID | Description | File | Severity | Resolution |
+|----|-------------|------|----------|------------|
+| TD-011 | Keyword search is naive — no stemming, no synonyms | wizard-composer.ts | Low | Upgrade to embeddings-based search using existing Skills infrastructure in v2 |
+| TD-012 | COMPOSE_PROMPT is a hardcoded template string — not configurable | wizard-composer.ts | Low | Move to configurable prompt template in settings in v2 |
+| TD-013 | No retry or timeout on LLM call in composeAgent | wizard-composer.ts | Low | Add timeout and retry with exponential backoff |
+| TD-014 | composeAgent parses LLM JSON without schema validation — trusts LLM output shape | wizard-composer.ts | Medium | Add Zod parse on LLM response for safety |
