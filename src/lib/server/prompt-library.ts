@@ -1,9 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { PromptLibraryEntry, PromptLibraryEntryFull, PromptLibraryListResponse } from '../../types/prompt-library'
-
-/** Maximum characters of prompt content returned by the single-entry endpoint. Leaves headroom for Mustache variable injection at dispatch time. */
-export const MAX_PROMPT_CONTENT_CHARS = 9_500
+import { MAX_PROMPT_CONTENT_CHARS } from '@/types/prompt-library'
 
 /** Returns the configured archive root, or null if not set. */
 export function getLibraryPath(): string | null {

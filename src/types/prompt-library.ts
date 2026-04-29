@@ -1,3 +1,6 @@
+/** Maximum characters of prompt content returned by the API. Leaves headroom for Mustache variable injection. */
+export const MAX_PROMPT_CONTENT_CHARS = 9_500
+
 /** Lightweight metadata returned in list responses. */
 export interface PromptLibraryEntry {
   /** base64url-encoded relative file path — stable, URL-safe ID */

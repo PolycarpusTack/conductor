@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Loader2, FileText, AlertCircle } from 'lucide-react'
+import { MAX_PROMPT_CONTENT_CHARS } from '@/types/prompt-library'
 import type { PromptLibraryEntry, PromptLibraryListResponse, PromptLibraryEntryFull } from '@/types/prompt-library'
 
 interface PromptArchivePickerProps {
@@ -100,7 +101,7 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
                             <span className="block text-xs text-muted-foreground truncate">{entry.description}</span>
                           )}
                         </span>
-                        {entry.charCount > 9_500 && (
+                        {entry.charCount > MAX_PROMPT_CONTENT_CHARS && (
                           <Badge variant="outline" className="text-xs shrink-0">Large</Badge>
                         )}
                       </button>
