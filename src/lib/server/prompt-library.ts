@@ -29,6 +29,34 @@ function decodeId(id: string): string {
   return Buffer.from(id, 'base64url').toString('utf8')
 }
 
+/** Reads all .md files in a directory and returns them as PromptLibraryEntry records. */
+function readCategoryEntries(categoryName: string, categoryDir: string): PromptLibraryEntry[] {
+  const files = fs.readdirSync(categoryDir, { withFileTypes: true })
+  const entries: PromptLibraryEntry[] = []
+
+  for (const file of files) {
+    if (file.name.startsWith('.')) continue
+    if (!file.isFile() || !file.name.endsWith('.md')) continue
+
+    const relativePath = categoryName ? `${categoryName}/${file.name}` : file.name
+    const absolutePath = path.join(categoryDir, file.name)
+    const content = fs.readFileSync(absolutePath, 'utf8')
+    const fallback = file.name.replace(/\.md$/, '')
+
+    entries.push({
+      id: encodeId(relativePath),
+      category: categoryName,
+      title: extractTitle(content, fallback),
+      description: extractDescription(content),
+      charCount: content.length,
+      relativePath,
+    })
+  }
+
+  entries.sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()))
+  return entries
+}
+
 function extractTitle(content: string, fallback: string): string {
   const match = content.match(/^#\s+(.+)$/m)
   return match ? match[1].trim() : fallback
@@ -66,76 +94,26 @@ export function listEntries(): PromptLibraryListResponse {
   const libraryPath = getLibraryPath()!
 
   const topLevel = fs.readdirSync(libraryPath, { withFileTypes: true })
-
   const categoryMap = new Map<string, PromptLibraryEntry[]>()
 
-  // Process subdirectories (categories)
   for (const entry of topLevel) {
     if (entry.name.startsWith('.')) continue
-
     if (entry.isDirectory()) {
-      const categoryName = entry.name
-      const categoryDir = path.join(libraryPath, categoryName)
-      const files = fs.readdirSync(categoryDir, { withFileTypes: true })
-      const entries: PromptLibraryEntry[] = []
-
-      for (const file of files) {
-        if (file.name.startsWith('.')) continue
-        if (!file.isFile() || !file.name.endsWith('.md')) continue
-
-        const relativePath = `${categoryName}/${file.name}`
-        const absolutePath = path.join(categoryDir, file.name)
-        const content = fs.readFileSync(absolutePath, 'utf8')
-        const fallback = file.name.replace(/\.md$/, '')
-
-        entries.push({
-          id: encodeId(relativePath),
-          category: categoryName,
-          title: extractTitle(content, fallback),
-          description: extractDescription(content),
-          charCount: content.length,
-          relativePath,
-        })
-      }
-
-      entries.sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()))
-      categoryMap.set(categoryName, entries)
+      const categoryDir = path.join(libraryPath, entry.name)
+      const entries = readCategoryEntries(entry.name, categoryDir)
+      if (entries.length > 0) categoryMap.set(entry.name, entries)
     }
   }
 
-  // Process root-level .md files — placed in category ""
-  const rootMdEntries: PromptLibraryEntry[] = []
-  for (const entry of topLevel) {
-    if (entry.name.startsWith('.')) continue
-    if (!entry.isFile() || !entry.name.endsWith('.md')) continue
-
-    const relativePath = entry.name
-    const absolutePath = path.join(libraryPath, entry.name)
-    const content = fs.readFileSync(absolutePath, 'utf8')
-    const fallback = entry.name.replace(/\.md$/, '')
-
-    rootMdEntries.push({
-      id: encodeId(relativePath),
-      category: '',
-      title: extractTitle(content, fallback),
-      description: extractDescription(content),
-      charCount: content.length,
-      relativePath,
-    })
-  }
-  if (rootMdEntries.length > 0) {
-    rootMdEntries.sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()))
-    categoryMap.set('', rootMdEntries)
-  }
+  // Root-level .md files — placed in category ""
+  const rootEntries = readCategoryEntries('', libraryPath)
+  if (rootEntries.length > 0) categoryMap.set('', rootEntries)
 
   // Sort categories alphabetically, root "" goes last
   const sortedNames = Array.from(categoryMap.keys())
     .filter(name => name !== '')
     .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
-
-  if (categoryMap.has('')) {
-    sortedNames.push('')
-  }
+  if (categoryMap.has('')) sortedNames.push('')
 
   const categories = sortedNames.map(name => ({
     name,
