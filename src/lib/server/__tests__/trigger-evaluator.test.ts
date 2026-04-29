@@ -1,6 +1,7 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import type { Trigger, Reaction } from '@/generated/prisma/client'
 
-const mockTriggerFindMany = mock(() => Promise.resolve([]))
+const mockTriggerFindMany = mock((): Promise<(Trigger & { reactions: Reaction[] })[]> => Promise.resolve([]))
 const mockTriggerUpdate = mock(() => Promise.resolve({}))
 const mockExecuteReactions = mock(() => Promise.resolve())
 
@@ -19,14 +20,20 @@ mock.module('@/lib/server/reactions/executor', () => ({
 
 import { checkAndFireTriggers } from '../triggers/evaluator'
 
-function makeTrigger(overrides: Record<string, unknown> = {}) {
+function makeTrigger(overrides: Partial<Trigger & { reactions: Reaction[] }> = {}): Trigger & { reactions: Reaction[] } {
   return {
     id: 'trig-1',
     projectId: 'proj-1',
+    name: 'Test Trigger',
+    description: null,
     type: 'event',
     eventType: 'chain-completed',
     eventFilters: '[]',
+    pollConfig: '{}',
     enabled: true,
+    lastFiredAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
     reactions: [],
     ...overrides,
   }
