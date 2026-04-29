@@ -1,5 +1,6 @@
 import { listEntries, getEntry } from './prompt-library'
 import type { PromptLibraryEntry, PromptLibraryEntryFull } from '@/types/prompt-library'
+import type { RuntimeAdapter } from '@/lib/server/adapters/types'
 import { db } from '@/lib/db'
 import { getAdapter } from '@/lib/server/adapters/registry'
 import { safeJsonParse } from '@/lib/server/utils'
@@ -72,29 +73,25 @@ Respond with ONLY a JSON object (no markdown fences) with this exact shape:
 }
 `.trim()
 
-/** Calls the configured ProjectRuntime LLM to compose agent fields from requirements. */
-export async function composeAgent(req: ComposeRequest): Promise<ComposeResult> {
-  const runtime = await db.projectRuntime.findUnique({
-    where: { id: req.runtimeId },
-  })
-
-  if (!runtime) {
-    throw new Error(`Runtime not found: ${req.runtimeId}`)
-  }
+/** Resolves a ProjectRuntime record and its adapter, throwing if either is missing or unavailable. */
+async function resolveRuntime(runtimeId: string) {
+  const runtime = await db.projectRuntime.findUnique({ where: { id: runtimeId } })
+  if (!runtime) throw new Error(`Runtime not found: ${runtimeId}`)
 
   const adapter = getAdapter(runtime.adapter)
-  if (!adapter || !adapter.available) {
-    throw new Error(`Adapter "${runtime.adapter}" not available`)
-  }
+  if (!adapter || !adapter.available) throw new Error(`Adapter "${runtime.adapter}" not available`)
 
-  const terms = [req.purpose, req.domain, req.goal].flatMap((s) => s.split(/\s+/)).filter(Boolean)
-  const sources = await findRelevantEntries(terms, 3)
+  return { runtime, adapter }
+}
 
-  const systemPrompt = COMPOSE_PROMPT(req, sources)
-
-  const models = safeJsonParse<string[]>(runtime.models, [])
-  const model = models[0] ?? 'default'
-
+/** Dispatches the compose prompt to the adapter and parses the JSON result. */
+async function dispatchCompose(
+  adapter: RuntimeAdapter,
+  runtime: Awaited<ReturnType<typeof resolveRuntime>>['runtime'],
+  systemPrompt: string,
+  purpose: string,
+): Promise<Omit<ComposeResult, 'sourcesUsed'>> {
+  const model = (safeJsonParse<string[]>(runtime.models, []))[0] ?? 'default'
   const runtimeConfig: Record<string, unknown> = {
     ...safeJsonParse<Record<string, unknown>>(runtime.config, {}),
     apiKeyEnvVar: runtime.apiKeyEnvVar,
@@ -103,23 +100,29 @@ export async function composeAgent(req: ComposeRequest): Promise<ComposeResult> 
 
   const result = await adapter.dispatch({
     systemPrompt,
-    taskContext: `Compose an agent for: ${req.purpose}`,
+    taskContext: `Compose an agent for: ${purpose}`,
     mode: 'compose',
     model,
     runtimeConfig,
   })
 
-  let parsed: Omit<ComposeResult, 'sourcesUsed'>
   try {
-    parsed = JSON.parse(result.output) as Omit<ComposeResult, 'sourcesUsed'>
+    return JSON.parse(result.output) as Omit<ComposeResult, 'sourcesUsed'>
   } catch {
     const err = new Error('LLM_PARSE_FAILURE') as Error & { rawResponse?: string }
     err.rawResponse = result.output
     throw err
   }
+}
 
-  return {
-    ...parsed,
-    sourcesUsed: sources.map((s) => s.id),
-  }
+/** Calls the configured ProjectRuntime LLM to compose agent fields from requirements. */
+export async function composeAgent(req: ComposeRequest): Promise<ComposeResult> {
+  const { runtime, adapter } = await resolveRuntime(req.runtimeId)
+
+  const terms = [req.purpose, req.domain, req.goal].flatMap((s) => s.split(/\s+/)).filter(Boolean)
+  const sources = await findRelevantEntries(terms, 3)
+
+  const parsed = await dispatchCompose(adapter, runtime, COMPOSE_PROMPT(req, sources), req.purpose)
+
+  return { ...parsed, sourcesUsed: sources.map((s) => s.id) }
 }
