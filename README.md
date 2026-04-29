@@ -182,6 +182,8 @@ AGENTBOARD_WS_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
 OPENAI_API_KEY=""
 # Optional: override the default embedding model
 EMBEDDING_MODEL="text-embedding-3-small"
+# Optional: path to a local system prompt archive directory (enables /api/prompt-library)
+PROMPT_LIBRARY_PATH="/path/to/system_prompts_leaks"
 ```
 
 The board UI now requires the admin password before it can access project management routes.
@@ -216,6 +218,39 @@ Set the same `AGENTBOARD_WS_SECRET` and `AGENTBOARD_WS_INTERNAL_SECRET` for both
 - **Database**: Prisma ORM with SQLite (default) or PostgreSQL 17 + pgvector
 - **Real-time**: Socket.io
 - **Search**: Text search (SQLite) or pgvector cosine similarity (PostgreSQL)
+
+## Prompt Archive Browser
+
+AgentBoard can browse a local directory of markdown system prompt templates and use them as a base for new agents.
+
+**Setup:** Set `PROMPT_LIBRARY_PATH` in `.env` to the root of your prompt archive directory:
+
+```
+PROMPT_LIBRARY_PATH="/path/to/your/prompt/archive"
+```
+
+The archive should contain top-level subdirectory "categories" (e.g. `Anthropic/`, `agents/`, `Google/`), each containing `.md` files with the system prompt content. The first H1 heading becomes the entry title; the first paragraph becomes the description.
+
+**Usage:** In the agent creation modal, click **From Archive** on the Runtime tab to open the archive browser, preview entries, and use one as a base for your agent's system prompt.
+
+## Agent Wizard
+
+The Agent Wizard creates a new agent from natural-language requirements. It searches the prompt archive for relevant templates and uses an LLM to compose a tailored system prompt and agent profile.
+
+**Steps:**
+1. **Requirements** — describe what the agent should do, its domain, primary goal, and which LLM runtime to use for composition
+2. **Composing** — the wizard searches the archive and calls the selected LLM to generate agent fields
+3. **Review & Save** — inspect and edit the generated name, role, personality, and system prompt before saving
+
+**Usage:** Click the **✨ Wizard** button in the sidebar to open the wizard.
+
+### API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/prompt-library` | GET | List all archive entries grouped by category |
+| `/api/prompt-library/[entryId]` | GET | Get full content of one archive entry |
+| `/api/agent-wizard/compose` | POST | Compose agent fields from requirements using LLM |
 
 ## License
 

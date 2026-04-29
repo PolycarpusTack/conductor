@@ -66,6 +66,7 @@ import { SettingsAutomation } from '@/components/settings-automation'
 import { SettingsIntegrations, type IntegrationTrigger } from '@/components/settings-integrations'
 import { ActivityTail } from '@/components/activity-tail'
 import { AgentCreationModal } from '@/components/agent-creation-modal'
+import { AgentWizardModal } from '@/components/agent-wizard-modal'
 import { ChainBuilder } from '@/components/chain-builder'
 import { StepOutputViewer } from '@/components/step-output-viewer'
 import { TaskDetailDrawer } from '@/components/task-detail-drawer'
@@ -200,6 +201,7 @@ export default function Home() {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   const [projectDialogOpen, setProjectDialogOpen] = useState(false)
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
+  const [wizardOpen, setWizardOpen] = useState(false)
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
   const [settingsTab, setSettingsTab] = useState<'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null>(null)
   const [expandedAgentStats, setExpandedAgentStats] = useState<string | null>(null)
@@ -1821,6 +1823,9 @@ export default function Home() {
               <Plus className="h-3 w-3 mr-2" />
               Create Agent
             </Button>
+            <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => setWizardOpen(true)}>
+              ✨ Wizard
+            </Button>
             <Button
               variant="outline"
               className="w-full text-xs"
@@ -2842,6 +2847,13 @@ export default function Home() {
           />
         </>
       )}
+
+      <AgentWizardModal
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        projectId={currentProject?.id ?? ''}
+        onAgentCreated={() => { setWizardOpen(false); if (currentProject) fetchProject(currentProject.id).then(setCurrentProject) }}
+      />
     </div>
   )
 }
