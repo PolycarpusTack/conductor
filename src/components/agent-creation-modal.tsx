@@ -10,7 +10,10 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { X } from 'lucide-react'
+import { toast } from 'sonner'
 import { AgentMemoryPanel } from '@/components/agent-memory-panel'
+import { PromptArchivePicker } from '@/components/prompt-archive-picker'
+import type { PromptLibraryEntry } from '@/types/prompt-library'
 
 interface Agent {
   id: string
@@ -135,6 +138,9 @@ export function AgentCreationModal({
   // Connections
   const [selectedMcpIds, setSelectedMcpIds] = useState<string[]>([])
 
+  // Archive picker
+  const [archivePickerOpen, setArchivePickerOpen] = useState(false)
+
   const isEditing = !!editingAgent
 
   useEffect(() => {
@@ -209,6 +215,16 @@ export function AgentCreationModal({
     } else {
       setSelectedMcpIds([...selectedMcpIds, id])
     }
+  }
+
+  /** Called when the user picks an entry from the archive. */
+  function handleArchiveSelect(content: string, _meta: PromptLibraryEntry) {
+    const MAX = 9_500
+    const trimmed = content.length > MAX ? content.slice(0, MAX) : content
+    if (content.length > MAX) {
+      toast.warning('Prompt truncated to 9,500 characters to fit the system prompt limit.')
+    }
+    setSystemPrompt(trimmed)
   }
 
   const handleSave = async () => {
@@ -546,17 +562,27 @@ export function AgentCreationModal({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-medium">System Prompt</label>
-                  {role && role !== 'custom' && ROLE_TEMPLATES[role] && (
+                  <div className="flex gap-2">
+                    {role && role !== 'custom' && ROLE_TEMPLATES[role] && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-auto py-1"
+                        onClick={() => setSystemPrompt(ROLE_TEMPLATES[role] || '')}
+                      >
+                        Load {role} template
+                      </Button>
+                    )}
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="text-xs h-auto py-1"
-                      onClick={() => setSystemPrompt(ROLE_TEMPLATES[role] || '')}
+                      onClick={() => setArchivePickerOpen(true)}
                     >
-                      Load {role} template
+                      From Archive
                     </Button>
-                  )}
+                  </div>
                 </div>
                 <Textarea
                   value={systemPrompt}
@@ -620,6 +646,11 @@ export function AgentCreationModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <PromptArchivePicker
+        open={archivePickerOpen}
+        onOpenChange={setArchivePickerOpen}
+        onSelect={handleArchiveSelect}
+      />
     </Dialog>
   )
 }
