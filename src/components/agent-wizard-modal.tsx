@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
+/** The three steps of the agent creation wizard. */
 export type WizardStep = 'requirements' | 'composing' | 'review'
 
 const STEPS: { id: WizardStep; label: string }[] = [
@@ -29,6 +30,7 @@ const requirementsSchema = z.object({
   runtimeId: z.string().trim().min(1, 'Select a runtime for the LLM composition'),
 })
 
+/** Validated form data collected on the Requirements step. */
 export type WizardRequirements = z.infer<typeof requirementsSchema>
 
 /** Shape of an agent composed by the LLM wizard. */

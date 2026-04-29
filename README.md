@@ -233,6 +233,17 @@ The archive should contain top-level subdirectory "categories" (e.g. `Anthropic/
 
 **Usage:** In the agent creation modal, click **From Archive** on the Runtime tab to open the archive browser, preview entries, and use one as a base for your agent's system prompt.
 
+## Agent Wizard
+
+The Agent Wizard creates a new agent from natural-language requirements. It searches the prompt archive for relevant templates and uses an LLM to compose a tailored system prompt and agent profile.
+
+**Steps:**
+1. **Requirements** — describe what the agent should do, its domain, primary goal, and which LLM runtime to use for composition
+2. **Composing** — the wizard searches the archive and calls the selected LLM to generate agent fields
+3. **Review & Save** — inspect and edit the generated name, role, personality, and system prompt before saving
+
+**Usage:** Click the **✨ Wizard** button in the sidebar to open the wizard.
+
 ## License
 
 MIT
