@@ -80,6 +80,20 @@ function extractDescription(content: string): string {
   return paragraphLines.join(' ').slice(0, 200)
 }
 
+interface CacheEntry {
+  data: PromptLibraryListResponse
+  expiresAt: number
+}
+
+let listCache: CacheEntry | null = null
+
+const CACHE_TTL_MS = 60_000
+
+/** Clears the list cache — intended for use in tests only. */
+export function clearListCache(): void {
+  listCache = null
+}
+
 /**
  * Lists all prompt archive entries grouped by top-level category folder.
  * Skips hidden directories (names starting with '.') and non-.md files.
@@ -87,6 +101,9 @@ function extractDescription(content: string): string {
  * Categories are sorted alphabetically.
  */
 export function listEntries(): PromptLibraryListResponse {
+  if (listCache && Date.now() < listCache.expiresAt) {
+    return listCache.data
+  }
   const error = validateLibraryPath()
   if (error) throw new Error(error)
   const libraryPath = getLibraryPath()!
@@ -118,7 +135,9 @@ export function listEntries(): PromptLibraryListResponse {
     entries: categoryMap.get(name)!,
   }))
 
-  return { categories }
+  const result: PromptLibraryListResponse = { categories }
+  listCache = { data: result, expiresAt: Date.now() + CACHE_TTL_MS }
+  return result
 }
 
 /**

@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach, beforeEach } from 'bun:test'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { getLibraryPath, validateLibraryPath, listEntries, getEntry } from '../prompt-library'
+import { getLibraryPath, validateLibraryPath, listEntries, getEntry, clearListCache } from '../prompt-library'
 
 describe('getLibraryPath', () => {
   let original: string | undefined
@@ -68,6 +68,7 @@ describe('listEntries', () => {
     rmSync(tmpDir, { recursive: true, force: true })
     if (original === undefined) delete process.env.PROMPT_LIBRARY_PATH
     else process.env.PROMPT_LIBRARY_PATH = original
+    clearListCache()
   })
 
   test('basic: returns entries under the correct category with extracted titles, sorted alphabetically', () => {
@@ -186,5 +187,40 @@ describe('getEntry', () => {
     const id = Buffer.from('nonexistent/file.md').toString('base64url')
     const entry = getEntry(id)
     expect(entry).toBeNull()
+  })
+})
+
+describe('listEntries — caching', () => {
+  let tmpDir: string
+  let original: string | undefined
+
+  beforeEach(() => {
+    original = process.env.PROMPT_LIBRARY_PATH
+    tmpDir = mkdtempSync(join(tmpdir(), 'pl-cache-'))
+    process.env.PROMPT_LIBRARY_PATH = tmpDir
+  })
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.PROMPT_LIBRARY_PATH
+    else process.env.PROMPT_LIBRARY_PATH = original
+    rmSync(tmpDir, { recursive: true, force: true })
+    clearListCache()
+  })
+
+  test('returns same result on second call without re-reading disk', () => {
+    const catDir = join(tmpDir, 'test')
+    mkdirSync(catDir)
+    writeFileSync(join(catDir, 'a.md'), '# Alpha\nFirst.')
+
+    const result1 = listEntries()
+
+    // Mutate the file — cache should return stale data
+    writeFileSync(join(catDir, 'a.md'), '# Beta\nChanged.')
+
+    const result2 = listEntries()
+
+    // Both calls should return the same (first) result — proves cache was used
+    expect(result1.categories[0].entries[0].title).toBe('Alpha')
+    expect(result2.categories[0].entries[0].title).toBe('Alpha')
   })
 })
