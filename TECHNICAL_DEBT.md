@@ -1,10 +1,16 @@
 # Technical Debt Register
 
+> Last updated: 2026-04-29
+>
+> ✅ = resolved | ⚠️ = active | 🔴 = blocking
+>
+> Items marked resolved are kept for historical context.
+
 ## Epic 1 — Prompt Archive Infrastructure (2026-04-29)
 
 | ID | Description | File | Severity | Resolution |
 |----|-------------|------|----------|------------|
-| TD-001 | No caching — archive is re-read from disk on every request | src/lib/server/prompt-library.ts | Low | Add 60s in-memory cache in Epic 5 polish task |
+| TD-001 ✅ | No caching — archive is re-read from disk on every request | src/lib/server/prompt-library.ts | Low | ✅ Resolved in Task 5.1 — 60s in-memory cache added to `listEntries()` |
 | TD-002 | No recursive subfolder support (e.g. Anthropic/old/) | src/lib/server/prompt-library.ts | Low | Implement in a future iteration if needed |
 | TD-003 | No file watcher — archive changes require app restart | src/lib/server/prompt-library.ts | Low | Acceptable for v1; add inotify/chokidar watch in v2 |
 
@@ -12,7 +18,7 @@
 
 | ID | Description | File | Severity | Resolution |
 |----|-------------|------|----------|------------|
-| TD-004 | No search/filter within the archive picker | prompt-archive-picker.tsx | Low | Add client-side filter in Epic 5 polish task |
+| TD-004 ✅ | No search/filter within the archive picker | prompt-archive-picker.tsx | Low | ✅ Resolved in Task 5.2 — client-side filter added to PromptArchivePicker |
 | TD-005 | No keyboard navigation for the entry list (accessibility gap) | prompt-archive-picker.tsx | Medium | Add aria-* attributes and keyboard handler in a follow-up |
 | TD-006 | Inline fetch logic in PromptArchivePicker could be extracted to a custom hook | prompt-archive-picker.tsx | Low | Extract to usePomptLibrary hook if component grows |
 
