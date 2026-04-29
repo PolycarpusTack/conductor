@@ -25,6 +25,7 @@ export interface PromptLibraryEntryFull extends PromptLibraryEntry {
   truncated: boolean
 }
 
+/** Response shape for GET /api/prompt-library — entries grouped by category folder. */
 export interface PromptLibraryListResponse {
   categories: {
     name: string
