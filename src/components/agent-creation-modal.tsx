@@ -13,7 +13,7 @@ import { X } from 'lucide-react'
 import { toast } from 'sonner'
 import { AgentMemoryPanel } from '@/components/agent-memory-panel'
 import { PromptArchivePicker } from '@/components/prompt-archive-picker'
-import type { PromptLibraryEntry } from '@/types/prompt-library'
+import { MAX_PROMPT_CONTENT_CHARS, type PromptLibraryEntry } from '@/types/prompt-library'
 
 interface Agent {
   id: string
@@ -219,9 +219,8 @@ export function AgentCreationModal({
 
   /** Called when the user picks an entry from the archive. */
   function handleArchiveSelect(content: string, _meta: PromptLibraryEntry) {
-    const MAX = 9_500
-    const trimmed = content.length > MAX ? content.slice(0, MAX) : content
-    if (content.length > MAX) {
+    const trimmed = content.length > MAX_PROMPT_CONTENT_CHARS ? content.slice(0, MAX_PROMPT_CONTENT_CHARS) : content
+    if (content.length > MAX_PROMPT_CONTENT_CHARS) {
       toast.warning('Prompt truncated to 9,500 characters to fit the system prompt limit.')
     }
     setSystemPrompt(trimmed)
