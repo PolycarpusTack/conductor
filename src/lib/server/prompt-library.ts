@@ -37,13 +37,17 @@ function extractTitle(content: string, fallback: string): string {
 function extractDescription(content: string): string {
   const lines = content.split('\n')
   const paragraphLines: string[] = []
-  let inParagraph = false
 
   for (const line of lines) {
     const trimmed = line.trim()
-    if (trimmed.startsWith('#')) { inParagraph = false; paragraphLines.length = 0; continue }
-    if (trimmed === '') { if (inParagraph && paragraphLines.length > 0) break; continue }
-    inParagraph = true
+    if (trimmed.startsWith('#')) {
+      if (paragraphLines.length > 0) break
+      continue
+    }
+    if (trimmed === '') {
+      if (paragraphLines.length > 0) break
+      continue
+    }
     paragraphLines.push(trimmed)
   }
 
@@ -57,10 +61,9 @@ function extractDescription(content: string): string {
  * Categories are sorted alphabetically.
  */
 export function listEntries(): PromptLibraryListResponse {
-  const libraryPath = getLibraryPath()
-  if (!libraryPath || validateLibraryPath() !== null) {
-    throw new Error('Prompt library not configured')
-  }
+  const error = validateLibraryPath()
+  if (error) throw new Error(error)
+  const libraryPath = getLibraryPath()!
 
   const topLevel = fs.readdirSync(libraryPath, { withFileTypes: true })
 
@@ -148,13 +151,16 @@ export function listEntries(): PromptLibraryListResponse {
  * If truncated, appends "\n\n---\n*[Content truncated to 9500 characters]*" to the content.
  */
 export function getEntry(id: string): PromptLibraryEntryFull | null {
-  const libraryPath = getLibraryPath()
-  if (!libraryPath || validateLibraryPath() !== null) {
-    throw new Error('Prompt library not configured')
-  }
+  const error = validateLibraryPath()
+  if (error) throw new Error(error)
+  const libraryPath = getLibraryPath()!
 
   const relativePath = decodeId(id)
   const absolutePath = path.join(libraryPath, relativePath)
+
+  if (!absolutePath.startsWith(libraryPath + path.sep) && absolutePath !== libraryPath) {
+    return null
+  }
 
   if (!fs.existsSync(absolutePath)) return null
 

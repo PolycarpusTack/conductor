@@ -1,18 +1,15 @@
 import { describe, test, expect, afterEach, beforeEach } from 'bun:test'
-import { mkdtempSync, rmdirSync, mkdirSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { getLibraryPath, validateLibraryPath, listEntries, getEntry } from '../prompt-library'
 
 describe('getLibraryPath', () => {
-  const ORIGINAL = process.env.PROMPT_LIBRARY_PATH
-
+  let original: string | undefined
+  beforeEach(() => { original = process.env.PROMPT_LIBRARY_PATH })
   afterEach(() => {
-    if (ORIGINAL === undefined) {
-      delete process.env.PROMPT_LIBRARY_PATH
-    } else {
-      process.env.PROMPT_LIBRARY_PATH = ORIGINAL
-    }
+    if (original === undefined) delete process.env.PROMPT_LIBRARY_PATH
+    else process.env.PROMPT_LIBRARY_PATH = original
   })
 
   test('returns null when env var is unset', () => {
@@ -27,14 +24,11 @@ describe('getLibraryPath', () => {
 })
 
 describe('validateLibraryPath', () => {
-  const ORIGINAL = process.env.PROMPT_LIBRARY_PATH
-
+  let original: string | undefined
+  beforeEach(() => { original = process.env.PROMPT_LIBRARY_PATH })
   afterEach(() => {
-    if (ORIGINAL === undefined) {
-      delete process.env.PROMPT_LIBRARY_PATH
-    } else {
-      process.env.PROMPT_LIBRARY_PATH = ORIGINAL
-    }
+    if (original === undefined) delete process.env.PROMPT_LIBRARY_PATH
+    else process.env.PROMPT_LIBRARY_PATH = original
   })
 
   test('returns error string when env var is unset', () => {
@@ -55,27 +49,25 @@ describe('validateLibraryPath', () => {
       process.env.PROMPT_LIBRARY_PATH = tmpDir
       expect(validateLibraryPath()).toBeNull()
     } finally {
-      rmdirSync(tmpDir)
+      rmSync(tmpDir, { recursive: true, force: true })
     }
   })
 })
 
 describe('listEntries', () => {
   let tmpDir: string
-  const ORIGINAL = process.env.PROMPT_LIBRARY_PATH
+  let original: string | undefined
 
   beforeEach(() => {
+    original = process.env.PROMPT_LIBRARY_PATH
     tmpDir = mkdtempSync(join(tmpdir(), 'agentboard-list-test-'))
     process.env.PROMPT_LIBRARY_PATH = tmpDir
   })
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true })
-    if (ORIGINAL === undefined) {
-      delete process.env.PROMPT_LIBRARY_PATH
-    } else {
-      process.env.PROMPT_LIBRARY_PATH = ORIGINAL
-    }
+    if (original === undefined) delete process.env.PROMPT_LIBRARY_PATH
+    else process.env.PROMPT_LIBRARY_PATH = original
   })
 
   test('basic: returns entries under the correct category with extracted titles, sorted alphabetically', () => {
@@ -123,24 +115,40 @@ describe('listEntries', () => {
     expect(result.categories[0].name).toBe('apple')
     expect(result.categories[1].name).toBe('zebra')
   })
+
+  test('places root-level .md files in category "" sorted last', () => {
+    const tmpDir2 = mkdtempSync(join(tmpdir(), 'pl-root-'))
+    const catDir = join(tmpDir2, 'alpha')
+    mkdirSync(catDir)
+    writeFileSync(join(catDir, 'a.md'), '# Alpha Entry\nAlpha desc.')
+    writeFileSync(join(tmpDir2, 'root.md'), '# Root Entry\nRoot desc.')
+    process.env.PROMPT_LIBRARY_PATH = tmpDir2
+    try {
+      const result = listEntries()
+      expect(result.categories[0].name).toBe('alpha')
+      expect(result.categories[1].name).toBe('')
+      expect(result.categories[1].entries[0].title).toBe('Root Entry')
+    } finally {
+      delete process.env.PROMPT_LIBRARY_PATH
+      rmSync(tmpDir2, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('getEntry', () => {
   let tmpDir: string
-  const ORIGINAL = process.env.PROMPT_LIBRARY_PATH
+  let original: string | undefined
 
   beforeEach(() => {
+    original = process.env.PROMPT_LIBRARY_PATH
     tmpDir = mkdtempSync(join(tmpdir(), 'agentboard-get-test-'))
     process.env.PROMPT_LIBRARY_PATH = tmpDir
   })
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true })
-    if (ORIGINAL === undefined) {
-      delete process.env.PROMPT_LIBRARY_PATH
-    } else {
-      process.env.PROMPT_LIBRARY_PATH = ORIGINAL
-    }
+    if (original === undefined) delete process.env.PROMPT_LIBRARY_PATH
+    else process.env.PROMPT_LIBRARY_PATH = original
   })
 
   test('returns full entry with content when file exists', () => {
