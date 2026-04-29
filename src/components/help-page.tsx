@@ -23,6 +23,8 @@ const TOC: TocGroup[] = [
   {
     label: 'Release notes',
     items: [
+      { id: 'help-release-0-5', title: "What's new in 0.5" },
+      { id: 'help-release-0-4', title: "What's new in 0.4" },
       { id: 'help-release-0-3', title: "What's new in 0.3" },
       { id: 'help-release-0-2', title: "What's new in 0.2" },
       { id: 'help-release-0-1', title: "What's new in 0.1" },
@@ -447,6 +449,59 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             {/* ════════════════════════════════════════════════════════════════
                 RELEASE NOTES
                ════════════════════════════════════════════════════════════════ */}
+
+            <Section
+              id="help-release-0-5"
+              title="What's new in 0.5"
+              subtitle="Activity log, log retention, structured tracing, and a green CI baseline."
+            >
+              <Callout tone="neon" title="The headline">
+                <p>
+                  0.5 is the &ldquo;trust the system&rdquo; release. A structured activity log gives every agent action
+                  a searchable, filterable audit trail. Per-project log retention keeps storage bounded. A GitHub Actions
+                  pipeline enforces a green build on every merge so regressions are caught before they reach production.
+                </p>
+              </Callout>
+
+              <H3 id="help-release-0-5-activity">Structured activity log</H3>
+              <p>
+                Every agent action, tool call, and step transition is now written to a structured log with{' '}
+                <strong>level</strong> (<code>debug</code> / <code>info</code> / <code>warn</code> / <code>error</code>),
+                {' '}<strong>component</strong> (<code>task</code> / <code>agent</code> / <code>daemon</code> / <code>wizard</code> / <code>runtime</code>),
+                and an optional <strong>trace ID</strong> that links related events across components.
+                Access it in <em>Settings &rarr; Activity</em>.
+              </p>
+              <Bullets>
+                <li><strong>Filter by level</strong> — surface only warnings and errors without scrolling through info noise.</li>
+                <li><strong>Filter by component</strong> — isolate daemon logs, wizard logs, or a specific agent.</li>
+                <li><strong>Trace ID search</strong> — paste a trace ID to see every event from a single request end-to-end.</li>
+                <li><strong>Full-text search</strong> — filter the log table by any keyword.</li>
+                <li><strong>Export</strong> — download as JSONL or CSV for offline analysis or incident review.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-5-retention">Log retention &amp; automatic purge</H3>
+              <p>
+                Configure how long logs are kept in <em>Settings &rarr; Activity &rarr; Log Retention</em>.
+                Options range from 7 days to 1 year, or keep logs forever. Logs older than the retention window
+                are purged automatically in the background each time the activity feed is loaded — no cron job required.
+                You can also trigger an immediate purge with the <em>Purge now</em> button.
+              </p>
+
+              <H3 id="help-release-0-5-ci">CI &amp; build discipline</H3>
+              <Bullets>
+                <li><strong>GitHub Actions pipeline</strong> — every push and pull request to <code>main</code> runs schema validation, stale-client detection, type-check, lint, tests, and build in the correct order.</li>
+                <li><strong>Stale Prisma client detection</strong> — CI regenerates the Prisma client and fails the build if the committed client is out of sync with the schema, so schema changes can never silently break TypeScript.</li>
+                <li><strong>Auto-generate on install</strong> — <code>bun install</code> now runs <code>prisma generate</code> automatically via a postinstall hook, so a fresh clone is always ready to type-check immediately.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-5-roadmap">What comes next</H3>
+              <p>
+                Upcoming work includes auth test coverage, CSRF protection on admin routes, scoped API keys,
+                execution hardening (idempotency, dead-letter, exponential backoff), OpenTelemetry tracing,
+                and a Pino-based structured logger. See the implementation plans in{' '}
+                <code>docs/superpowers/plans/</code> for the full roadmap.
+              </p>
+            </Section>
 
             <Section
               id="help-release-0-4"
