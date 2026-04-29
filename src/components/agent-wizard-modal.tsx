@@ -1,8 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 export type WizardStep = 'requirements' | 'composing' | 'review'
@@ -12,6 +19,15 @@ const STEPS: { id: WizardStep; label: string }[] = [
   { id: 'composing',    label: '2. Composing' },
   { id: 'review',       label: '3. Review & Save' },
 ]
+
+const requirementsSchema = z.object({
+  purpose:   z.string().trim().min(10, 'Describe the agent purpose in at least 10 characters'),
+  domain:    z.string().trim().min(1, 'Domain is required'),
+  goal:      z.enum(['analysis', 'security', 'documentation', 'testing', 'research', 'custom']),
+  runtimeId: z.string().trim().min(1, 'Select a runtime for the LLM composition'),
+})
+
+export type WizardRequirements = z.infer<typeof requirementsSchema>
 
 interface AgentWizardModalProps {
   open: boolean
@@ -24,6 +40,20 @@ interface AgentWizardModalProps {
 /** Multi-step wizard for creating an agent from natural-language requirements. */
 export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated }: AgentWizardModalProps) {
   const [step, setStep] = useState<WizardStep>('requirements')
+  const [runtimes, setRuntimes] = useState<{ id: string; name: string }[]>([])
+
+  const form = useForm<WizardRequirements>({
+    resolver: zodResolver(requirementsSchema),
+    defaultValues: { purpose: '', domain: '', goal: 'analysis', runtimeId: '' },
+  })
+
+  useEffect(() => {
+    if (!open || !projectId) return
+    fetch(`/api/projects/${projectId}/runtimes`)
+      .then((r) => r.json())
+      .then((data) => setRuntimes(data.runtimes ?? []))
+      .catch(() => {})
+  }, [open, projectId])
 
   function handleCancel() {
     setStep('requirements')
@@ -64,7 +94,73 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
 
         {/* Step content — filled in by subsequent tasks */}
         <div className="min-h-[300px] flex items-center justify-center text-muted-foreground text-sm">
-          {step === 'requirements' && <p>Requirements form (Task 3.2)</p>}
+          {step === 'requirements' && (
+            <form className="space-y-4 w-full" onSubmit={(e) => e.preventDefault()}>
+              <div className="space-y-1">
+                <Label htmlFor="purpose">What should this agent do? *</Label>
+                <Textarea
+                  id="purpose"
+                  placeholder="e.g. Analyze Rust/Tauri codebases for security vulnerabilities and produce a severity-ranked report"
+                  rows={3}
+                  {...form.register('purpose')}
+                />
+                {form.formState.errors.purpose && (
+                  <p className="text-xs text-destructive">{form.formState.errors.purpose.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="domain">Technology stack / domain *</Label>
+                <Input
+                  id="domain"
+                  placeholder="e.g. Rust/Tauri, Python/FastAPI, VisualWorks Smalltalk"
+                  {...form.register('domain')}
+                />
+                {form.formState.errors.domain && (
+                  <p className="text-xs text-destructive">{form.formState.errors.domain.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Primary goal *</Label>
+                  <Select
+                    value={form.watch('goal')}
+                    onValueChange={(v) => form.setValue('goal', v as WizardRequirements['goal'])}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(['analysis','security','documentation','testing','research','custom'] as const).map((g) => (
+                        <SelectItem key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Runtime for composition *</Label>
+                  <Select
+                    value={form.watch('runtimeId')}
+                    onValueChange={(v) => form.setValue('runtimeId', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select runtime…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {runtimes.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {form.formState.errors.runtimeId && (
+                    <p className="text-xs text-destructive">{form.formState.errors.runtimeId.message}</p>
+                  )}
+                </div>
+              </div>
+            </form>
+          )}
           {step === 'composing'    && <p>Composing… (Epic 4)</p>}
           {step === 'review'       && <p>Review form (Task 3.3)</p>}
         </div>
@@ -79,7 +175,9 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
               </Button>
             )}
             {step === 'requirements' && (
-              <Button onClick={() => setStep('composing')}>Next</Button>
+              <Button onClick={() => form.handleSubmit(() => setStep('composing'))()}>
+                Next
+              </Button>
             )}
             {step === 'review' && (
               <Button>Save Agent</Button>
