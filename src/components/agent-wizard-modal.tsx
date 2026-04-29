@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +58,8 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
   const [runtimes, setRuntimes] = useState<{ id: string; name: string }[]>([])
   const [composed, setComposed] = useState<WizardComposedAgent | null>(null)
   const [saving, setSaving] = useState(false)
+  const [composeError, setComposeError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   const form = useForm<WizardRequirements>({
     resolver: zodResolver(requirementsSchema),
@@ -79,6 +81,26 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
   useEffect(() => {
     if (composed) reviewForm.reset(composed)
   }, [composed])
+
+  useEffect(() => {
+    if (step !== 'composing') return
+    setComposeError(null)
+
+    const req = form.getValues()
+    fetch('/api/agent-wizard/compose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error ?? 'Composition failed')
+        setComposed(data)
+        setStep('review')
+      })
+      .catch((err: Error) => setComposeError(err.message))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, retryCount])
 
   function handleCancel() {
     setStep('requirements')
@@ -220,7 +242,24 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
               </div>
             </form>
           )}
-          {step === 'composing'    && <p>Composing… (Epic 4)</p>}
+          {step === 'composing' && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              {!composeError ? (
+                <>
+                  <Loader2 className="animate-spin h-8 w-8 text-primary" />
+                  <p className="text-sm text-muted-foreground">Searching archive and composing your agent…</p>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-8 w-8 text-destructive" />
+                  <p className="text-sm text-destructive">{composeError}</p>
+                  <Button variant="outline" size="sm" onClick={() => setRetryCount((c) => c + 1)}>
+                    Try Again
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
           {step === 'review' && (
             <form className="space-y-3 w-full" onSubmit={(e) => e.preventDefault()}>
               {!composed ? (
