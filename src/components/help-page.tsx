@@ -1923,7 +1923,7 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li><code>matches</code> — JavaScript regex match (e.g. <code>^sentry-</code>).</li>
               </Bullets>
 
-              <Callout tone="blue" title="Enable/disable">
+              <Callout tone="cobalt" title="Enable/disable">
                 <p>
                   Each Trigger has an enable/disable toggle. Disabled Triggers are skipped by the event evaluator
                   and the Sentry poller — useful for temporarily pausing a rule without deleting it.
@@ -1980,7 +1980,7 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li><strong>html</strong> (optional) — HTML body.</li>
               </Bullets>
 
-              <Callout tone="blue" title="Credentials stay in env vars">
+              <Callout tone="cobalt" title="Credentials stay in env vars">
                 <p>
                   All secrets (tokens, passwords, webhook URLs) are referenced by env var <em>name</em>, not stored
                   as values. The reaction config stores the variable name; Conductor resolves the actual value at
