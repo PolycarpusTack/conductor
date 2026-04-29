@@ -182,6 +182,8 @@ AGENTBOARD_WS_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
 OPENAI_API_KEY=""
 # Optional: override the default embedding model
 EMBEDDING_MODEL="text-embedding-3-small"
+# Optional: path to a local system prompt archive directory (enables /api/prompt-library)
+PROMPT_LIBRARY_PATH="/path/to/system_prompts_leaks"
 ```
 
 The board UI now requires the admin password before it can access project management routes.
