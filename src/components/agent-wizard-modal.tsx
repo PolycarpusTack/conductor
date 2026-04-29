@@ -72,7 +72,7 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
     if (!open || !projectId) return
     fetch(`/api/projects/${projectId}/runtimes`)
       .then((r) => r.json())
-      .then((data) => setRuntimes(data.runtimes ?? []))
+      .then((data) => setRuntimes(Array.isArray(data) ? data : (data.runtimes ?? [])))
       .catch(() => {})
   }, [open, projectId])
 

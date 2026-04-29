@@ -23,3 +23,4 @@
 | TD-007 | `reviewForm` omitted from useEffect dependency array (stable ref — safe, but ESLint may warn) | agent-wizard-modal.tsx | Low | Add eslint-disable comment if lint baseline changes |
 | TD-008 | Review form uses getValues() — user edits on review step are read at save time, not watched | agent-wizard-modal.tsx | Low | Switch to watch() if live validation is needed |
 | TD-009 | Composing step (step 2) is a placeholder — wired in Epic 4 | agent-wizard-modal.tsx | High | Implement compose API call in Epic 4 |
+| TD-010 | Runtimes API returned bare array not wrapped object — wizard adapted with Array.isArray guard | agent-wizard-modal.tsx | Low | Standardize API response shape in API review |
