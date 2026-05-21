@@ -64,6 +64,7 @@ import { SettingsTemplates } from '@/components/settings-templates'
 import { ObservabilityDashboard } from '@/components/observability-dashboard'
 import { SettingsAutomation } from '@/components/settings-automation'
 import { SettingsIntegrations, type IntegrationTrigger } from '@/components/settings-integrations'
+import { SettingsActivity } from '@/components/settings-activity'
 import { ActivityTail } from '@/components/activity-tail'
 import { AgentCreationModal } from '@/components/agent-creation-modal'
 import { AgentWizardModal } from '@/components/agent-wizard-modal'
@@ -2695,29 +2696,9 @@ export default function Home() {
               
               {/* Activity Tab */}
               <TabsContent value="activity" className="mt-0">
-                <div className="space-y-2">
-                  {activities.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      No activity yet
-                    </div>
-                  ) : (
-                    activities.map((activity) => (
-                      <div key={activity.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/20">
-                        <span className="text-lg">{activity.agent?.emoji || '📋'}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm">
-                            <span className="font-medium">{activity.agent?.name || 'System'}</span>
-                            <span className="text-muted-foreground ml-2">{activity.action}</span>
-                          </div>
-                          {activity.details && (
-                            <div className="text-xs text-muted-foreground truncate">{activity.details}</div>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-muted-foreground/50">{timeAgo(activity.createdAt)}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
+                {currentProject && (
+                  <SettingsActivity projectId={currentProject.id} />
+                )}
               </TabsContent>
 
               <TabsContent value="modes" className="mt-0">

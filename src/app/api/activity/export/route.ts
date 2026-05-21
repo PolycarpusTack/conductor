@@ -33,11 +33,11 @@ export const GET = withErrorHandling('api/activity/export', async (request: Requ
     })
 
     if (format === 'csv') {
-      const header = 'id,action,taskId,agentId,agentName,projectId,details,createdAt'
+      const header = 'id,level,component,traceId,action,taskId,agentId,agentName,projectId,details,createdAt'
       const rows = activities.map((a) => {
         const details = (a.details || '').replace(/"/g, '""')
         const agentName = a.agent?.name || ''
-        return `"${a.id}","${a.action}","${a.taskId || ''}","${a.agentId || ''}","${agentName}","${a.projectId}","${details}","${a.createdAt.toISOString()}"`
+        return `"${a.id}","${a.level}","${a.component || ''}","${a.traceId || ''}","${a.action}","${a.taskId || ''}","${a.agentId || ''}","${agentName}","${a.projectId}","${details}","${a.createdAt.toISOString()}"`
       })
       const csv = [header, ...rows].join('\n')
 
@@ -52,6 +52,9 @@ export const GET = withErrorHandling('api/activity/export', async (request: Requ
     // Default: JSONL
     const lines = activities.map((a) => JSON.stringify({
       id: a.id,
+      level: a.level,
+      component: a.component,
+      traceId: a.traceId,
       action: a.action,
       taskId: a.taskId,
       agentId: a.agentId,

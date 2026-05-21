@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { activityQuerySchema } from '@/lib/server/contracts'
+import { purgeProjectLogs } from '@/lib/server/activity-logger'
 
 export const GET = withErrorHandling('api/activity', async (request: Request) => {
   const unauthorized = await requireAdminSession()
@@ -14,16 +15,29 @@ export const GET = withErrorHandling('api/activity', async (request: Request) =>
     projectId: searchParams.get('projectId'),
     limit: searchParams.get('limit') || undefined,
     agentId: searchParams.get('agentId') || undefined,
+    level: searchParams.get('level') || undefined,
+    component: searchParams.get('component') || undefined,
+    search: searchParams.get('search') || undefined,
+    traceId: searchParams.get('traceId') || undefined,
   })
 
   if (!parsed.success) {
     throw badRequest(parsed.error.issues[0]?.message || 'Invalid activity query')
   }
 
-  const { projectId, limit, agentId } = parsed.data
-  const where: { projectId: string; agentId?: string } = { projectId }
+  const { projectId, limit, agentId, level, component, search, traceId } = parsed.data
 
+  const where: Record<string, unknown> = { projectId }
   if (agentId) where.agentId = agentId
+  if (level) where.level = level
+  if (component) where.component = component
+  if (traceId) where.traceId = traceId
+  if (search) {
+    where.OR = [
+      { action: { contains: search } },
+      { details: { contains: search } },
+    ]
+  }
 
   const activities = await db.activityLog.findMany({
     where,
@@ -33,6 +47,10 @@ export const GET = withErrorHandling('api/activity', async (request: Request) =>
     orderBy: { createdAt: 'desc' },
     take: limit,
   })
+
+  // Lazy purge: fire-and-forget after response data is ready. Does not delay
+  // the response. Only runs if the project has a retention policy configured.
+  void purgeProjectLogs(projectId)
 
   return NextResponse.json(activities)
 })

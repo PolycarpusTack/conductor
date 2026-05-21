@@ -63,11 +63,11 @@ export const PUT = withErrorHandling(
     if (!parsed.success) {
       throw badRequest(parsed.error.issues[0]?.message || 'Invalid project payload')
     }
-    const { name, description, color } = parsed.data
+    const { name, description, color, logRetentionDays } = parsed.data
 
     const project = await db.project.update({
       where: { id },
-      data: { name, description, color },
+      data: { name, description, color, logRetentionDays },
       select: {
         id: true,
         name: true,

@@ -30,10 +30,15 @@ export const createProjectSchema = z.object({
   workspaceId: z.string().trim().min(1).optional(),
 })
 
-export const updateProjectSchema = createProjectSchema.partial().refine(
-  (value) => Object.keys(value).length > 0,
-  'Provide at least one project field to update',
-)
+export const updateProjectSchema = createProjectSchema
+  .extend({
+    logRetentionDays: z.number().int().min(1).max(3650).nullable().optional(),
+  })
+  .partial()
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    'Provide at least one project field to update',
+  )
 
 export const agentRoleSchema = z.enum([
   'developer', 'architect', 'security', 'reviewer', 'qa', 'analyst', 'writer', 'researcher', 'support', 'custom'
@@ -141,16 +146,17 @@ export const adminLoginSchema = z.object({
   password: z.string().min(1),
 })
 
+export const logLevelSchema = z.enum(['debug', 'info', 'warn', 'error'])
+export const logComponentSchema = z.enum(['task', 'agent', 'daemon', 'wizard', 'runtime', 'system'])
+
 export const activityQuerySchema = z.object({
   projectId: z.string().trim().min(1),
-  limit: z
-    .coerce
-    .number()
-    .int()
-    .min(1)
-    .max(100)
-    .default(50),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
   agentId: z.string().trim().min(1).optional(),
+  level: logLevelSchema.optional(),
+  component: logComponentSchema.optional(),
+  search: z.string().trim().max(200).optional(),
+  traceId: z.string().trim().min(1).optional(),
 })
 
 export const cliActionSchema = z.enum(['claim', 'start', 'done', 'note', 'review'])

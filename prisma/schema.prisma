@@ -33,6 +33,8 @@ model Project {
   automationMode     String                 @default("manual") // manual, always, scheduled, startup
   automationSchedule String? // JSON: { startDay, startTime, endDay, endTime }
   automationPollMs   Int                    @default(10000) // poll interval in ms
+  // Activity log retention (null = keep forever)
+  logRetentionDays   Int?
   // Workspace container (nullable; backfilled)
   workspaceId        String?
   workspace          Workspace?             @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
@@ -101,17 +103,23 @@ model Task {
 
 model ActivityLog {
   id        String   @id @default(cuid())
-  action    String // created, started, updated, completed, moved
+  action    String
+  level     String   @default("info") // debug | info | warn | error
+  component String?                   // task | agent | daemon | wizard | runtime | system
+  traceId   String?
   taskId    String?
   task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
   agentId   String?
   agent     Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  details   String? // JSON string for additional info
+  details   String?
   createdAt DateTime @default(now())
 
   @@index([projectId])
+  @@index([projectId, level])
+  @@index([projectId, component])
+  @@index([traceId])
 }
 
 model ProjectMode {
