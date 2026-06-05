@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -75,6 +76,81 @@ interface SettingsDialogProps {
   handleDeleteAgent: (id: string) => Promise<void>
   resetAgentForm: () => void
   setAgentDialogOpen: Dispatch<SetStateAction<boolean>>
+  onProjectUpdated: (patch: { name: string; description: string | null }) => void
+}
+
+/** Editable project basics — saves through PUT /api/projects/[id]. */
+function GeneralTab({
+  project,
+  onProjectUpdated,
+  children,
+}: {
+  project: Project
+  onProjectUpdated: (patch: { name: string; description: string | null }) => void
+  children: React.ReactNode
+}) {
+  const [name, setName] = useState(project.name)
+  const [description, setDescription] = useState(project.description ?? '')
+  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle')
+
+  // Re-sync when switching projects while the dialog is open
+  useEffect(() => {
+    setName(project.name)
+    setDescription(project.description ?? '')
+    setStatus('idle')
+  }, [project.id, project.name, project.description])
+
+  const dirty = name !== project.name || description !== (project.description ?? '')
+
+  const save = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    setStatus('idle')
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), description: description.trim() || null }),
+      })
+      if (!res.ok) {
+        setStatus('error')
+        return
+      }
+      onProjectUpdated({ name: name.trim(), description: description.trim() || null })
+      setStatus('saved')
+    } catch {
+      setStatus('error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2">
+        <label htmlFor="settings-project-name" className="text-sm font-medium">Project Name</label>
+        <Input id="settings-project-name" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="grid gap-2">
+        <label htmlFor="settings-project-description" className="text-sm font-medium">Description</label>
+        <Textarea
+          id="settings-project-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+        />
+      </div>
+      <div className="flex items-center gap-3">
+        <Button size="sm" onClick={save} disabled={saving || !dirty || !name.trim()}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+        {status === 'saved' && !dirty && <span className="text-xs text-emerald-400">Saved.</span>}
+        {status === 'error' && <span className="text-xs text-[var(--op-red,#F87171)]">Failed to save — try again.</span>}
+      </div>
+      {children}
+    </div>
+  )
 }
 
 export function SettingsDialog({
@@ -90,6 +166,7 @@ export function SettingsDialog({
   copyToClipboard, rotateProjectApiKey, rotateAgentApiKey, migrateLegacyKeys,
   expandedAgentStats, setExpandedAgentStats,
   openEditAgentDialog, handleDeleteAgent, resetAgentForm, setAgentDialogOpen,
+  onProjectUpdated,
 }: SettingsDialogProps) {
   return (
     <Dialog open={settingsTab !== null} onOpenChange={(open) => !open && setSettingsTab(null)}>
@@ -115,27 +192,21 @@ export function SettingsDialog({
 
           <div className="mt-4 overflow-y-auto max-h-[50vh]">
             <TabsContent value="general" className="mt-0">
-              <div className="space-y-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-muted-foreground">Project Name <span className="text-[10px] font-normal">(read-only)</span></label>
-                  <Input value={currentProject?.name || ''} readOnly disabled className="opacity-70" />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-muted-foreground">Description <span className="text-[10px] font-normal">(read-only)</span></label>
-                  <Textarea value={currentProject?.description || ''} readOnly disabled rows={2} className="opacity-70" />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Tasks Summary</label>
-                  <div className="grid grid-cols-5 gap-2 text-center">
-                    {statusColumns.map((col) => (
-                      <div key={col.id} className="rounded-lg bg-muted/30 p-2">
-                        <div className="text-lg font-bold">{getTasksByStatus(col.id).length}</div>
-                        <div className="text-[10px] text-muted-foreground">{col.label}</div>
-                      </div>
-                    ))}
+              {currentProject && (
+                <GeneralTab key={currentProject.id} project={currentProject} onProjectUpdated={onProjectUpdated}>
+                  <div className="grid gap-2">
+                    <span className="text-sm font-medium">Tasks Summary</span>
+                    <div className="grid grid-cols-5 gap-2 text-center">
+                      {statusColumns.map((col) => (
+                        <div key={col.id} className="rounded-lg bg-muted/30 p-2">
+                          <div className="text-lg font-bold">{getTasksByStatus(col.id).length}</div>
+                          <div className="text-[10px] text-muted-foreground">{col.label}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </div>
+                </GeneralTab>
+              )}
             </TabsContent>
 
             <TabsContent value="agents" className="mt-0">

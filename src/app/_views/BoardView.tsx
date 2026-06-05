@@ -467,6 +467,9 @@ export function BoardView({
         handleDeleteAgent={handleDeleteAgent}
         resetAgentForm={resetAgentForm}
         setAgentDialogOpen={setAgentDialogOpen}
+        onProjectUpdated={(patch) =>
+          setCurrentProject(prev => (prev ? { ...prev, ...patch } : prev))
+        }
       />
 
       <AgentCreationModal
