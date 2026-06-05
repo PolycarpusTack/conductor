@@ -8,6 +8,7 @@ import { createExecution, succeedExecution, failExecution, timeoutExecution } fr
 import { resolveNextSteps, type StepEdge } from '@/lib/server/condition-evaluator'
 import { findPreviousAgentStep, normalizeDagEdges, hasDagEdges } from '@/lib/server/dag-edges'
 import { getLogger } from '@/lib/server/logger'
+import { appendStepEvent, computeBackoffMs, moveToDeadLetter } from '@/lib/server/step-events'
 import { LEASE_TIMEOUT_MS } from '@/lib/server/step-queue'
 import { safeJsonParse } from '@/lib/server/utils'
 import { randomBytes } from 'crypto'
@@ -205,11 +206,30 @@ export async function dispatchStep(stepId: string) {
     })
   }
 
+  await appendStepEvent(stepId, 'leased', {
+    worker: WORKER_ID,
+    ...(leased.evictedFrom ? { evictedFrom: leased.evictedFrom } : {}),
+  })
+
   // Determine attempt number
   const previousExecutions = await db.stepExecution.count({ where: { stepId } })
   const attemptNumber = previousExecutions + 1
 
-  const execution = await createExecution(stepId, attemptNumber)
+  // The unique (stepId, attempt) constraint on StepExecution is the
+  // idempotency key: if two workers race past the lease check with the same
+  // attempt number, exactly one insert wins and the loser aborts here.
+  let execution: Awaited<ReturnType<typeof createExecution>>
+  try {
+    execution = await createExecution(stepId, attemptNumber)
+  } catch (err) {
+    if ((err as { code?: string })?.code === 'P2002') {
+      log.warn(`attempt ${attemptNumber} of step ${stepId} already claimed by another worker`)
+      return
+    }
+    throw err
+  }
+
+  await appendStepEvent(stepId, 'started', { attempt: attemptNumber, executionId: execution.id })
 
   if (attemptNumber === 1) {
     await db.taskStep.updateMany({
@@ -252,6 +272,11 @@ export async function dispatchStep(stepId: string) {
       },
     })
 
+    await appendStepEvent(stepId, 'succeeded', {
+      attempt: attemptNumber,
+      tokensUsed: result.tokensUsed ?? null,
+    })
+
     // Save MCP artifacts if any were collected during tool use
     if (result.artifacts && result.artifacts.length > 0) {
       await db.stepArtifact.createMany({
@@ -286,18 +311,35 @@ export async function dispatchStep(stepId: string) {
       await failExecution(execution.id, message)
     }
 
+    await appendStepEvent(stepId, 'failed', {
+      attempt: attemptNumber,
+      error: message,
+      timeout: isTimeout,
+    })
+
     const maxRetries = step.maxRetries ?? 2
     const retryDelayMs = step.retryDelayMs ?? 5000
 
     if (attemptNumber < maxRetries + 1) {
-      // Retry: keep step active, schedule for re-pickup
+      // Retry: keep step active, schedule for re-pickup with exponential
+      // backoff + jitter (leasedAt doubles as the "not before" time).
+      const delayMs = retryDelayMs > 0 ? computeBackoffMs(attemptNumber, retryDelayMs) : 0
+      const retryAt = delayMs > 0 ? new Date(Date.now() + delayMs) : null
+
       await db.taskStep.update({
         where: { id: stepId },
         data: {
           attempts: attemptNumber,
           leasedBy: null,
-          leasedAt: retryDelayMs > 0 ? new Date(Date.now() + retryDelayMs) : null,
+          leasedAt: retryAt,
         },
+      })
+
+      await appendStepEvent(stepId, 'retry_scheduled', {
+        attempt: attemptNumber,
+        delayMs,
+        retryAt: retryAt?.toISOString() ?? null,
+        error: message,
       })
 
       broadcastProjectEvent(step.task.projectId, 'step-retrying', {
@@ -332,7 +374,19 @@ export async function dispatchStep(stepId: string) {
         })
         // Step is active with new agent — the queue will pick it up
       } else {
-        // No fallback — dead-letter
+        // No fallback — snapshot into the dead-letter table, then mark failed
+        await moveToDeadLetter(
+          {
+            id: stepId,
+            taskId: step.taskId,
+            agentId: step.agentId,
+            mode: step.mode,
+            instructions: step.instructions,
+            attempts: attemptNumber,
+          },
+          message,
+        )
+
         await db.taskStep.update({
           where: { id: stepId },
           data: {

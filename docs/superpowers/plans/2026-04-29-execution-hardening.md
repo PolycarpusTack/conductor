@@ -8,6 +8,14 @@
 
 **Tech Stack:** Prisma 7, SQLite, TypeScript 5, Bun 1.3.4
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - No `idempotencyKey` column on `TaskStep` — the existing `@@unique([stepId, attempt])` constraint on `StepExecution` already is the idempotency key. `dispatchStep` now treats a P2002 collision on `createExecution` as "another worker won this attempt" and aborts gracefully instead of erroring.
+> - The retry/failure path lives in `dispatch.ts`, not `step-queue.ts` as the File Map guessed; all wiring went there. `leasedAt` keeps doubling as the "not before" time for retries, now set via backoff instead of the fixed delay.
+> - `computeBackoffMs` uses equal jitter (`exp + rand(exp)`, floor at the deterministic component) rather than the plan's full jitter — the plan's own test bounds (`attempt 1 >= baseMs`) are only guaranteed with a floor.
+> - `appendStepEvent` never throws (logged + swallowed): the audit log must not break dispatch.
+> - Events emitted: `leased` (with eviction info), `started` (with executionId), `succeeded`, `failed` (every failed attempt), `retry_scheduled` (with delayMs/retryAt), `dead_lettered`. Dead-letter still respects the fallback-agent cycle first.
+> - The executions API keeps its bare-array shape for existing consumers; `?include=events` returns `{ executions, events }`.
+
 ---
 
 ## File Map
@@ -28,7 +36,7 @@
 **Files:**
 - Modify: `prisma/schema.prisma`
 
-- [ ] **Step 1: Add `idempotencyKey` to `TaskStep`**
+- [x] **Step 1: Add `idempotencyKey` to `TaskStep`**
 
 In `prisma/schema.prisma`, inside the `TaskStep` model, add after the `fallbackAgentId` field:
 
@@ -36,7 +44,7 @@ In `prisma/schema.prisma`, inside the `TaskStep` model, add after the `fallbackA
 idempotencyKey String? @unique
 ```
 
-- [ ] **Step 2: Add `StepEvent` model**
+- [x] **Step 2: Add `StepEvent` model**
 
 After the `StepReview` model, add:
 
@@ -61,7 +69,7 @@ Also add the relation to `TaskStep`:
 stepEvents StepEvent[]
 ```
 
-- [ ] **Step 3: Add `DeadLetterStep` model**
+- [x] **Step 3: Add `DeadLetterStep` model**
 
 After `StepEvent`, add:
 
@@ -83,7 +91,7 @@ model DeadLetterStep {
 }
 ```
 
-- [ ] **Step 4: Push schema changes**
+- [x] **Step 4: Push schema changes**
 
 ```bash
 bun run db:push
@@ -91,13 +99,13 @@ bun run db:push
 
 Expected output: `Your database is now in sync with your Prisma schema.`
 
-- [ ] **Step 5: Regenerate client**
+- [x] **Step 5: Regenerate client**
 
 ```bash
 bun run db:generate
 ```
 
-- [ ] **Step 6: Verify no type errors from schema changes**
+- [x] **Step 6: Verify no type errors from schema changes**
 
 ```bash
 bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
@@ -105,7 +113,7 @@ bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
 
 Expected: no new errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add prisma/schema.prisma src/generated/prisma/
@@ -119,7 +127,7 @@ git commit -m "feat(schema): add idempotency key, step event log, and dead-lette
 **Files:**
 - Create: `src/lib/server/step-events.ts`
 
-- [ ] **Step 1: Write the failing test first**
+- [x] **Step 1: Write the failing test first**
 
 Create `src/lib/server/__tests__/execution-hardening.test.ts`:
 
@@ -156,7 +164,7 @@ describe('appendStepEvent', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to confirm it fails**
+- [x] **Step 2: Run the test to confirm it fails**
 
 ```bash
 bun test src/lib/server/__tests__/execution-hardening.test.ts
@@ -164,7 +172,7 @@ bun test src/lib/server/__tests__/execution-hardening.test.ts
 
 Expected: FAIL — `appendStepEvent` not found.
 
-- [ ] **Step 3: Write `src/lib/server/step-events.ts`**
+- [x] **Step 3: Write `src/lib/server/step-events.ts`**
 
 ```typescript
 import { db } from '@/lib/db'
@@ -192,7 +200,7 @@ export async function appendStepEvent(
 }
 ```
 
-- [ ] **Step 4: Run the test to confirm it passes**
+- [x] **Step 4: Run the test to confirm it passes**
 
 ```bash
 bun test src/lib/server/__tests__/execution-hardening.test.ts
@@ -200,7 +208,7 @@ bun test src/lib/server/__tests__/execution-hardening.test.ts
 
 Expected: 2 pass, 0 fail.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/server/step-events.ts src/lib/server/__tests__/execution-hardening.test.ts
@@ -216,7 +224,7 @@ git commit -m "feat: add appendStepEvent helper for append-only step event log"
 
 Currently `retryDelayMs` is a fixed value. Replace with an exponential formula capped at 1 hour.
 
-- [ ] **Step 1: Add a backoff test**
+- [x] **Step 1: Add a backoff test**
 
 In `src/lib/server/__tests__/execution-hardening.test.ts`, add:
 
@@ -244,7 +252,7 @@ describe('computeBackoffMs', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 bun test src/lib/server/__tests__/execution-hardening.test.ts
@@ -252,7 +260,7 @@ bun test src/lib/server/__tests__/execution-hardening.test.ts
 
 Expected: FAIL — `computeBackoffMs` not exported.
 
-- [ ] **Step 3: Add `computeBackoffMs` to `src/lib/server/step-events.ts`**
+- [x] **Step 3: Add `computeBackoffMs` to `src/lib/server/step-events.ts`**
 
 ```typescript
 /**
@@ -267,7 +275,7 @@ export function computeBackoffMs(attempt: number, baseMs: number): number {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 bun test src/lib/server/__tests__/execution-hardening.test.ts
@@ -275,7 +283,7 @@ bun test src/lib/server/__tests__/execution-hardening.test.ts
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Wire backoff into the step failure path**
+- [x] **Step 5: Wire backoff into the step failure path**
 
 In `src/lib/server/step-queue.ts` (or `dispatch.ts`), find where `retryDelayMs` is used to schedule the next retry. Replace the fixed delay with `computeBackoffMs`:
 
@@ -299,7 +307,7 @@ await appendStepEvent(step.id, 'retry_scheduled', {
 })
 ```
 
-- [ ] **Step 6: Type-check and full test run**
+- [x] **Step 6: Type-check and full test run**
 
 ```bash
 bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
@@ -308,7 +316,7 @@ bun test
 
 Expected: no new errors, all tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/server/step-events.ts src/lib/server/step-queue.ts src/lib/server/__tests__/execution-hardening.test.ts
@@ -324,7 +332,7 @@ git commit -m "feat: replace fixed retry delay with exponential backoff in step 
 
 When `step.attempts >= step.maxRetries`, move the step to `DeadLetterStep` instead of scheduling another retry.
 
-- [ ] **Step 1: Add a dead-letter test**
+- [x] **Step 1: Add a dead-letter test**
 
 In `src/lib/server/__tests__/execution-hardening.test.ts`, add:
 
@@ -358,7 +366,7 @@ describe('moveToDeadLetter', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 bun test src/lib/server/__tests__/execution-hardening.test.ts 2>&1 | grep "moveToDeadLetter"
@@ -366,7 +374,7 @@ bun test src/lib/server/__tests__/execution-hardening.test.ts 2>&1 | grep "moveT
 
 Expected: FAIL — `moveToDeadLetter` not found.
 
-- [ ] **Step 3: Add `moveToDeadLetter` to `src/lib/server/step-events.ts`**
+- [x] **Step 3: Add `moveToDeadLetter` to `src/lib/server/step-events.ts`**
 
 ```typescript
 interface StepSnapshot {
@@ -397,7 +405,7 @@ export async function moveToDeadLetter(step: StepSnapshot, lastError: string): P
 }
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 bun test src/lib/server/__tests__/execution-hardening.test.ts
@@ -405,7 +413,7 @@ bun test src/lib/server/__tests__/execution-hardening.test.ts
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Wire `moveToDeadLetter` into the failure path**
+- [x] **Step 5: Wire `moveToDeadLetter` into the failure path**
 
 In `src/lib/server/step-queue.ts`, in the step failure handler, replace the current "retry or give up" logic:
 
@@ -432,7 +440,7 @@ if (step.attempts >= step.maxRetries) {
 }
 ```
 
-- [ ] **Step 6: Type-check and full test run**
+- [x] **Step 6: Type-check and full test run**
 
 ```bash
 bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
@@ -441,7 +449,7 @@ bun test
 
 Expected: no new errors, all tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/server/step-events.ts src/lib/server/step-queue.ts src/lib/server/__tests__/execution-hardening.test.ts

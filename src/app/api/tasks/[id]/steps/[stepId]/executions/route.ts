@@ -26,6 +26,17 @@ export const GET = withErrorHandling(
       orderBy: { attempt: 'asc' },
     })
 
+    // Default response stays a bare array for existing consumers;
+    // ?include=events adds the append-only step event log alongside.
+    const include = new URL(request.url).searchParams.get('include')
+    if (include === 'events') {
+      const events = await db.stepEvent.findMany({
+        where: { stepId },
+        orderBy: { createdAt: 'asc' },
+      })
+      return NextResponse.json({ executions, events })
+    }
+
     return NextResponse.json(executions)
   },
 )
