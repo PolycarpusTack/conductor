@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { assertSameOrigin } from '@/lib/csrf'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { getLogger } from '@/lib/server/logger'
 import { composeAgent } from '@/lib/server/wizard-composer'
 import { validateLibraryPath } from '@/lib/server/prompt-library'
+
+const log = getLogger('api/agent-wizard/compose')
 
 const composeRequestSchema = z.object({
   purpose:   z.string().trim().min(10),
@@ -49,7 +52,7 @@ export async function POST(req: Request) {
     if (e.message.startsWith('Runtime not found')) {
       return NextResponse.json({ error: e.message }, { status: 404 })
     }
-    console.error('[wizard/compose]', e)
+    log.error('compose failed', e)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

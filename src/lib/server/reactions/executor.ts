@@ -1,5 +1,6 @@
 import type { Trigger, Reaction } from '@/generated/prisma/client'
 import { db } from '@/lib/db'
+import { getLogger } from '@/lib/server/logger'
 import { safeJsonParse } from '@/lib/server/utils'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { renderConfigMustache } from './mustache'
@@ -7,6 +8,8 @@ import { executeSlackReaction } from './types/slack'
 import { executeHttpReaction } from './types/http'
 import { executeJiraReaction } from './types/jira'
 import { executeEmailReaction } from './types/email'
+
+const log = getLogger('reactions')
 
 type ReactionOutput = Record<string, unknown>
 
@@ -49,7 +52,7 @@ export async function executeReactions(
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       const newFailures = reaction.consecutiveFailures + 1
-      console.error(`[reactions] ${reaction.type} "${reaction.name}" failed:`, errorMessage)
+      log.error(`${reaction.type} "${reaction.name}" failed`, errorMessage)
 
       await db.reaction.update({
         where: { id: reaction.id },

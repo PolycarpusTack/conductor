@@ -8,6 +8,12 @@
 
 **Tech Stack:** Pino v10, `@vercel/otel`, `@opentelemetry/api`, Next.js 16, TypeScript 5, Bun 1.3.4
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - **No Pino.** This plan predates `src/lib/server/logger.ts`, which already delivers the goal (structured JSON to stdout in production, LOG_LEVEL filtering, per-module tags, dev-readable format) with zero deps. The two remaining stray `console.error` calls (reactions executor, wizard compose route) were converted to `getLogger`, and the logger gained smoke tests.
+> - `registerOTel` lives in the existing `src/instrumentation.ts` (with `src/` layout that IS the project-root instrumentation file); Next 16 needs no `experimental.instrumentationHook` flag. Service name: `conductor-web`.
+> - Telemetry helpers live in `src/lib/server/telemetry.ts` (not `adapters/dispatch-telemetry.ts`): `captureTraceContext()` + `dispatchWithTelemetry()` (span around adapter calls with adapter/model/tokens/cost attributes). Built on `@opentelemetry/api` only — no-op safe when no SDK is registered.
+> - Trace context is injected at **step creation** in the two HTTP routes that create steps (`/api/tasks` POST, `/api/tasks/[id]/steps` POST) — that's where an active request span exists; `dispatch.ts` runs from the scheduler with no ambient trace. The dispatcher extracts the persisted carrier as the span parent, and `/api/daemon/steps/next` hands `traceContext` to the external daemon in its payload (continuing the trace is the daemon's side of the contract).
+
 ---
 
 ## File Map
@@ -30,20 +36,20 @@
 **Files:**
 - Modify: `package.json` (via bun add)
 
-- [ ] **Step 1: Install Pino**
+- [x] **Step 1: Install Pino**
 
 ```bash
 cd /mnt/c/Projects/AgentBoard && bun add pino
 bun add -d @types/pino
 ```
 
-- [ ] **Step 2: Install OpenTelemetry packages**
+- [x] **Step 2: Install OpenTelemetry packages**
 
 ```bash
 bun add @vercel/otel @opentelemetry/api
 ```
 
-- [ ] **Step 3: Verify installation**
+- [x] **Step 3: Verify installation**
 
 ```bash
 bun run type-check 2>&1 | grep "pino\|otel" | head -5
@@ -51,7 +57,7 @@ bun run type-check 2>&1 | grep "pino\|otel" | head -5
 
 Expected: no errors from these packages.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add package.json bun.lockb
@@ -66,7 +72,7 @@ git commit -m "chore: add pino and @vercel/otel dependencies for structured obse
 - Create: `src/lib/logger.ts`
 - Create: `src/lib/server/__tests__/logger.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/lib/server/__tests__/logger.test.ts`:
 
@@ -94,7 +100,7 @@ describe('logger', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 bun test src/lib/server/__tests__/logger.test.ts
@@ -102,7 +108,7 @@ bun test src/lib/server/__tests__/logger.test.ts
 
 Expected: FAIL — `@/lib/logger` not found.
 
-- [ ] **Step 3: Write `src/lib/logger.ts`**
+- [x] **Step 3: Write `src/lib/logger.ts`**
 
 ```typescript
 import pino from 'pino'
@@ -124,7 +130,7 @@ export const reactionLogger = logger.child({ component: 'reaction' })
 export const wizardLogger = logger.child({ component: 'wizard' })
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 bun test src/lib/server/__tests__/logger.test.ts
@@ -132,7 +138,7 @@ bun test src/lib/server/__tests__/logger.test.ts
 
 Expected: 3 pass, 0 fail.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/logger.ts src/lib/server/__tests__/logger.test.ts
@@ -148,13 +154,13 @@ git commit -m "feat(observability): add singleton Pino logger with child loggers
 
 `@vercel/otel`'s `registerOTel` auto-instruments every Next.js API route handler and all `fetch()` calls made inside them. It must be in `instrumentation.ts` at the project root (not inside `src/`).
 
-- [ ] **Step 1: Check if `instrumentation.ts` exists at project root**
+- [x] **Step 1: Check if `instrumentation.ts` exists at project root**
 
 ```bash
 ls /mnt/c/Projects/AgentBoard/instrumentation.ts 2>/dev/null || echo "missing"
 ```
 
-- [ ] **Step 2: Write/update `instrumentation.ts`**
+- [x] **Step 2: Write/update `instrumentation.ts`**
 
 If the file doesn't exist, create it at the project root (same level as `package.json`):
 
@@ -178,7 +184,7 @@ export async function register() {
 
 **Note:** If `src/instrumentation.ts` exists from a previous plan (security-pass), move the `env` import there and add the `registerOTel` call alongside it. Do not create two `instrumentation.ts` files.
 
-- [ ] **Step 3: Add `instrumentationHook` to `next.config` if not already present**
+- [x] **Step 3: Add `instrumentationHook` to `next.config` if not already present**
 
 ```bash
 grep -n "instrumentationHook" next.config.ts next.config.mjs next.config.js 2>/dev/null | head
@@ -195,7 +201,7 @@ const nextConfig = {
 }
 ```
 
-- [ ] **Step 4: Type-check**
+- [x] **Step 4: Type-check**
 
 ```bash
 bun run type-check 2>&1 | grep "instrumentation"
@@ -203,7 +209,7 @@ bun run type-check 2>&1 | grep "instrumentation"
 
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add instrumentation.ts next.config.ts
@@ -219,7 +225,7 @@ git commit -m "feat(observability): register @vercel/otel in instrumentation.ts 
 - Modify: `src/lib/server/reactions/executor.ts`
 - Modify: `src/app/api/` route handlers using `console.error`
 
-- [ ] **Step 1: Find all console.error/info calls in server code**
+- [x] **Step 1: Find all console.error/info calls in server code**
 
 ```bash
 grep -rn "console\.error\|console\.warn\|console\.info\|console\.log" \
@@ -228,7 +234,7 @@ grep -rn "console\.error\|console\.warn\|console\.info\|console\.log" \
 
 Note the count — these are the targets to replace.
 
-- [ ] **Step 2: Update `src/lib/server/activity-logger.ts` to log on writes**
+- [x] **Step 2: Update `src/lib/server/activity-logger.ts` to log on writes**
 
 Add a `logger.info` call alongside each `db.activityLog.create`:
 
@@ -248,7 +254,7 @@ export async function writeLog(input: WriteLogInput): Promise<void> {
 }
 ```
 
-- [ ] **Step 3: Replace `console.error` in route handlers**
+- [x] **Step 3: Replace `console.error` in route handlers**
 
 For each route handler that uses `console.error('[route-name]', e)`, replace with:
 
@@ -263,7 +269,7 @@ logger.error({ err: e, route: 'wizard/compose' }, 'Unhandled error in route hand
 
 The `err` field is Pino's convention for serializing Error objects (it captures `message`, `stack`, and `name`).
 
-- [ ] **Step 4: Run the full test suite to confirm nothing broken**
+- [x] **Step 4: Run the full test suite to confirm nothing broken**
 
 ```bash
 bun test
@@ -271,7 +277,7 @@ bun test
 
 Expected: all tests pass, 0 fail.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/server/activity-logger.ts src/lib/server/reactions/ src/app/api/
@@ -289,20 +295,20 @@ git commit -m "feat(observability): replace console.error/info with structured P
 
 This links a user's HTTP request trace to the daemon's execution span, giving one unified trace from browser to LLM response.
 
-- [ ] **Step 1: Add `traceContext` to `TaskStep` in schema**
+- [x] **Step 1: Add `traceContext` to `TaskStep` in schema**
 
 ```prisma
 // Inside TaskStep model:
 traceContext String? // JSON: W3C traceparent propagation carrier
 ```
 
-- [ ] **Step 2: Push and regenerate**
+- [x] **Step 2: Push and regenerate**
 
 ```bash
 bun run db:push && bun run db:generate
 ```
 
-- [ ] **Step 3: Inject trace context at step creation in `dispatch.ts`**
+- [x] **Step 3: Inject trace context at step creation in `dispatch.ts`**
 
 ```typescript
 import { context, propagation } from '@opentelemetry/api'
@@ -320,7 +326,7 @@ await db.taskStep.update({
 })
 ```
 
-- [ ] **Step 4: Restore trace context in daemon step dequeue**
+- [x] **Step 4: Restore trace context in daemon step dequeue**
 
 Find where the daemon picks up a step (`db.taskStep.findFirst` or the polling query in `src/app/api/daemon/steps/next/route.ts`). After retrieving the step, restore context before creating spans:
 
@@ -344,7 +350,7 @@ tracer.startActiveSpan('daemon.execute_step', {}, parentCtx, async (span) => {
 })
 ```
 
-- [ ] **Step 5: Type-check and full test run**
+- [x] **Step 5: Type-check and full test run**
 
 ```bash
 bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
@@ -353,7 +359,7 @@ bun test
 
 Expected: no new errors, all tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add prisma/schema.prisma src/generated/prisma/ src/lib/server/dispatch.ts src/app/api/daemon/
