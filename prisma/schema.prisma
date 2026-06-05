@@ -405,6 +405,53 @@ model AgentSession {
   @@index([taskId, stepId])
 }
 
+// ─── Agent messaging ───────────────────────────────────────────────────────
+
+// A stable, human-readable address for an agent within a project
+// (auto-provisioned as a name slug on first use). Project-scoped: agents
+// can only message peers in their own project.
+model AgentAddress {
+  id        String   @id @default(cuid())
+  agentId   String
+  projectId String
+  address   String
+  label     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, address])
+  @@index([agentId])
+}
+
+// Durable, task-aware agent-to-agent (or admin-to-agent) message. The body
+// is stored as written; content-safety verdicts live in bodySecurity and
+// flagged bodies are wrapped at DELIVERY, keeping the original intact for
+// admin forensics. Messages never advance chains in v1.
+model AgentMessage {
+  id           String    @id @default(cuid())
+  projectId    String
+  workspaceId  String?
+  taskId       String?
+  stepId       String?
+  threadId     String?
+  fromAgentId  String?
+  toAgentId    String?
+  fromAddress  String
+  toAddress    String
+  priority     String    @default("normal") // low | normal | high | urgent
+  subject      String?
+  body         String
+  bodySecurity String?   // JSON: { trust, flags } from content-safety
+  status       String    @default("queued") // queued | delivered | read | archived
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+  deliveredAt  DateTime?
+
+  @@index([projectId, toAgentId, status])
+  @@index([taskId])
+  @@index([threadId])
+}
+
 enum AgentInvocationMode {
   HTTP
   DAEMON
