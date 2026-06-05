@@ -1,6 +1,12 @@
 export async function register() {
   // Only run on the server, not during build
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Fail fast on misconfigured env vars (throws at import time).
+    // Skipped in tests where env vars may legitimately be unset.
+    if (process.env.NODE_ENV !== 'test') {
+      await import('@/lib/env')
+    }
+
     const { initializeScheduler } = await import('@/lib/server/scheduler')
     await initializeScheduler()
 
