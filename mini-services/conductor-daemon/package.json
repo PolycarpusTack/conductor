@@ -1,0 +1,9 @@
+{
+  "name": "conductor-daemon",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun index.ts",
+    "register": "bun index.ts --register"
+  }
+}
