@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
-import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
+import { authorizeAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
+import { scanForPromptInjection, wrapExternalContent } from '@/lib/server/content-safety'
 import { createTaskSchema } from '@/lib/server/contracts'
 import { normalizeDagEdges, startChain } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
@@ -41,15 +42,46 @@ export const GET = withErrorHandling('api/tasks', async (request: Request) => {
 export const POST = withErrorHandling('api/tasks', async (request: Request) => {
   // Admin session (with CSRF check) OR a scoped API key with "write" —
   // lets webhooks and scripts create tasks without a browser session.
-  const unauthorized = await requireAdminOrScopedKey(request, 'write')
-  if (unauthorized) return unauthorized
+  const auth = await authorizeAdminOrScopedKey(request, 'write')
+  if (!auth.ok) return auth.response
 
   const parsed = createTaskSchema.safeParse(await request.json())
   if (!parsed.success) {
     throw badRequest(parsed.error.issues[0]?.message || 'Invalid task payload')
   }
 
-  const { title, description, status, priority, tag, projectId, agentId, notes, runtimeOverride } = parsed.data
+  const { title, status, priority, tag, projectId, agentId, notes, runtimeOverride } = parsed.data
+  let { description } = parsed.data
+
+  // Key-created tasks are external content: their description flows into
+  // agent prompts at dispatch. Scan always; wrap as data when flagged.
+  if (auth.via === 'key') {
+    const scanned = scanForPromptInjection(
+      [title, description, ...(parsed.data.steps ?? []).map((s) => s.instructions)].filter(Boolean).join('\n'),
+    )
+    if (scanned.length > 0) {
+      if (description) {
+        description = wrapExternalContent({
+          text: description,
+          source: 'api:tasks',
+          trust: 'external',
+        }).text
+      }
+      void db.activityLog.create({
+        data: {
+          action: 'content_safety_flagged',
+          level: 'warn',
+          component: 'system',
+          projectId,
+          details: JSON.stringify({
+            source: 'api:tasks',
+            keyId: auth.keyId,
+            categories: [...new Set(scanned.map((f) => f.category))],
+          }),
+        },
+      }).catch(() => {})
+    }
+  }
 
   if (agentId) {
     const agent = await db.agent.findUnique({

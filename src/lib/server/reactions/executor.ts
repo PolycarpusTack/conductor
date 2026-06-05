@@ -1,5 +1,6 @@
 import type { Trigger, Reaction } from '@/generated/prisma/client'
 import { db } from '@/lib/db'
+import { scanForPromptInjection } from '@/lib/server/content-safety'
 import { getLogger } from '@/lib/server/logger'
 import { safeJsonParse } from '@/lib/server/utils'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
@@ -32,9 +33,24 @@ export async function executeReactions(
   eventPayload: unknown,
   taskId: string | undefined,
 ): Promise<void> {
+  // Trigger payloads can carry external content (Sentry messages, webhook
+  // bodies) that gets mustache-rendered into reaction configs. Scan once and
+  // expose the verdict to reaction templates as {{security.flagged}}.
+  const safetyFlags = scanForPromptInjection(JSON.stringify(eventPayload ?? ''))
+  if (safetyFlags.length > 0) {
+    log.warn('prompt-injection patterns in trigger payload', {
+      triggerId: trigger.id,
+      categories: [...new Set(safetyFlags.map((f) => f.category))],
+    })
+  }
+
   const context: Record<string, unknown> = {
     event: eventPayload,
     reactions: {} as Record<string, unknown>,
+    security: {
+      flagged: safetyFlags.length > 0,
+      categories: [...new Set(safetyFlags.map((f) => f.category))],
+    },
   }
 
   for (const reaction of trigger.reactions) {
