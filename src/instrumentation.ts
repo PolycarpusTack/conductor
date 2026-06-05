@@ -7,6 +7,11 @@ export async function register() {
       await import('@/lib/env')
     }
 
+    // Route + fetch tracing. OTEL_EXPORTER_OTLP_ENDPOINT controls where
+    // traces go; unset = spans are created but not exported (safe default).
+    const { registerOTel } = await import('@vercel/otel')
+    registerOTel({ serviceName: 'conductor-web' })
+
     const { initializeScheduler } = await import('@/lib/server/scheduler')
     await initializeScheduler()
 
