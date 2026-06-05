@@ -61,6 +61,9 @@ mock.module('@/lib/db', () => ({
         Promise.resolve(where.prefix === KEY_RECORD.prefix ? KEY_RECORD : null),
       update: () => Promise.resolve(KEY_RECORD),
     },
+    agentSession: {
+      findMany: () => Promise.resolve([]),
+    },
   },
   isPostgresDb: false,
 }))

@@ -55,7 +55,11 @@ export const GET = withErrorHandling(
         capabilities: safeJsonParse<Record<string, unknown>>(d.capabilities, {}),
         sessionCapabilities: safeJsonParse<Record<string, unknown> | null>(d.sessionCapabilities, null),
       })),
-      sessions: [], // populated in Epic 2
+      sessions: await db.agentSession.findMany({
+        where: { hostId: host.id },
+        orderBy: [{ lastActivityAt: 'desc' }, { startedAt: 'desc' }],
+        take: 20,
+      }),
     })
   },
 )
