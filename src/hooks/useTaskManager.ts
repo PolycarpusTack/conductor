@@ -189,6 +189,8 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
   }, [currentProject, taskTitle, taskDescription, taskPriority, taskSteps, setCurrentProject, readApiError, resetTaskForm, toast])
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
+    // Permanent — steps, executions, and artifacts go with the task.
+    if (!window.confirm('Delete this task? Its steps, executions, and artifacts are removed too.')) return
     try {
       const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
       if (!res.ok) {

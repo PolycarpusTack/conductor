@@ -20,6 +20,7 @@ import { ObservabilityDashboard } from '@/components/observability-dashboard'
 import { SettingsAutomation } from '@/components/settings-automation'
 import { SettingsIntegrations } from '@/components/settings-integrations'
 import { SettingsActivity } from '@/components/settings-activity'
+import { SettingsScopedKeys } from '@/components/settings-scoped-keys'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import {
   Activity,
@@ -116,12 +117,12 @@ export function SettingsDialog({
             <TabsContent value="general" className="mt-0">
               <div className="space-y-4">
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Project Name</label>
-                  <Input value={currentProject?.name || ''} readOnly />
+                  <label className="text-sm font-medium text-muted-foreground">Project Name <span className="text-[10px] font-normal">(read-only)</span></label>
+                  <Input value={currentProject?.name || ''} readOnly disabled className="opacity-70" />
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Description</label>
-                  <Textarea value={currentProject?.description || ''} readOnly rows={2} />
+                  <label className="text-sm font-medium text-muted-foreground">Description <span className="text-[10px] font-normal">(read-only)</span></label>
+                  <Textarea value={currentProject?.description || ''} readOnly disabled rows={2} className="opacity-70" />
                 </div>
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Tasks Summary</label>
@@ -302,6 +303,8 @@ export function SettingsDialog({
                     </Button>
                   </div>
                 </div>
+
+                <SettingsScopedKeys />
 
                 <div className="rounded-lg border border-border/30 p-4">
                   <h4 className="text-sm font-medium mb-2 flex items-center gap-2">

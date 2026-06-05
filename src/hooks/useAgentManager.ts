@@ -48,6 +48,8 @@ export function useAgentManager({ setCurrentProject }: UseAgentManagerParams) {
   }, [])
 
   const handleDeleteAgent = useCallback(async (agentId: string) => {
+    // Deletion is permanent and wipes the agent's API key — confirm first.
+    if (!window.confirm('Delete this agent? This is permanent and invalidates its API key.')) return
     try {
       const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' })
       if (!res.ok) {
