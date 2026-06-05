@@ -2,24 +2,24 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { getAdminConfig, scryptVerify } from '@/lib/server/admin-config'
 import { getLogger } from '@/lib/server/logger'
 
 const log = getLogger('admin-session')
 
 const ADMIN_COOKIE_NAME = 'agentboard_admin_session'
 const ADMIN_SESSION_NONCE_COOKIE = 'agentboard_admin_nonce'
-const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 12
 
-function getAdminPassword() {
+function getEnvPassword() {
   return process.env.AGENTBOARD_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || null
 }
 
-if (!getAdminPassword()) {
+if (!getEnvPassword()) {
   log.warn('No admin password configured. Set AGENTBOARD_ADMIN_PASSWORD in .env to enable admin access.')
 }
 
 function getSessionSecret() {
-  return process.env.AGENTBOARD_ADMIN_SESSION_SECRET || getAdminPassword()
+  return process.env.AGENTBOARD_ADMIN_SESSION_SECRET || getEnvPassword()
 }
 
 function digest(value: string) {
@@ -37,21 +37,33 @@ function secureEquals(left: string, right: string) {
   return timingSafeEqual(leftBuffer, rightBuffer)
 }
 
-function buildSessionToken(nonce: string) {
-  const password = getAdminPassword()
+/**
+ * The credential fingerprint anchors session tokens (Epic S2). DB password
+ * hash when set (UI-managed), else a digest of the env password (bootstrap).
+ * Changing either credential changes the fingerprint, which invalidates
+ * every outstanding session with zero extra bookkeeping.
+ */
+async function getCredentialFingerprint(): Promise<string | null> {
+  const config = await getAdminConfig()
+  if (config.passwordHash) return config.passwordHash
+
+  const envPassword = getEnvPassword()
+  return envPassword ? digest(envPassword) : null
+}
+
+async function buildSessionToken(nonce: string): Promise<string | null> {
+  const fingerprint = await getCredentialFingerprint()
   const secret = getSessionSecret()
 
-  if (!password || !secret) {
+  if (!fingerprint || !secret) {
     return null
   }
 
-  return digest(`${password}:${secret}:${nonce}`)
+  return digest(`${fingerprint}:${secret}:${nonce}`)
 }
 
-export function isAdminAuthConfigured() {
-  const password = getAdminPassword()
-  const secret = getSessionSecret()
-  return Boolean(password && secret)
+export async function isAdminAuthConfigured(): Promise<boolean> {
+  return (await getCredentialFingerprint()) !== null && Boolean(getSessionSecret())
 }
 
 export async function hasAdminSession() {
@@ -63,7 +75,7 @@ export async function hasAdminSession() {
     return false
   }
 
-  const expectedToken = buildSessionToken(nonce)
+  const expectedToken = await buildSessionToken(nonce)
   if (!expectedToken) {
     return false
   }
@@ -72,7 +84,7 @@ export async function hasAdminSession() {
 }
 
 export async function requireAdminSession() {
-  if (!isAdminAuthConfigured()) {
+  if (!(await isAdminAuthConfigured())) {
     return NextResponse.json(
       { error: 'Admin authentication is not configured on the server' },
       { status: 503 },
@@ -86,23 +98,33 @@ export async function requireAdminSession() {
   return null
 }
 
+/**
+ * Layered verification: a UI-set DB password takes precedence; the env var
+ * remains the bootstrap / break-glass credential when no DB password exists.
+ */
 export async function verifyAdminPassword(password: string) {
-  const configuredPassword = getAdminPassword()
+  const config = await getAdminConfig()
+  if (config.passwordHash) {
+    return scryptVerify(password, config.passwordHash)
+  }
 
-  if (!configuredPassword) {
+  const envPassword = getEnvPassword()
+  if (!envPassword) {
     return false
   }
 
-  return secureEquals(password, configuredPassword)
+  return secureEquals(password, envPassword)
 }
 
 export async function createAdminSession() {
   const nonce = randomBytes(16).toString('hex')
-  const token = buildSessionToken(nonce)
+  const token = await buildSessionToken(nonce)
 
   if (!token) {
     throw new Error('Admin authentication is not configured on the server')
   }
+
+  const { sessionTtlHours } = await getAdminConfig()
 
   const cookieStore = await cookies()
   const cookieOptions = {
@@ -110,7 +132,7 @@ export async function createAdminSession() {
     sameSite: 'lax' as const,
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: ADMIN_SESSION_TTL_SECONDS,
+    maxAge: sessionTtlHours * 60 * 60,
   }
 
   cookieStore.set(ADMIN_COOKIE_NAME, token, cookieOptions)

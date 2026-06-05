@@ -415,6 +415,16 @@ model AgentSession {
   @@index([taskId, stepId])
 }
 
+// Instance-wide admin settings (Epic S2). Singleton row; the DB password
+// hash (scrypt) overrides the AGENTBOARD_ADMIN_PASSWORD env var, which
+// remains the bootstrap / break-glass credential.
+model AdminConfig {
+  id              String   @id @default("singleton")
+  passwordHash    String? // scrypt: "salt:hash" hex
+  sessionTtlHours Int      @default(12)
+  updatedAt       DateTime @updatedAt
+}
+
 // ─── Agent messaging ───────────────────────────────────────────────────────
 
 // A stable, human-readable address for an agent within a project

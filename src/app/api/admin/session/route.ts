@@ -39,7 +39,7 @@ function isRateLimited(ip: string): boolean {
 // Returns whether auth is configured and whether the current session is valid.
 export async function GET() {
   return NextResponse.json({
-    configured: isAdminAuthConfigured(),
+    configured: await isAdminAuthConfigured(),
     authenticated: await hasAdminSession(),
   })
 }
@@ -56,7 +56,7 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
     throw new ApiError(429, 'Too many login attempts. Try again later.')
   }
 
-  if (!isAdminAuthConfigured()) {
+  if (!(await isAdminAuthConfigured())) {
     throw new ApiError(503, 'Admin authentication is not configured on the server')
   }
 
