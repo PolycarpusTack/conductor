@@ -10,6 +10,12 @@
 
 **Tech Stack:** Bun, TypeScript 5
 
+> **Implemented 2026-06-05.** Deviations from the plan as written (and the design doc):
+> - No global `agentboard` binary — `bun run doctor` / `bun run smoke-test` in-repo; packaging waits for a distribution story.
+> - Daemon `install` is documentation (wrap the start command in systemd/launchd/Windows service); daemon `status` is a doctor check + the Hosts tab.
+> - The design's `bash -n` installer linting has nothing to lint — there are no shell installers; CI runs the offline doctor itself as the validation.
+> - First local run immediately surfaced the known better-sqlite3 bindings failure on the dev machine — the doctor finding real problems on day one.
+
 ---
 
 ## File Map
@@ -25,22 +31,22 @@
 ---
 
 ### Task 1: doctor script
-- [ ] Check runner: `{ name, severity: pass|warn|fail, detail }[]`, human output with ✓/!/✗, `--json` structured, exit 1 iff any fail.
-- [ ] Local checks: bun/node version; `.env` present (warn); `validateEnv()` (fail on invalid); admin password configured (warn when absent outside production); realtime secrets (warn); Prisma client generated (`src/generated/prisma` exists, fail); DB reachable via `db.project.count()` (fail); ≥1 runtime configured (warn); daemon census (info-as-pass: total/online).
-- [ ] Network checks (skip with `--offline`): `GET {CONDUCTOR_URL|http://localhost:3000}/api/health` and board-ws reachability (`{AGENTBOARD_WS_URL|http://127.0.0.1:3003}/broadcast` answering at all) — `warn` by default, `fail` under `--smoke`.
-- [ ] `package.json`: `"doctor": "bun scripts/doctor.ts"`, `"smoke-test": "bun scripts/doctor.ts --smoke"`.
-- [ ] Verify locally: `bun run doctor --offline` exits 0 against the dev DB.
+- [x] Check runner: `{ name, severity: pass|warn|fail, detail }[]`, human output with ✓/!/✗, `--json` structured, exit 1 iff any fail.
+- [x] Local checks: bun/node version; `.env` present (warn); `validateEnv()` (fail on invalid); admin password configured (warn when absent outside production); realtime secrets (warn); Prisma client generated (`src/generated/prisma` exists, fail); DB reachable via `db.project.count()` (fail); ≥1 runtime configured (warn); daemon census (info-as-pass: total/online).
+- [x] Network checks (skip with `--offline`): `GET {CONDUCTOR_URL|http://localhost:3000}/api/health` and board-ws reachability (`{AGENTBOARD_WS_URL|http://127.0.0.1:3003}/broadcast` answering at all) — `warn` by default, `fail` under `--smoke`.
+- [x] `package.json`: `"doctor": "bun scripts/doctor.ts"`, `"smoke-test": "bun scripts/doctor.ts --smoke"`.
+- [x] Verify locally: `bun run doctor --offline` exits 0 against the dev DB.
 
 ### Task 2: CI integration
-- [ ] Add step after Test: `bun scripts/doctor.ts --offline --json` with `DATABASE_URL: file:./prisma/ci.db`.
+- [x] Add step after Test: `bun scripts/doctor.ts --offline --json` with `DATABASE_URL: file:./prisma/ci.db`.
 
 ### Task 3: Docs
-- [ ] INSTALL.md: replace the curl-based Verify section with doctor/smoke-test; daemon install pointer (OS service registration documented as manual, with the README's start command).
-- [ ] conductor-daemon README: status via doctor + Hosts tab.
+- [x] INSTALL.md: replace the curl-based Verify section with doctor/smoke-test; daemon install pointer (OS service registration documented as manual, with the README's start command).
+- [x] conductor-daemon README: status via doctor + Hosts tab.
 
 ### Task 4: Wrap-up + v0.2.0 release
-- [ ] Full verification; checkboxes; deviations.
-- [ ] Release v0.2.0 — Epics 4–7 (content safety, messaging, evidence, doctor): version bump, help page, release commit.
+- [x] Full verification; checkboxes; deviations.
+- [x] Release v0.2.0 — Epics 4–7 (content safety, messaging, evidence, doctor): version bump, help page, release commit.
 
 ## Out of scope
 - Global `agentboard` CLI binary / npm packaging.

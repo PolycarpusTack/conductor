@@ -23,6 +23,7 @@ const TOC: TocGroup[] = [
   {
     label: 'Release notes',
     items: [
+      { id: 'help-release-0-2-0', title: "What's new in 0.2.0" },
       { id: 'help-release-0-1-0', title: "What's new in 0.1.0" },
       { id: 'help-release-0-6', title: "What's new in 0.6" },
       { id: 'help-release-0-5', title: "What's new in 0.5" },
@@ -451,6 +452,49 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             {/* ════════════════════════════════════════════════════════════════
                 RELEASE NOTES
                ════════════════════════════════════════════════════════════════ */}
+
+            <Section
+              id="help-release-0-2-0"
+              title="What's new in 0.2.0"
+              subtitle="Agent messaging, content safety, evidence packets, and the deployment doctor."
+            >
+              <Callout tone="neon" title="The headline">
+                <p>
+                  0.2.0 completes the operations layer. Agents now communicate through durable, task-aware
+                  inboxes; every untrusted input is scanned for prompt injection and quarantined as data when
+                  flagged; each step execution can show an <strong>evidence packet</strong> binding its output to
+                  the memories, tool calls, sessions, and messages it relied on; and <code>bun run doctor</code>{' '}
+                  verifies a deployment end to end.
+                </p>
+              </Callout>
+
+              <H3 id="help-release-0-2-0-messaging">Agent messaging</H3>
+              <Bullets>
+                <li><strong>Project-scoped inboxes</strong> — agents send/read via their API keys (<code>/api/agent/messages</code>); statuses flow queued → delivered → read with thread support.</li>
+                <li><strong>Task threads</strong> — a Messages section in the task drawer shows the conversation; admins can message agents as <code>admin@conductor</code>.</li>
+                <li><strong>Safety built in</strong> — every body is scanned at send; flagged content is delivered wrapped as data while admins see the original.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-2-0-safety">Content safety</H3>
+              <Bullets>
+                <li><strong>Injection scanner</strong> — instruction-override, role-hijack, prompt-exfiltration, and tool-abuse patterns; conservative by design.</li>
+                <li><strong>Scan-always, wrap-when-flagged</strong> — MCP tool results, webhook-created tasks, and trigger payloads pass through untouched unless suspicious; flagged content gets an explicit DATA-ONLY envelope and a warning in the activity log.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-2-0-evidence">Evidence packets</H3>
+              <p>
+                Expand <em>Show evidence</em> on any step to see what the agent relied on: injected memories by
+                category, MCP tool calls with durations, linked execution sessions, task messages, and aggregated
+                safety flags — assembled live from the audit trail, never a stale snapshot.
+              </p>
+
+              <H3 id="help-release-0-2-0-doctor">Deployment doctor</H3>
+              <Bullets>
+                <li><code>bun run doctor</code> — runtime, env validation, Prisma client, database, runtimes, daemons, plus live server and realtime checks.</li>
+                <li><code>bun run smoke-test</code> — the strict variant for post-deploy gates; network checks must pass.</li>
+                <li><strong>CI runs the offline doctor</strong> on every push.</li>
+              </Bullets>
+            </Section>
 
             <Section
               id="help-release-0-1-0"
