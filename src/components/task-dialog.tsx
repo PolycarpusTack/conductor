@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,7 +23,7 @@ import {
 import { ChainBuilder } from '@/components/chain-builder'
 import { AgentBadge } from '@/components/agent-badge'
 import type { Task, TaskStatus, TaskPriority, Project } from '@/types/board'
-import type { ProjectMode, ChainTemplate, StepDraft } from '@/types/settings'
+import type { ProjectMode, ChainTemplate, TaskTemplate, StepDraft } from '@/types/settings'
 
 interface TaskDialogProps {
   taskDialogOpen: boolean
@@ -52,6 +52,7 @@ interface TaskDialogProps {
   currentProject: Project | null
   projectModes: ProjectMode[]
   chainTemplates: ChainTemplate[]
+  taskTemplates: TaskTemplate[]
   statusColumns: { id: TaskStatus; label: string; color: string }[]
 }
 
@@ -63,8 +64,36 @@ export function TaskDialog({
   taskNotes, setTaskNotes, taskRuntimeOverride, setTaskRuntimeOverride,
   taskSteps, setTaskSteps,
   handleSaveTask, resetTaskForm,
-  currentProject, projectModes, chainTemplates, statusColumns,
+  currentProject, projectModes, chainTemplates, taskTemplates, statusColumns,
 }: TaskDialogProps) {
+  // Task templates (Epic S6): picking one prefills the form. It's a suggestion —
+  // every field stays editable, and picking another template overwrites again.
+  const [pickedTemplateId, setPickedTemplateId] = useState('')
+
+  const applyTaskTemplate = (templateId: string) => {
+    setPickedTemplateId(templateId)
+    const template = taskTemplates.find((t) => t.id === templateId)
+    if (!template) return
+    if (template.titlePattern) {
+      const today = new Date().toISOString().slice(0, 10)
+      setTaskTitle(template.titlePattern.replaceAll('{date}', today))
+    }
+    if (template.description != null) setTaskDescription(template.description)
+    if (template.priority) setTaskPriority(template.priority as TaskPriority)
+    if (template.tag) setTaskTag(template.tag)
+    if (template.notes != null) setTaskNotes(template.notes)
+    if (template.chainTemplateId) {
+      const chain = chainTemplates.find((c) => c.id === template.chainTemplateId)
+      if (chain) {
+        try {
+          const parsed = JSON.parse(chain.steps)
+          if (Array.isArray(parsed)) setTaskSteps(parsed)
+        } catch {
+          // malformed chain steps — leave the builder as-is
+        }
+      }
+    }
+  }
   // Project default (Epic S1): fresh task dialogs start with the default
   // chain template's steps prefilled — visible and fully editable, so it's
   // a suggestion rather than a surprise.
@@ -82,7 +111,7 @@ export function TaskDialog({
   }, [taskDialogOpen, editingTask, defaultTemplateId, taskSteps.length, chainTemplates, setTaskSteps])
 
   return (
-    <Dialog open={taskDialogOpen} onOpenChange={(open) => { setTaskDialogOpen(open); if (!open) resetTaskForm() }}>
+    <Dialog open={taskDialogOpen} onOpenChange={(open) => { setTaskDialogOpen(open); if (!open) { resetTaskForm(); setPickedTemplateId('') } }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{editingTask ? 'Edit Task' : 'Create New Task'}</DialogTitle>
@@ -92,6 +121,20 @@ export function TaskDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
+          {!editingTask && taskTemplates.length > 0 && (
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Start from template</label>
+              <Select value={pickedTemplateId} onValueChange={applyTaskTemplate}>
+                <SelectTrigger><SelectValue placeholder="Blank task" /></SelectTrigger>
+                <SelectContent>
+                  {taskTemplates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.icon || '📋'} {t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="grid gap-2">
             <label className="text-sm font-medium">Title</label>
             <Input
@@ -208,7 +251,7 @@ export function TaskDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => { setTaskDialogOpen(false); resetTaskForm() }}>
+          <Button variant="outline" onClick={() => { setTaskDialogOpen(false); resetTaskForm(); setPickedTemplateId('') }}>
             Cancel
           </Button>
           <Button onClick={handleSaveTask}>

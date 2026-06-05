@@ -24,7 +24,7 @@ import { ChainDialog } from '@/components/chain-dialog'
 import { ProjectDialog } from '@/components/project-dialog'
 import { SettingsDialog } from '@/components/settings-dialog'
 import type { Task, TaskStatus, TaskPriority, TaskStepSummary, Project, Agent, ProjectListItem } from '@/types/board'
-import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, StepDraft } from '@/types/settings'
+import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, TaskTemplate, StepDraft } from '@/types/settings'
 import type { IntegrationTrigger } from '@/components/settings-integrations'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
 
@@ -49,6 +49,8 @@ interface BoardViewProps {
   setProjectMcpConnections: Dispatch<SetStateAction<ProjectMcpConnection[]>>
   chainTemplates: ChainTemplate[]
   setChainTemplates: Dispatch<SetStateAction<ChainTemplate[]>>
+  taskTemplates: TaskTemplate[]
+  setTaskTemplates: Dispatch<SetStateAction<TaskTemplate[]>>
   triggers: IntegrationTrigger[]
   setTriggers: Dispatch<SetStateAction<IntegrationTrigger[]>>
   projectApiKey: string | null
@@ -157,6 +159,7 @@ export function BoardView({
   projects, currentProject, setCurrentProject, loading, seedingDemoData,
   projectModes, setProjectModes, projectRuntimes, setProjectRuntimes,
   projectMcpConnections, setProjectMcpConnections, chainTemplates, setChainTemplates,
+  taskTemplates, setTaskTemplates,
   triggers, setTriggers,
   projectApiKey, projectApiPreview, agentApiKeys, agentApiPreviews,
   loadingApiKeys, rotatingKeyId, legacyKeyStatus, migratingLegacyKeys, copiedKey,
@@ -409,6 +412,7 @@ export function BoardView({
         currentProject={currentProject}
         projectModes={projectModes}
         chainTemplates={chainTemplates}
+        taskTemplates={taskTemplates}
         statusColumns={statusColumns}
       />
 
@@ -447,6 +451,7 @@ export function BoardView({
         projectRuntimes={projectRuntimes} setProjectRuntimes={setProjectRuntimes}
         projectMcpConnections={projectMcpConnections} setProjectMcpConnections={setProjectMcpConnections}
         chainTemplates={chainTemplates} setChainTemplates={setChainTemplates}
+        taskTemplates={taskTemplates} setTaskTemplates={setTaskTemplates}
         triggers={triggers} setTriggers={setTriggers}
         projectApiKey={projectApiKey}
         projectApiPreview={projectApiPreview}

@@ -14,6 +14,19 @@ export interface ProjectMode {
   outputFormat?: string | null
 }
 
+// Task templates (Epic S6): saved task-form defaults for the create dialog
+export interface TaskTemplate {
+  id: string
+  name: string
+  icon?: string | null
+  titlePattern?: string | null // {date} expands to YYYY-MM-DD at pick time
+  description?: string | null
+  priority?: string | null
+  tag?: string | null
+  notes?: string | null
+  chainTemplateId?: string | null
+}
+
 export interface RuntimeModel {
   id: string
   name: string

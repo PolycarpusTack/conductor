@@ -18,6 +18,7 @@ import { SettingsModes } from '@/components/settings-modes'
 import { SettingsRuntimes } from '@/components/settings-runtimes'
 import { SettingsMcp } from '@/components/settings-mcp'
 import { SettingsTemplates } from '@/components/settings-templates'
+import { SettingsTaskTemplates } from '@/components/settings-task-templates'
 import { ObservabilityDashboard } from '@/components/observability-dashboard'
 import { SettingsAutomation } from '@/components/settings-automation'
 import { SettingsIntegrations } from '@/components/settings-integrations'
@@ -39,7 +40,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { Project, TaskStatus, Agent } from '@/types/board'
-import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate } from '@/types/settings'
+import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, TaskTemplate } from '@/types/settings'
 import type { IntegrationTrigger } from '@/components/settings-integrations'
 
 type SettingsTabType = 'general' | 'agents' | 'api' | 'security' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
@@ -58,6 +59,8 @@ interface SettingsDialogProps {
   setProjectMcpConnections: Dispatch<SetStateAction<ProjectMcpConnection[]>>
   chainTemplates: ChainTemplate[]
   setChainTemplates: Dispatch<SetStateAction<ChainTemplate[]>>
+  taskTemplates: TaskTemplate[]
+  setTaskTemplates: Dispatch<SetStateAction<TaskTemplate[]>>
   triggers: IntegrationTrigger[]
   setTriggers: Dispatch<SetStateAction<IntegrationTrigger[]>>
   projectApiKey: string | null
@@ -292,7 +295,7 @@ export function SettingsDialog({
   projectModes, setProjectModes,
   projectRuntimes, setProjectRuntimes,
   projectMcpConnections, setProjectMcpConnections,
-  chainTemplates, setChainTemplates,
+  chainTemplates, setChainTemplates, taskTemplates, setTaskTemplates,
   triggers, setTriggers,
   projectApiKey, projectApiPreview, agentApiKeys, agentApiPreviews,
   loadingApiKeys, rotatingKeyId, legacyKeyStatus, migratingLegacyKeys, copiedKey,
@@ -605,12 +608,28 @@ export function SettingsDialog({
 
             <TabsContent value="templates" className="mt-0">
               {currentProject && (
-                <SettingsTemplates
-                  projectId={currentProject.id}
-                  templates={chainTemplates}
-                  modes={projectModes}
-                  onTemplatesChange={setChainTemplates}
-                />
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Chain templates</h3>
+                    <p className="text-xs text-muted-foreground mb-3">Reusable multi-step workflows for the chain builder.</p>
+                    <SettingsTemplates
+                      projectId={currentProject.id}
+                      templates={chainTemplates}
+                      modes={projectModes}
+                      onTemplatesChange={setChainTemplates}
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Task templates</h3>
+                    <p className="text-xs text-muted-foreground mb-3">Saved task-form defaults — pick one in the create-task dialog to prefill title, priority, tag, notes, and an attached chain.</p>
+                    <SettingsTaskTemplates
+                      projectId={currentProject.id}
+                      templates={taskTemplates}
+                      chainTemplates={chainTemplates}
+                      onTemplatesChange={setTaskTemplates}
+                    />
+                  </div>
+                </div>
               )}
             </TabsContent>
 

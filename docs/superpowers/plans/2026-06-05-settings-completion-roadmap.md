@@ -69,10 +69,11 @@ a button!), per-runtime usage rollups from execution logs, MCP tool discovery UI
 (`tools/list` against the endpoint), and per-tool enable/disable persisted to the unused
 `scopes` column.
 
-### Epic S6 — Task templates
-The form-side counterpart to chain templates: saved task defaults (title pattern,
-description, priority, tags, attached chain) surfaced in the board's task-create flow.
-Versioning/share-to-workspace/archive are stretch goals — ship CRUD first.
+### Epic S6 — Task templates ✅ SHIPPED 2026-06-05
+The form-side counterpart to chain templates: saved task defaults (title pattern with
+`{date}` expansion, description, priority, tag, notes, attached chain) with CRUD in the
+Templates tab and a "Start from template" picker in the task-create dialog.
+Versioning/share-to-workspace/archive remain stretch goals (not shipped).
 
 ### Epic S7 — Automation rules engine
 Beyond the scheduler: auto-assign by tag/priority/title, auto-archive DONE after N days,

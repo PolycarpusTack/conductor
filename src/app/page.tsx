@@ -68,6 +68,7 @@ export default function Home() {
     projectRuntimes, setProjectRuntimes,
     projectMcpConnections, setProjectMcpConnections,
     chainTemplates, setChainTemplates,
+    taskTemplates, setTaskTemplates,
     triggers, setTriggers,
     projectApiKey,
     projectApiPreview,
@@ -226,6 +227,8 @@ export default function Home() {
       setProjectMcpConnections={setProjectMcpConnections}
       chainTemplates={chainTemplates}
       setChainTemplates={setChainTemplates}
+      taskTemplates={taskTemplates}
+      setTaskTemplates={setTaskTemplates}
       triggers={triggers}
       setTriggers={setTriggers}
       projectApiKey={projectApiKey}

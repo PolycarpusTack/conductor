@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import type { Project, ProjectListItem, Activity } from '@/types/board'
-import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate } from '@/types/settings'
+import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, TaskTemplate } from '@/types/settings'
 import type { IntegrationTrigger } from '@/components/settings-integrations'
 
 export function useProjectData() {
@@ -20,6 +20,7 @@ export function useProjectData() {
   const [projectRuntimes, setProjectRuntimes] = useState<ProjectRuntime[]>([])
   const [projectMcpConnections, setProjectMcpConnections] = useState<ProjectMcpConnection[]>([])
   const [chainTemplates, setChainTemplates] = useState<ChainTemplate[]>([])
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([])
   const [triggers, setTriggers] = useState<IntegrationTrigger[]>([])
 
   // API key state
@@ -95,16 +96,18 @@ export function useProjectData() {
 
   const fetchProjectSettings = useCallback(async (projectId: string) => {
     try {
-      const [modesRes, runtimesRes, mcpRes, templatesRes] = await Promise.all([
+      const [modesRes, runtimesRes, mcpRes, templatesRes, taskTemplatesRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/modes`, { cache: 'no-store' }),
         fetch(`/api/projects/${projectId}/runtimes`, { cache: 'no-store' }),
         fetch(`/api/projects/${projectId}/mcp-connections`, { cache: 'no-store' }),
         fetch(`/api/projects/${projectId}/chain-templates`, { cache: 'no-store' }),
+        fetch(`/api/projects/${projectId}/task-templates`, { cache: 'no-store' }),
       ])
       if (modesRes.ok) setProjectModes(await modesRes.json())
       if (runtimesRes.ok) setProjectRuntimes(await runtimesRes.json())
       if (mcpRes.ok) setProjectMcpConnections(await mcpRes.json())
       if (templatesRes.ok) setChainTemplates(await templatesRes.json())
+      if (taskTemplatesRes.ok) setTaskTemplates(await taskTemplatesRes.json())
       const triggersRes = await fetch(`/api/projects/${projectId}/triggers`)
       if (triggersRes.ok) setTriggers(await triggersRes.json())
     } catch (error) {
@@ -333,6 +336,8 @@ export function useProjectData() {
     setProjectMcpConnections,
     chainTemplates,
     setChainTemplates,
+    taskTemplates,
+    setTaskTemplates,
     triggers,
     setTriggers,
 

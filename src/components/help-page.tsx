@@ -2687,13 +2687,16 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
             <Section id="help-settings-templates" title="Settings · Templates">
               <p>
-                Chain templates live here: create, edit, and delete reusable workflows with a step editor
-                (mode + agent role + instructions per step). See <Ref href="#help-chain-templates">Chain
-                templates</Ref>.
+                Two kinds of reusable building blocks live here:
               </p>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S6)">
-                <p>Task templates — saved task forms (title pattern, defaults, attached chain) surfaced in the board&apos;s create flow.</p>
-              </Callout>
+              <Bullets>
+                <li><strong>Chain templates</strong> — reusable workflows with a step editor (mode + agent role + instructions per step). See <Ref href="#help-chain-templates">Chain templates</Ref>.</li>
+                <li><strong>Task templates</strong> — saved task-form defaults: title pattern, description, priority, tag, notes, and optionally an attached chain template. A <em>Start from template</em> picker appears at the top of the create-task dialog; picking one prefills the form (and the step builder, if a chain is attached). Everything stays editable — it&apos;s a prefill, not a lock.</li>
+              </Bullets>
+              <TipBox>
+                Put <code>{'{date}'}</code> in a title pattern and it expands to today&apos;s date when you pick
+                the template — handy for recurring tasks like &ldquo;Standup notes {'{date}'}&rdquo;.
+              </TipBox>
             </Section>
 
             <Section id="help-settings-analytics" title="Settings · Analytics">
