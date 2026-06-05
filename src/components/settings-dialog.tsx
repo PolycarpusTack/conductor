@@ -23,11 +23,13 @@ import { SettingsAutomation } from '@/components/settings-automation'
 import { SettingsIntegrations } from '@/components/settings-integrations'
 import { SettingsActivity } from '@/components/settings-activity'
 import { SettingsScopedKeys } from '@/components/settings-scoped-keys'
+import { SettingsSecurity } from '@/components/settings-security'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import {
   Activity,
   Check,
   Copy,
+  CopyPlus,
   ExternalLink,
   Key,
   Pencil,
@@ -40,7 +42,7 @@ import type { Project, TaskStatus, Agent } from '@/types/board'
 import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate } from '@/types/settings'
 import type { IntegrationTrigger } from '@/components/settings-integrations'
 
-type SettingsTabType = 'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
+type SettingsTabType = 'general' | 'agents' | 'api' | 'security' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
 
 interface SettingsDialogProps {
   settingsTab: SettingsTabType
@@ -299,6 +301,24 @@ export function SettingsDialog({
   openEditAgentDialog, handleDeleteAgent, resetAgentForm, setAgentDialogOpen,
   onProjectUpdated, onProjectDeleted,
 }: SettingsDialogProps) {
+  const handleDuplicateAgent = async (agentId: string) => {
+    try {
+      const res = await fetch(`/api/agents/${agentId}/duplicate`, { method: 'POST' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data) return
+      // Surface the once-shown key; prompt doubles as a copy affordance
+      window.prompt(
+        'Agent duplicated (inactive). Copy its API key now — it will not be shown again:',
+        data.rawKey,
+      )
+      if (currentProject) {
+        onProjectUpdated({ agents: [...currentProject.agents, data.agent] })
+      }
+    } catch {
+      // toast-less panel — failures leave the list unchanged
+    }
+  }
+
   return (
     <Dialog open={settingsTab !== null} onOpenChange={(open) => !open && setSettingsTab(null)}>
       <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden">
@@ -311,6 +331,7 @@ export function SettingsDialog({
             <TabsTrigger value="general" className="text-xs">General</TabsTrigger>
             <TabsTrigger value="agents" className="text-xs">Agents</TabsTrigger>
             <TabsTrigger value="api" className="text-xs">API Keys</TabsTrigger>
+            <TabsTrigger value="security" className="text-xs">Security</TabsTrigger>
             <TabsTrigger value="activity" className="text-xs">Activity</TabsTrigger>
             <TabsTrigger value="modes" className="text-xs">Modes</TabsTrigger>
             <TabsTrigger value="runtimes" className="text-xs">Runtimes</TabsTrigger>
@@ -394,6 +415,9 @@ export function SettingsDialog({
                       <div className="flex items-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setExpandedAgentStats(expandedAgentStats === agent.id ? null : agent.id)}>
                           <Activity className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" title="Duplicate agent" onClick={() => handleDuplicateAgent(agent.id)}>
+                          <CopyPlus className="h-3 w-3" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => openEditAgentDialog(agent)}>
                           <Pencil className="h-3 w-3" />
@@ -539,6 +563,10 @@ export function SettingsDialog({
                   </div>
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="security" className="mt-0">
+              <SettingsSecurity />
             </TabsContent>
 
             <TabsContent value="activity" className="mt-0">

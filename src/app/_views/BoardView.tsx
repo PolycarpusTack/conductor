@@ -29,7 +29,7 @@ import type { IntegrationTrigger } from '@/components/settings-integrations'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
 
 export type ViewType = 'landing' | 'board' | 'runtime' | 'skills' | 'help'
-export type SettingsTabType = 'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
+export type SettingsTabType = 'general' | 'agents' | 'api' | 'security' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
 
 interface BoardViewProps {
   // Auth

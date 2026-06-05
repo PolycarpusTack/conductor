@@ -15,25 +15,25 @@
 ---
 
 ### Task 1: AdminConfig + credential layering (TDD)
-- [ ] Schema: `AdminConfig { id @default("singleton"), passwordHash String?, sessionTtlHours Int @default(12), updatedAt }`; push + generate.
-- [ ] `admin-config.ts`: `scryptHash`/`scryptVerify` (random salt, timing-safe compare), `getAdminConfig()` (30s cache + `invalidateAdminConfigCache()`), `setAdminPassword`, `setSessionTtlHours`. Unit tests: hash roundtrip, wrong password, cache invalidation.
-- [ ] `admin-session.ts`: credential fingerprint resolution (DB-first), async `isAdminAuthConfigured`, layered `verifyAdminPassword`, fingerprint-based `buildSessionToken`, TTL-aware `createAdminSession`. Session route updated for async configured-check.
-- [ ] Commit.
+- [x] Schema: `AdminConfig { id @default("singleton"), passwordHash String?, sessionTtlHours Int @default(12), updatedAt }`; push + generate.
+- [x] `admin-config.ts`: `scryptHash`/`scryptVerify` (random salt, timing-safe compare), `getAdminConfig()` (30s cache + `invalidateAdminConfigCache()`), `setAdminPassword`, `setSessionTtlHours`. Unit tests: hash roundtrip, wrong password, cache invalidation.
+- [x] `admin-session.ts`: credential fingerprint resolution (DB-first), async `isAdminAuthConfigured`, layered `verifyAdminPassword`, fingerprint-based `buildSessionToken`, TTL-aware `createAdminSession`. Session route updated for async configured-check.
+- [x] Commit.
 
 ### Task 2: Security routes + agent duplicate
-- [ ] `POST /api/admin/security/password` — admin + CSRF; `{currentPassword, newPassword(min 8)}`; verify current via layered check; persist scrypt hash; sessions implicitly invalidated (client re-logs in).
-- [ ] `GET/PUT /api/admin/security/config` — TTL (1–720 h).
-- [ ] `POST /api/agents/[id]/duplicate` — admin + CSRF; clones identity/config with name + " (copy)", mints a fresh key, returns `{agent, rawKey}` once.
-- [ ] Route tests: wrong current password → 401-equivalent error; TTL bounds; duplicate returns key and copies fields.
-- [ ] Commit.
+- [x] `POST /api/admin/security/password` — admin + CSRF; `{currentPassword, newPassword(min 8)}`; verify current via layered check; persist scrypt hash; sessions implicitly invalidated (client re-logs in).
+- [x] `GET/PUT /api/admin/security/config` — TTL (1–720 h).
+- [x] `POST /api/agents/[id]/duplicate` — admin + CSRF; clones identity/config with name + " (copy)", mints a fresh key, returns `{agent, rawKey}` once.
+- [x] Route tests: wrong current password → 401-equivalent error; TTL bounds; duplicate returns key and copies fields.
+- [x] Commit.
 
 ### Task 3: UI
-- [ ] Settings dialog gains a **Security** tab (instance-wide, labelled as such): change-password form (current + new + confirm, "you'll be signed out" note) and session-TTL select.
-- [ ] Agents tab: duplicate button per row; on success show the new key once (copy-to-clipboard prompt) and refresh the list.
-- [ ] Commit.
+- [x] Settings dialog gains a **Security** tab (instance-wide, labelled as such): change-password form (current + new + confirm, "you'll be signed out" note) and session-TTL select.
+- [x] Agents tab: duplicate button per row; on success show the new key once (copy-to-clipboard prompt) and refresh the list.
+- [x] Commit.
 
 ### Task 4: Wrap-up
-- [ ] Help (admin login/session + Settings API/agents sections + S2 roadmap callouts) updated; INSTALL.md notes the layered credential + break-glass; roadmap S2 marked; full verification; commit.
+- [x] Help (admin login/session + Settings API/agents sections + S2 roadmap callouts) updated; INSTALL.md notes the layered credential + break-glass; roadmap S2 marked; full verification; commit.
 
 ## Out of scope
 - Multiple admin users / roles — a different epic entirely.

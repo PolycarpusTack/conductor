@@ -2580,9 +2580,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li>Key rotation lives on the <em>API Keys</em> tab, next to the keys themselves.</li>
                 <li><em>+ Add Agent</em> opens the creation modal — disabled (with a pointer) until you&apos;ve added a runtime.</li>
               </Bullets>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S2)">
-                <p>Agent duplication (clone a working config) is planned.</p>
-              </Callout>
+              <p className="text-sm">
+                The <strong>duplicate</strong> button clones a working agent&apos;s full configuration with a
+                fresh API key (shown once) — the copy starts <em>inactive</em> so you can review it before it
+                claims work.
+              </p>
             </Section>
 
             <Section id="help-settings-api" title="Settings · API keys">
@@ -2608,13 +2610,9 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
               <H3>Admin session</H3>
               <p>
-                A session cookie issued when you sign in with the admin password (set via the
-                <code> AGENTBOARD_ADMIN_PASSWORD</code> env var). Sessions last 12 hours. Changing the password
-                (and restarting) invalidates all existing sessions.
+                A session cookie issued when you sign in. Password and session length are managed on the
+                <em> Security</em> tab; changing the password signs everyone out immediately.
               </p>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S2)">
-                <p>In-UI password change and a configurable session timeout.</p>
-              </Callout>
             </Section>
 
             <Section id="help-settings-activity" title="Settings · Activity">
@@ -2988,24 +2986,26 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
               subtitle="How authentication works in the browser."
             >
               <p>
-                Conductor is admin-password protected. The password lives in the
-                <code> AGENTBOARD_ADMIN_PASSWORD</code> env var (with an optional separate cookie-signing secret
-                in <code>AGENTBOARD_ADMIN_SESSION_SECRET</code>). After signing in, your browser carries a
-                session cookie — HttpOnly, SameSite=Lax, HMAC-signed.
+                Conductor is admin-password protected, with <strong>layered credentials</strong>: the
+                <code> AGENTBOARD_ADMIN_PASSWORD</code> env var bootstraps a fresh install, and a password set in
+                <em> Settings &rarr; Security</em> overrides it from then on (stored as a slow scrypt hash). The
+                env var stays your <strong>break-glass</strong> credential — clear the AdminConfig database row
+                and it works again. After signing in, your browser carries a session cookie — HttpOnly,
+                SameSite=Lax, HMAC-signed.
               </p>
 
               <H3>Session lifetime</H3>
               <Bullets>
-                <li>Sessions last 12 hours.</li>
-                <li>Changing the password (and restarting the server) invalidates every active session — the session token is derived from it.</li>
+                <li>Configurable in <em>Settings &rarr; Security</em> (1 hour to 30 days; default 12 hours). Applies to new sign-ins.</li>
+                <li>Changing the password invalidates every active session instantly — session tokens are derived from the credential itself.</li>
                 <li>Mutating requests additionally pass a same-origin CSRF check, so a malicious site can&apos;t ride your cookie.</li>
               </Bullets>
 
               <WatchIt>
                 <p>
-                  Current releases have one shared admin password. Share it narrowly, rotate whenever someone
-                  with access leaves. In-UI password change and per-user accounts are on the roadmap
-                  (settings-completion Epic S2).
+                  Still one shared admin password (per-user accounts are a future epic). Share it narrowly and
+                  rotate from <em>Settings &rarr; Security</em> whenever someone with access leaves — everyone
+                  gets signed out, which is exactly what you want.
                 </p>
               </WatchIt>
             </Section>

@@ -46,7 +46,7 @@ pattern), and delete-project with type-the-name confirmation. *Touches:* setting
 General tab, project schema (defaults), task-create route, a purge job, `DELETE
 /api/projects/[id]` confirmation flow.
 
-### Epic S2 — Admin & security settings
+### Epic S2 — Admin & security settings ✅ SHIPPED 2026-06-05 (layered env+DB credentials)
 A real Security tab: change admin password from the UI (writes hash, invalidates sessions),
 configurable session TTL, and agent duplicate action. *Depends on:* deciding to move the
 admin password from env to DB (or layering: env var bootstraps, DB overrides). Design

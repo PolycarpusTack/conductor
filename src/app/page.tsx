@@ -45,7 +45,7 @@ export default function Home() {
   const [view, setView] = useState<'landing' | 'board' | 'runtime' | 'skills' | 'help'>('landing')
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [settingsTab, setSettingsTab] = useState<'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null>(null)
+  const [settingsTab, setSettingsTab] = useState<'general' | 'agents' | 'api' | 'security' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null>(null)
 
   const {
     isAdminAuthenticated,
