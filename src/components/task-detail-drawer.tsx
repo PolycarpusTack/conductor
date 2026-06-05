@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { AgentBadge } from '@/components/agent-badge'
 import { TaskSessions } from '@/components/session-list'
+import { TaskMessages } from '@/components/task-messages'
 import type { Task } from '@/types/board'
 
 // Full step detail fetched from /api/tasks/[id] — richer than TaskStepSummary on the board Task
@@ -33,6 +34,8 @@ interface TaskStep {
 
 interface TaskDetailDrawerProps {
   task: Task
+  /** Project agents — recipients for the messages section. */
+  agents?: Array<{ id: string; name: string }>
   onClose: () => void
   onEdit: () => void
   onRefresh: () => void
@@ -70,7 +73,7 @@ const STEP_STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   skipped: { color: 'text-muted-foreground/50', label: 'Skipped' },
 }
 
-export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetailDrawerProps) {
+export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh }: TaskDetailDrawerProps) {
   const [fullSteps, setFullSteps] = useState<TaskStep[]>(task.steps || [])
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null)
@@ -368,6 +371,9 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
 
           {/* Daemon execution sessions (renders only when the task has any) */}
           <TaskSessions taskId={task.id} />
+
+          {/* Agent messages for this task */}
+          <TaskMessages taskId={task.id} agents={agents} />
 
           {/* Timestamps */}
           <div className="pt-2">

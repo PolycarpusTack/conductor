@@ -10,6 +10,12 @@
 
 **Tech Stack:** Prisma 7, Next.js 16 App Router, TypeScript 5, Zod 4, Bun test
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - Admin task-thread reads return RAW bodies + parsed `bodySecurity` (forensics view); delivery-time wrapping applies only to agent reads via `presentBody` — admins need to see exactly what was sent.
+> - The Messages drawer section always offers a compose affordance (collapsed one-liner when the thread is empty) rather than rendering nothing — an invisible feature is an unused feature.
+> - `admin@conductor` is the fixed admin from-address constant; admin sends carry trust `admin` and are never wrapped at delivery even if the scanner flags them (admins may legitimately quote injection text when instructing agents about it).
+> - Recipient slugs in the UI are derived client-side from agent names with the same slug algorithm — acceptable duplication until an address-listing endpoint exists (address management is v1.1).
+
 ---
 
 ## File Map
@@ -30,33 +36,33 @@
 ---
 
 ### Task 1: Schema
-- [ ] `AgentAddress { id, agentId, projectId, address, label?, active, createdAt; @@unique([projectId, address]); @@index([agentId]) }`
-- [ ] `AgentMessage { id, projectId, workspaceId?, taskId?, stepId?, threadId?, fromAgentId?, toAgentId?, fromAddress, toAddress, priority=normal, subject?, body, bodySecurity?, status=queued, readAt?, createdAt, deliveredAt?; @@index([projectId, toAgentId, status]); @@index([taskId]); @@index([threadId]) }`
-- [ ] push + generate + commit.
+- [x] `AgentAddress { id, agentId, projectId, address, label?, active, createdAt; @@unique([projectId, address]); @@index([agentId]) }`
+- [x] `AgentMessage { id, projectId, workspaceId?, taskId?, stepId?, threadId?, fromAgentId?, toAgentId?, fromAddress, toAddress, priority=normal, subject?, body, bodySecurity?, status=queued, readAt?, createdAt, deliveredAt?; @@index([projectId, toAgentId, status]); @@index([taskId]); @@index([threadId]) }`
+- [x] push + generate + commit.
 
 ### Task 2: agent-messaging service (TDD)
-- [ ] `slugifyAddress(name)` — lowercase, dashes, stable.
-- [ ] `ensureAgentAddress(agentId, projectId, name)` — upsert by (projectId, slug); returns address.
-- [ ] `resolveRecipientByAddress(projectId, address)` — AgentAddress lookup, active only; null for cross-project/unknown.
-- [ ] `sendMessage({ from?, fromAddress, toAgent, ..., trust })` — scans body (Epic 4), stores `bodySecurity` JSON `{ trust, flags }`, status `queued`, threadId defaults to own id; broadcasts `agent-message-created`.
-- [ ] `presentBody(message)` — returns body wrapped as external-content when flags exist AND trust isn't admin/system; verbatim otherwise (delivery-time wrapping; stored original intact).
-- [ ] Tests for all of the above with mocked db.
+- [x] `slugifyAddress(name)` — lowercase, dashes, stable.
+- [x] `ensureAgentAddress(agentId, projectId, name)` — upsert by (projectId, slug); returns address.
+- [x] `resolveRecipientByAddress(projectId, address)` — AgentAddress lookup, active only; null for cross-project/unknown.
+- [x] `sendMessage({ from?, fromAddress, toAgent, ..., trust })` — scans body (Epic 4), stores `bodySecurity` JSON `{ trust, flags }`, status `queued`, threadId defaults to own id; broadcasts `agent-message-created`.
+- [x] `presentBody(message)` — returns body wrapped as external-content when flags exist AND trust isn't admin/system; verbatim otherwise (delivery-time wrapping; stored original intact).
+- [x] Tests for all of the above with mocked db.
 
 ### Task 3: Agent-key routes
-- [ ] `GET /api/agent/messages?status=` — inbox of authenticated agent; auto-transition returned `queued` → `delivered` (+`deliveredAt`); bodies via `presentBody`.
-- [ ] `POST /api/agent/messages` — `{ to, body, subject?, taskId?, stepId?, priority?, threadId? }`; sender = authenticated agent (address auto-provisioned); recipient must resolve in the same project; taskId must belong to the project; trust `agent`.
-- [ ] `POST /api/agent/messages/[id]/read` — 403 unless addressed to the authenticated agent; sets `read`/`readAt`; broadcasts `agent-message-read`.
-- [ ] Route tests: 401 bad key, 404 unknown recipient address, 403 foreign read, send→queued, GET marks delivered, read marks read, flagged body delivered wrapped.
+- [x] `GET /api/agent/messages?status=` — inbox of authenticated agent; auto-transition returned `queued` → `delivered` (+`deliveredAt`); bodies via `presentBody`.
+- [x] `POST /api/agent/messages` — `{ to, body, subject?, taskId?, stepId?, priority?, threadId? }`; sender = authenticated agent (address auto-provisioned); recipient must resolve in the same project; taskId must belong to the project; trust `agent`.
+- [x] `POST /api/agent/messages/[id]/read` — 403 unless addressed to the authenticated agent; sets `read`/`readAt`; broadcasts `agent-message-read`.
+- [x] Route tests: 401 bad key, 404 unknown recipient address, 403 foreign read, send→queued, GET marks delivered, read marks read, flagged body delivered wrapped.
 
 ### Task 4: Admin routes + UI
-- [ ] `GET /api/tasks/[id]/messages` (admin) — thread for a task, raw bodies + bodySecurity (forensics view).
-- [ ] `POST /api/tasks/[id]/messages` (admin + CSRF) — `{ to, body, subject? }` from address `admin@conductor`, trust `admin`.
-- [ ] `GET /api/projects/[id]/messages?limit=` (admin).
-- [ ] `task-messages.tsx` — section in the task drawer: thread list (from→to, priority, security badge when flagged, relative time), admin send box with recipient select from task's project agents. Renders only when messages exist or compose is opened.
-- [ ] Endpoint auth tests for the admin routes.
+- [x] `GET /api/tasks/[id]/messages` (admin) — thread for a task, raw bodies + bodySecurity (forensics view).
+- [x] `POST /api/tasks/[id]/messages` (admin + CSRF) — `{ to, body, subject? }` from address `admin@conductor`, trust `admin`.
+- [x] `GET /api/projects/[id]/messages?limit=` (admin).
+- [x] `task-messages.tsx` — section in the task drawer: thread list (from→to, priority, security badge when flagged, relative time), admin send box with recipient select from task's project agents. Renders only when messages exist or compose is opened.
+- [x] Endpoint auth tests for the admin routes.
 
 ### Task 5: Wrap-up
-- [ ] Full verification; checkboxes; deviations; commit.
+- [x] Full verification; checkboxes; deviations; commit.
 
 ## Out of scope (v1.1+)
 - `wait_message` step mode and message-driven triggers (`message-created` etc.).

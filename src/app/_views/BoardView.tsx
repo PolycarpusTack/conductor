@@ -505,6 +505,7 @@ export function BoardView({
           <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" onClick={() => setSelectedTask(null)} />
           <TaskDetailDrawer
             task={selectedTask}
+            agents={currentProject?.agents ?? []}
             onClose={() => setSelectedTask(null)}
             onEdit={() => { openEditTaskDialog(selectedTask); setSelectedTask(null) }}
             onRefresh={() => {
