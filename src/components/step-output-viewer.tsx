@@ -38,6 +38,13 @@ interface StepExecutionSummary {
   completedAt?: string | null
 }
 
+interface StepEventSummary {
+  id: string
+  event: string
+  data?: string | null
+  createdAt: string
+}
+
 interface StepArtifactSummary {
   id: string
   type: string
@@ -82,6 +89,7 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
   const [rejectionNote, setRejectionNote] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [executionHistory, setExecutionHistory] = useState<Record<string, StepExecutionSummary[]>>({})
+  const [stepEvents, setStepEvents] = useState<Record<string, StepEventSummary[]>>({})
   const [expandedExecutions, setExpandedExecutions] = useState<Set<string>>(new Set())
   const [stepArtifacts, setStepArtifacts] = useState<Record<string, StepArtifactSummary[]>>({})
 
@@ -97,10 +105,11 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
       return
     }
     try {
-      const res = await fetch(`/api/tasks/${taskId}/steps/${stepId}/executions`, { cache: 'no-store' })
+      const res = await fetch(`/api/tasks/${taskId}/steps/${stepId}/executions?include=events`, { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
-        setExecutionHistory(prev => ({ ...prev, [stepId]: data }))
+        setExecutionHistory(prev => ({ ...prev, [stepId]: data.executions }))
+        setStepEvents(prev => ({ ...prev, [stepId]: data.events }))
         setExpandedExecutions(prev => new Set(prev).add(stepId))
       }
     } catch (err) {
@@ -111,6 +120,7 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
   // Clear stale execution/artifact data when task changes
   useEffect(() => {
     setExecutionHistory({})
+    setStepEvents({})
     setExpandedExecutions(new Set())
     setStepArtifacts({})
   }, [taskId])
@@ -484,6 +494,30 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
                                   )}
                                 </div>
                               ))}
+
+                              {/* Event timeline (append-only audit trail) */}
+                              {(stepEvents[step.id]?.length ?? 0) > 0 && (
+                                <div className="rounded border border-border/20 bg-card/10 p-2 text-[10px] font-mono space-y-0.5">
+                                  {stepEvents[step.id].map((evt) => (
+                                    <div key={evt.id} className="flex items-baseline gap-2">
+                                      <span className="text-muted-foreground/40 shrink-0">
+                                        {new Date(evt.createdAt).toLocaleTimeString()}
+                                      </span>
+                                      <span className={
+                                        evt.event === 'succeeded' ? 'text-[var(--op-teal)]' :
+                                        evt.event === 'failed' || evt.event === 'dead_lettered' ? 'text-[var(--op-red)]' :
+                                        evt.event === 'retry_scheduled' ? 'text-[var(--op-amber)]' :
+                                        'text-muted-foreground'
+                                      }>
+                                        {evt.event}
+                                      </span>
+                                      {evt.data && (
+                                        <span className="text-muted-foreground/40 truncate">{evt.data}</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

@@ -5,6 +5,7 @@ import { Trash2, Download, RefreshCw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { DeadLetterPanel } from '@/components/dead-letter-panel'
 import {
   Select,
   SelectContent,
@@ -147,6 +148,9 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
 
   return (
     <div className="space-y-5">
+      {/* Exhausted steps awaiting operator attention (hidden when empty) */}
+      <DeadLetterPanel projectId={projectId} />
+
       {/* Retention settings */}
       <div className="rounded-lg border border-border p-4 space-y-3">
         <div>
