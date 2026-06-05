@@ -5,6 +5,7 @@
 // The adapter loops until the model produces a final text response.
 
 import { db } from '@/lib/db'
+import { scanForPromptInjection, wrapExternalContent } from '@/lib/server/content-safety'
 import { getLogger } from '@/lib/server/logger'
 
 const log = getLogger('mcp-resolver')
@@ -207,7 +208,24 @@ export async function executeMcpTool(
     }
 
     log.debug('tool result', { toolName, textParts: textParts.length, artifacts: artifacts.length })
-    const text = textParts.join('\n') || JSON.stringify(data.result || data)
+    let text = textParts.join('\n') || JSON.stringify(data.result || data)
+
+    // Tool results loop straight back into the LLM conversation — a hostile
+    // tool response is a prompt-injection vector. Scan always; wrap only when
+    // flagged so trusted-looking results pass through byte-identical.
+    const safetyFlags = scanForPromptInjection(text)
+    if (safetyFlags.length > 0) {
+      log.warn('prompt-injection patterns in tool result — wrapping as data', {
+        toolName,
+        categories: safetyFlags.map((f) => f.category),
+      })
+      text = wrapExternalContent({
+        text,
+        source: `mcp:${connectionName}/${actualToolName}`,
+        trust: 'external',
+      }).text
+    }
+
     return { text, artifacts }
   } catch (error) {
     return { text: JSON.stringify({ error: `MCP tool execution error: ${error instanceof Error ? error.message : 'unknown'}` }), artifacts: [] }
