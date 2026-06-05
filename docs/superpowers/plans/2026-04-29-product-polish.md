@@ -8,6 +8,11 @@
 
 **Tech Stack:** Next.js 16 App Router, Prisma 7, TypeScript 5, Bun 1.3.4
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - Health env check reuses `validateEnv()` from `src/lib/env.ts` (added in the security pass) instead of a hardcoded `REQUIRED_ENV` list with the plan's stale names (`SESSION_SECRET` doesn't exist) — one source of truth for what "configured" means. Response exposes constraint messages (`envIssues`), never values.
+> - Runtime health parses `runtime.models` as the real `RuntimeModel[]` object shape (`[{id,name,tier}]`), not the plan's `string[]`; pings with mode `analyze`.
+> - `INSTALL.md` documents the real setup: SQLite default with optional Postgres+pgvector via `docker:up` (docker-compose only runs the database, not the app), the `board-ws` realtime mini-service, and the actual `AGENTBOARD_*` env names.
+
 ---
 
 ## File Map
@@ -29,7 +34,7 @@
 
 The health endpoint must not require auth (load balancers call it), but must not expose secrets. It checks: DB connectivity (one cheap query), required env vars present, and application version.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/lib/server/__tests__/health.test.ts`:
 
@@ -61,7 +66,7 @@ describe('getHealthStatus', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 bun test src/lib/server/__tests__/health.test.ts
@@ -69,7 +74,7 @@ bun test src/lib/server/__tests__/health.test.ts
 
 Expected: FAIL — `getHealthStatus` not found.
 
-- [ ] **Step 3: Write `src/lib/server/health.ts`**
+- [x] **Step 3: Write `src/lib/server/health.ts`**
 
 ```typescript
 import { db } from '@/lib/db'
@@ -109,7 +114,7 @@ export async function getHealthStatus(): Promise<HealthStatus> {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 bun test src/lib/server/__tests__/health.test.ts
@@ -117,7 +122,7 @@ bun test src/lib/server/__tests__/health.test.ts
 
 Expected: 2 pass, 0 fail.
 
-- [ ] **Step 5: Write `src/app/api/health/route.ts`**
+- [x] **Step 5: Write `src/app/api/health/route.ts`**
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -131,7 +136,7 @@ export async function GET() {
 }
 ```
 
-- [ ] **Step 6: Verify the endpoint is reachable (manual)**
+- [x] **Step 6: Verify the endpoint is reachable (manual)**
 
 Start the dev server in a separate terminal:
 ```bash
@@ -155,7 +160,7 @@ Expected:
 }
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/server/health.ts src/lib/server/__tests__/health.test.ts src/app/api/health/route.ts
@@ -171,7 +176,7 @@ git commit -m "feat: add /api/health endpoint for load balancers and monitoring"
 
 This endpoint fires a minimal "echo" prompt at the configured runtime adapter and reports whether it responded, with latency.
 
-- [ ] **Step 1: Locate the adapter dispatch pattern**
+- [x] **Step 1: Locate the adapter dispatch pattern**
 
 ```bash
 grep -n "getAdapter\|adapter.dispatch\|resolveRuntime" src/lib/server/wizard-composer.ts
@@ -179,13 +184,13 @@ grep -n "getAdapter\|adapter.dispatch\|resolveRuntime" src/lib/server/wizard-com
 
 Note the pattern for resolving and calling an adapter — this endpoint uses the same pattern.
 
-- [ ] **Step 2: Create the directory structure**
+- [x] **Step 2: Create the directory structure**
 
 ```bash
 mkdir -p src/app/api/admin/runtimes/\[id\]/health
 ```
 
-- [ ] **Step 3: Write `src/app/api/admin/runtimes/[id]/health/route.ts`**
+- [x] **Step 3: Write `src/app/api/admin/runtimes/[id]/health/route.ts`**
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -250,7 +255,7 @@ export const GET = withErrorHandling(
 )
 ```
 
-- [ ] **Step 4: Type-check**
+- [x] **Step 4: Type-check**
 
 ```bash
 bun run type-check 2>&1 | grep "runtimes.*health"
@@ -258,7 +263,7 @@ bun run type-check 2>&1 | grep "runtimes.*health"
 
 Expected: no output (no errors).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/api/admin/runtimes/
@@ -272,7 +277,7 @@ git commit -m "feat: add per-runtime health ping endpoint at /api/admin/runtimes
 **Files:**
 - Create: `INSTALL.md`
 
-- [ ] **Step 1: Write `INSTALL.md`**
+- [x] **Step 1: Write `INSTALL.md`**
 
 ```markdown
 # AgentBoard — Install Guide
@@ -353,7 +358,7 @@ bun run start
 ```
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add INSTALL.md
