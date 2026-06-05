@@ -264,6 +264,23 @@ export const updateChainTemplateSchema = createChainTemplateSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
 
+// Task templates (Epic S6): saved task-form defaults. Everything but the name
+// is optional — a template can be as thin as "bug report, HIGH priority".
+export const createTaskTemplateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  icon: z.string().max(16).optional(),
+  titlePattern: z.string().trim().max(200).nullable().optional(),
+  description: z.string().max(2000).nullable().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).nullable().optional(),
+  tag: z.string().trim().max(60).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  chainTemplateId: z.string().trim().min(1).nullable().optional(),
+})
+
+export const updateTaskTemplateSchema = createTaskTemplateSchema
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
+
 // ── Skills ──────────────────────────────────────────────────────────────────
 
 export const createSkillSchema = z.object({

@@ -27,6 +27,7 @@ model Project {
   runtimes           ProjectRuntime[]
   mcpConnections     ProjectMcpConnection[]
   chainTemplates     ChainTemplate[]
+  taskTemplates      TaskTemplate[]
   memories           AgentMemory[]
   triggers           Trigger[]
   // Automation scheduler config
@@ -186,9 +187,30 @@ model ChainTemplate {
   icon        String   @default("🔗")
   projectId   String
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  steps       String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  steps         String
+  taskTemplates TaskTemplate[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+// Task templates (Epic S6): saved task-form defaults surfaced in the board's
+// create flow. The optional chain link degrades to null if the chain template
+// is deleted — the task template keeps its field defaults.
+model TaskTemplate {
+  id              String         @id @default(cuid())
+  name            String
+  icon            String         @default("📋")
+  projectId       String
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  titlePattern    String? // supports {date} -> YYYY-MM-DD at pick time
+  description     String?
+  priority        String? // LOW | MEDIUM | HIGH | URGENT
+  tag             String?
+  notes           String?
+  chainTemplateId String?
+  chainTemplate   ChainTemplate? @relation(fields: [chainTemplateId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 }
 
 model TaskStep {
