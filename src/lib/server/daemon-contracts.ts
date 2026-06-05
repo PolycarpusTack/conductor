@@ -44,6 +44,49 @@ export const daemonHealthSchema = z.object({
   activeSessions: z.number().int().min(0).optional(),
 })
 
+export const SESSION_BACKENDS = ['pty', 'tmux', 'process', 'container'] as const
+export const SESSION_STATUSES = ['starting', 'active', 'idle', 'waiting', 'exited', 'failed'] as const
+
+/** Daemon upserts a session it owns; identity fields come from the token, not this payload. */
+export const upsertSessionSchema = z.object({
+  sessionKey: z.string().trim().min(1).max(120),
+  backend: z.enum(SESSION_BACKENDS),
+  cwd: z.string().trim().max(500).optional(),
+  command: z.string().trim().max(500).optional(),
+  agentId: z.string().trim().min(1).optional(),
+  projectId: z.string().trim().min(1).optional(),
+  taskId: z.string().trim().min(1).optional(),
+  stepId: z.string().trim().min(1).optional(),
+  status: z.enum(SESSION_STATUSES).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
+export const sessionEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('status'),
+    status: z.enum(['active', 'idle', 'waiting', 'exited', 'failed']),
+    reason: z.string().max(500).optional(),
+    exitCode: z.number().int().optional(),
+  }),
+  z.object({
+    type: z.literal('output'),
+    stream: z.enum(['stdout', 'stderr']),
+    chunk: z.string().max(8000),
+    truncated: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal('command'),
+    commandSummary: z.string().max(500),
+  }),
+  z.object({
+    type: z.literal('metric'),
+    cpuPct: z.number().min(0).max(100).optional(),
+    memoryMb: z.number().min(0).optional(),
+  }),
+])
+
+export type SessionEvent = z.infer<typeof sessionEventSchema>
+
 export const liveAgentEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('thinking') }),
   z.object({
