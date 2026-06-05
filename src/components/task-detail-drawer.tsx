@@ -10,6 +10,7 @@ import {
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { AgentBadge } from '@/components/agent-badge'
+import { TaskSessions } from '@/components/session-list'
 import type { Task } from '@/types/board'
 
 // Full step detail fetched from /api/tasks/[id] — richer than TaskStepSummary on the board Task
@@ -364,6 +365,9 @@ export function TaskDetailDrawer({ task, onClose, onEdit, onRefresh }: TaskDetai
               </div>
             </div>
           )}
+
+          {/* Daemon execution sessions (renders only when the task has any) */}
+          <TaskSessions taskId={task.id} />
 
           {/* Timestamps */}
           <div className="pt-2">

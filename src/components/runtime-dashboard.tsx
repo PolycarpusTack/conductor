@@ -9,6 +9,7 @@ import { RefreshCw, Server, Cpu, HardDrive, Activity, Wifi, WifiOff, AlertTriang
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DaemonLogViewer } from '@/components/daemon-log-viewer'
 import { HostsPanel } from '@/components/host-card'
+import { SessionsPanel } from '@/components/session-list'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
 
 interface DaemonInfo {
@@ -84,10 +85,15 @@ export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
       <TabsList>
         <TabsTrigger value="daemons">Daemons</TabsTrigger>
         <TabsTrigger value="hosts">Hosts</TabsTrigger>
+        <TabsTrigger value="sessions">Sessions</TabsTrigger>
       </TabsList>
 
       <TabsContent value="hosts">
         <HostsPanel />
+      </TabsContent>
+
+      <TabsContent value="sessions">
+        <SessionsPanel />
       </TabsContent>
 
       <TabsContent value="daemons">
