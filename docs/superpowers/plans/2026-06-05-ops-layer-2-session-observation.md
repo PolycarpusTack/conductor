@@ -10,6 +10,12 @@
 
 **Tech Stack:** Prisma 7, Next.js 16 App Router, TypeScript 5, Zod 4, Bun test
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - Output events on a non-terminal session also flip its status to `active` (output implies liveness); terminal statuses stay sticky as planned.
+> - The task drawer got an "Execution Sessions" *section* (renders only when sessions exist) rather than a tab — the drawer has no tab system and one wasn't worth introducing for a single panel; the design's Messages/Evidence tabs can drive that refactor when they land.
+> - `redactSecrets` masks bearer tokens, structured app keys (`cd_daemon.*`/`ab_agent.*`/`ab_project.*`), `sk-*` keys, and secret-looking `KEY=value` pairs — pattern list is deliberately conservative and lives in one place for extension.
+> - Broadcasts are emitted server-side (`session-status`/`session-output`); the dashboard polls (10s) like the Hosts tab. Socket wiring into the UI rides along with Epic 3 as planned.
+
 ---
 
 ## File Map
@@ -33,7 +39,7 @@
 
 ### Task 1: Schema — AgentSession
 
-- [ ] **Step 1:** Add to `prisma/schema.prisma` (after `Host`):
+- [x] **Step 1:** Add to `prisma/schema.prisma` (after `Host`):
 
 ```prisma
 model AgentSession {
@@ -67,59 +73,59 @@ model AgentSession {
 ```
 plus `sessions AgentSession[]` on `Host`. Note `daemonId` is required (sessions are daemon-owned) but intentionally NOT a relation — sessions outlive daemon re-registration the same way dead-letters outlive tasks.
 
-- [ ] **Step 2:** `db:push` + `generate`; type-check; commit.
+- [x] **Step 2:** `db:push` + `generate`; type-check; commit.
 
 ---
 
 ### Task 2: Contracts + session service (TDD)
 
-- [ ] **Step 1:** Zod in `daemon-contracts.ts`:
+- [x] **Step 1:** Zod in `daemon-contracts.ts`:
   - `upsertSessionSchema`: `{ sessionKey (1..120), backend enum, cwd?, command? (≤500), agentId?, projectId?, taskId?, stepId?, status? enum, metadata? }`
   - `sessionEventSchema` discriminated union:
     - `{ type: 'status', status: 'active'|'idle'|'waiting'|'exited'|'failed', reason?, exitCode? }`
     - `{ type: 'output', stream: 'stdout'|'stderr', chunk: string (≤8000), truncated? }`
     - `{ type: 'command', commandSummary: string (≤500) }`
     - `{ type: 'metric', cpuPct?, memoryMb? }`
-- [ ] **Step 2:** Failing tests for `src/lib/server/agent-sessions.ts`:
+- [x] **Step 2:** Failing tests for `src/lib/server/agent-sessions.ts`:
   - `appendOutputPreview(existing, chunk)` keeps only the LAST `MAX_OUTPUT_PREVIEW_CHARS` (5000)
   - `redactSecrets(text)` masks bearer tokens, `sk-…`/`cd_daemon.…`/`ab_agent.…` style keys, and `KEY=value` pairs for names matching /(secret|token|password|api_?key)/i
   - `applySessionEvent(session, event)` → status event sets status (+ `endedAt`/`exitCode` for exited/failed); output event appends redacted tail + bumps `lastActivityAt`; command event sets `command`; metric event merges into `metadata`
   - terminal statuses (`exited`/`failed`) are sticky — later `output` events don't resurrect `status`
-- [ ] **Step 3:** Implement; tests green; commit.
+- [x] **Step 3:** Implement; tests green; commit.
 
 ---
 
 ### Task 3: Daemon session routes
 
-- [ ] **Step 1:** `POST /api/daemon/sessions` — daemon token required. Upsert by `(daemon.id, sessionKey)`; `workspaceId`/`hostId` always from the resolved daemon, never the payload. If `taskId` present, verify the task's workspace matches the daemon's (events-route precedent) and derive `projectId` from the task. Broadcast `session-status` when projectId known. Returns `{ sessionId }`.
-- [ ] **Step 2:** `POST /api/daemon/sessions/[sessionId]/events` — daemon token; 403 unless `session.daemonId === daemon.id`; parse event; `applySessionEvent`; persist; broadcast `session-output` (bounded redacted chunk) or `session-status`.
-- [ ] **Step 3:** Route tests (mock `daemon-auth` full surface + db): 401 missing/invalid token, 403 foreign session, 404 unknown session, 400 malformed event, 200 upsert + status flow.
-- [ ] **Step 4:** Commit.
+- [x] **Step 1:** `POST /api/daemon/sessions` — daemon token required. Upsert by `(daemon.id, sessionKey)`; `workspaceId`/`hostId` always from the resolved daemon, never the payload. If `taskId` present, verify the task's workspace matches the daemon's (events-route precedent) and derive `projectId` from the task. Broadcast `session-status` when projectId known. Returns `{ sessionId }`.
+- [x] **Step 2:** `POST /api/daemon/sessions/[sessionId]/events` — daemon token; 403 unless `session.daemonId === daemon.id`; parse event; `applySessionEvent`; persist; broadcast `session-output` (bounded redacted chunk) or `session-status`.
+- [x] **Step 3:** Route tests (mock `daemon-auth` full surface + db): 401 missing/invalid token, 403 foreign session, 404 unknown session, 400 malformed event, 200 upsert + status flow.
+- [x] **Step 4:** Commit.
 
 ---
 
 ### Task 4: Admin read APIs
 
-- [ ] **Step 1:** `GET /api/sessions?workspaceId&taskId&status&limit` — `requireAdminOrScopedKey(request, 'read')`; newest-first by `lastActivityAt`.
-- [ ] **Step 2:** Fill host detail `sessions` (last 20, newest first).
-- [ ] **Step 3:** Endpoint auth tests (401/200/filters).
-- [ ] **Step 4:** Commit.
+- [x] **Step 1:** `GET /api/sessions?workspaceId&taskId&status&limit` — `requireAdminOrScopedKey(request, 'read')`; newest-first by `lastActivityAt`.
+- [x] **Step 2:** Fill host detail `sessions` (last 20, newest first).
+- [x] **Step 3:** Endpoint auth tests (401/200/filters).
+- [x] **Step 4:** Commit.
 
 ---
 
 ### Task 5: UI — Sessions tab + task drawer section
 
-- [ ] **Step 1:** `src/components/session-list.tsx` — reusable list: status badge (starting/active/idle/waiting/exited/failed), backend chip, sessionKey, command, cwd, relative last activity, expandable output preview (`<pre>` tail). Self-fetching panel variant with polling for the dashboard.
-- [ ] **Step 2:** `Sessions` tab in Runtime Dashboard.
-- [ ] **Step 3:** Task detail drawer: "Execution sessions" section (renders only when the task has sessions) fetching `/api/sessions?taskId=`.
-- [ ] **Step 4:** Type-check/lint/tests; commit.
+- [x] **Step 1:** `src/components/session-list.tsx` — reusable list: status badge (starting/active/idle/waiting/exited/failed), backend chip, sessionKey, command, cwd, relative last activity, expandable output preview (`<pre>` tail). Self-fetching panel variant with polling for the dashboard.
+- [x] **Step 2:** `Sessions` tab in Runtime Dashboard.
+- [x] **Step 3:** Task detail drawer: "Execution sessions" section (renders only when the task has sessions) fetching `/api/sessions?taskId=`.
+- [x] **Step 4:** Type-check/lint/tests; commit.
 
 ---
 
 ### Task 6: Wrap-up
 
-- [ ] **Step 1:** Full verification; mark checkboxes; deviations note.
-- [ ] **Step 2:** Commit.
+- [x] **Step 1:** Full verification; mark checkboxes; deviations note.
+- [x] **Step 2:** Commit.
 
 ## Out of scope (Epic 3+)
 
