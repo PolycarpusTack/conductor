@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { assertSameOrigin } from '@/lib/csrf'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { composeAgent } from '@/lib/server/wizard-composer'
 import { validateLibraryPath } from '@/lib/server/prompt-library'
@@ -15,6 +16,13 @@ const composeRequestSchema = z.object({
 export async function POST(req: Request) {
   const unauthorized = await requireAdminSession()
   if (unauthorized) return unauthorized
+
+  // This route is not wrapped in withErrorHandling, so map the CSRF error manually
+  try {
+    assertSameOrigin(req)
+  } catch {
+    return NextResponse.json({ error: 'Cross-origin request blocked' }, { status: 403 })
+  }
 
   const libraryError = validateLibraryPath()
   if (libraryError) {

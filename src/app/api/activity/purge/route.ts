@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
+import { assertSameOrigin } from '@/lib/csrf'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { purgeOldLogs } from '@/lib/server/activity-logger'
@@ -13,6 +14,7 @@ const purgeSchema = z.object({
 export const POST = withErrorHandling('api/activity/purge', async (request: Request) => {
   const unauthorized = await requireAdminSession()
   if (unauthorized) return unauthorized
+  assertSameOrigin(request)
 
   const body = await request.json().catch(() => null)
   const parsed = purgeSchema.safeParse(body)

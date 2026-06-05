@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
+import { assertSameOrigin } from '@/lib/csrf'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateTaskSchema } from '@/lib/server/contracts'
@@ -34,6 +35,7 @@ export const PUT = withErrorHandling(
   async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
+    assertSameOrigin(request)
 
     const { id } = await params
     const existingTask = await db.task.findUnique({
@@ -98,6 +100,7 @@ export const DELETE = withErrorHandling(
   async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
     const unauthorized = await requireAdminSession()
     if (unauthorized) return unauthorized
+    assertSameOrigin(request)
 
     const { id } = await params
     const task = await db.task.findUnique({
