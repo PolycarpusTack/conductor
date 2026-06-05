@@ -365,9 +365,44 @@ model Host {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   daemons     Daemon[]
+  sessions    AgentSession[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId, status])
+}
+
+// An observable local execution session reported by a daemon (pty, tmux,
+// process). Owned by the daemon — identity always derives from the daemon
+// token, never the payload. daemonId is intentionally NOT a relation so
+// sessions survive daemon re-registration. Stores only a redacted output
+// tail; durable results live in executions/artifacts.
+model AgentSession {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  projectId      String?
+  agentId        String?
+  daemonId       String
+  hostId         String?
+  taskId         String?
+  stepId         String?
+  sessionKey     String    // daemon-local stable name
+  backend        String    // pty | tmux | process | container
+  cwd            String?
+  command        String?   // summary only, never raw input streams
+  status         String    @default("starting") // starting | active | idle | waiting | exited | failed
+  lastActivityAt DateTime?
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  exitCode       Int?
+  outputPreview  String?   // redacted, bounded tail (~5KB)
+  metadata       String?   // JSON
+
+  host Host? @relation(fields: [hostId], references: [id], onDelete: SetNull)
+
+  @@unique([daemonId, sessionKey])
+  @@index([workspaceId, status])
+  @@index([projectId, agentId])
+  @@index([taskId, stepId])
 }
 
 enum AgentInvocationMode {
