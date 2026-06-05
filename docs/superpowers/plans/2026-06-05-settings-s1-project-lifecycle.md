@@ -33,27 +33,27 @@
 ---
 
 ### Task 1: Schema + contracts + project routes
-- [ ] Columns; push + generate. `updateProjectSchema` + PUT route data/select; GET select returns the new fields. `types/board.ts` Project extends.
-- [ ] Commit.
+- [x] Columns; push + generate. `updateProjectSchema` + PUT route data/select; GET select returns the new fields. `types/board.ts` Project extends.
+- [x] Commit.
 
 ### Task 2: Defaults consumption
-- [ ] tasks POST: fetch project defaults; when `agentId && !steps?.length && !status` → synthesize `steps = [{ mode: defaultStepMode ?? 'develop', agentId, autoContinue: true }]` before the existing pipeline (auto-start then applies naturally).
-- [ ] Route tests: agent-only task → step created with default mode, status IN_PROGRESS, startChain fired; explicit `status: 'BACKLOG'` opts out; project without default uses `develop`.
-- [ ] TaskDialog: on fresh open with empty steps, prefill from `currentProject.defaultChainTemplateId`.
-- [ ] Commit.
+- [x] tasks POST: fetch project defaults; when `agentId && !steps?.length && !status` → synthesize `steps = [{ mode: defaultStepMode ?? 'develop', agentId, autoContinue: true }]` before the existing pipeline (auto-start then applies naturally).
+- [x] Route tests: agent-only task → step created with default mode, status IN_PROGRESS, startChain fired; explicit `status: 'BACKLOG'` opts out; project without default uses `develop`.
+- [x] TaskDialog: on fresh open with empty steps, prefill from `currentProject.defaultChainTemplateId`.
+- [x] Commit.
 
 ### Task 3: Artifact retention
-- [ ] `purgeProjectArtifacts(projectId)`: no-op unless `artifactRetentionDays` set; deletes `StepArtifact` rows older than cutoff belonging to DONE tasks of the project; returns count. Unit tests (null retention no-op, cutoff math, DONE-only scoping).
-- [ ] Lazy fire in activity GET next to `purgeProjectLogs`.
-- [ ] Commit.
+- [x] `purgeProjectArtifacts(projectId)`: no-op unless `artifactRetentionDays` set; deletes `StepArtifact` rows older than cutoff belonging to DONE tasks of the project; returns count. Unit tests (null retention no-op, cutoff math, DONE-only scoping).
+- [x] Lazy fire in activity GET next to `purgeProjectLogs`.
+- [x] Commit.
 
 ### Task 4: Danger zone + settings UI
-- [ ] General tab: Defaults card (mode select from `projectModes`, chain template select from `chainTemplates`, artifact retention select) saving through the same PUT; Danger zone card — type the project name to enable <em>Delete project</em>; on success `onProjectDeleted()`.
-- [ ] BoardView: `onProjectDeleted` → switch to first other project (`switchProject`) or clear board state.
-- [ ] Commit.
+- [x] General tab: Defaults card (mode select from `projectModes`, chain template select from `chainTemplates`, artifact retention select) saving through the same PUT; Danger zone card — type the project name to enable <em>Delete project</em>; on success `onProjectDeleted()`.
+- [x] BoardView: `onProjectDeleted` → switch to first other project (`switchProject`) or clear board state.
+- [x] Commit.
 
 ### Task 5: Wrap-up
-- [ ] Help Settings·General updated (S1 shipped; roadmap callout slims to leftovers if any); roadmap doc S1 marked shipped; full verification; commit.
+- [x] Help Settings·General updated (S1 shipped; roadmap callout slims to leftovers if any); roadmap doc S1 marked shipped; full verification; commit.
 
 ## Out of scope
 - Step-execution retention (audit rows) — revisit with real disk pressure.

@@ -79,8 +79,7 @@ export function TaskDialog({
     } catch {
       // malformed template steps — leave the builder empty
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefill once per open
-  }, [taskDialogOpen, editingTask, defaultTemplateId])
+  }, [taskDialogOpen, editingTask, defaultTemplateId, taskSteps.length, chainTemplates, setTaskSteps])
 
   return (
     <Dialog open={taskDialogOpen} onOpenChange={(open) => { setTaskDialogOpen(open); if (!open) resetTaskForm() }}>

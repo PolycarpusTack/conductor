@@ -470,6 +470,15 @@ export function BoardView({
         onProjectUpdated={(patch) =>
           setCurrentProject(prev => (prev ? { ...prev, ...patch } : prev))
         }
+        onProjectDeleted={() => {
+          setSettingsTab(null)
+          const survivor = projects.find(p => p.id !== currentProject?.id)
+          if (survivor) {
+            switchProject(survivor.id)
+          } else {
+            setCurrentProject(null)
+          }
+        }}
       />
 
       <AgentCreationModal

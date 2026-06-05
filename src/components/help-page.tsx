@@ -2557,15 +2557,18 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               </TipBox>
               <Bullets>
                 <li><strong>Project name &amp; description</strong> — editable right here; <em>Save changes</em> updates the selector and sidebar immediately.</li>
-                <li><strong>Tasks summary</strong> — live card counts per column, for a quick health glance without closing the dialog.</li>
+                <li><strong>Task defaults</strong> — a default step mode (an agent-assigned task with no steps auto-creates one step in this mode and dispatches) and a default chain template (prefills the step builder on new tasks — visible and editable, a suggestion not a surprise).</li>
+                <li><strong>Artifact retention</strong> — how long DONE tasks keep their artifacts (7 days to forever). Purges run lazily in the background.</li>
+                <li><strong>Tasks summary</strong> — live card counts per column.</li>
+                <li><strong>Danger zone</strong> — delete the project by typing its name. Removes agents, tasks, steps, artifacts, and history. There is no undo, which is why there&apos;s typing.</li>
               </Bullets>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S1)">
+              <TipBox>
                 <p>
-                  Default mode &amp; default chain for new tasks, artifact/step retention controls, and a
-                  type-the-name delete-project flow. Tracked in
-                  <code> docs/superpowers/plans/2026-06-05-settings-completion-roadmap.md</code>.
+                  Set the default step mode and suddenly &ldquo;assign an agent&rdquo; on a plain task actually
+                  runs it — no chain-building required for simple one-shot work. Park a task in
+                  <Term> BACKLOG</Term> explicitly if you want assignment <em>without</em> dispatch.
                 </p>
-              </Callout>
+              </TipBox>
             </Section>
 
             <Section id="help-settings-agents" title="Settings · Agents">

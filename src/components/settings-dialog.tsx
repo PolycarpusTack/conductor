@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingsModes } from '@/components/settings-modes'
 import { SettingsRuntimes } from '@/components/settings-runtimes'
 import { SettingsMcp } from '@/components/settings-mcp'
@@ -76,53 +77,102 @@ interface SettingsDialogProps {
   handleDeleteAgent: (id: string) => Promise<void>
   resetAgentForm: () => void
   setAgentDialogOpen: Dispatch<SetStateAction<boolean>>
-  onProjectUpdated: (patch: { name: string; description: string | null }) => void
+  onProjectUpdated: (patch: Partial<Project>) => void
+  onProjectDeleted: () => void
 }
 
-/** Editable project basics — saves through PUT /api/projects/[id]. */
+const ARTIFACT_RETENTION_OPTIONS = [
+  { value: 'forever', label: 'Keep forever' },
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+  { value: '365', label: '1 year' },
+]
+
+/** Editable project basics, defaults, retention, and danger zone (Epic S1). */
 function GeneralTab({
   project,
+  modes,
+  templates,
   onProjectUpdated,
+  onProjectDeleted,
   children,
 }: {
   project: Project
-  onProjectUpdated: (patch: { name: string; description: string | null }) => void
+  modes: ProjectMode[]
+  templates: ChainTemplate[]
+  onProjectUpdated: (patch: Partial<Project>) => void
+  onProjectDeleted: () => void
   children: React.ReactNode
 }) {
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description ?? '')
+  const [defaultStepMode, setDefaultStepMode] = useState(project.defaultStepMode ?? 'none')
+  const [defaultChainTemplateId, setDefaultChainTemplateId] = useState(project.defaultChainTemplateId ?? 'none')
+  const [artifactRetention, setArtifactRetention] = useState(
+    project.artifactRetentionDays ? String(project.artifactRetentionDays) : 'forever',
+  )
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   // Re-sync when switching projects while the dialog is open
   useEffect(() => {
     setName(project.name)
     setDescription(project.description ?? '')
+    setDefaultStepMode(project.defaultStepMode ?? 'none')
+    setDefaultChainTemplateId(project.defaultChainTemplateId ?? 'none')
+    setArtifactRetention(project.artifactRetentionDays ? String(project.artifactRetentionDays) : 'forever')
     setStatus('idle')
-  }, [project.id, project.name, project.description])
+    setDeleteConfirm('')
+  }, [project.id, project.name, project.description, project.defaultStepMode, project.defaultChainTemplateId, project.artifactRetentionDays])
 
-  const dirty = name !== project.name || description !== (project.description ?? '')
+  const patch = {
+    name: name.trim(),
+    description: description.trim() || null,
+    defaultStepMode: defaultStepMode === 'none' ? null : defaultStepMode,
+    defaultChainTemplateId: defaultChainTemplateId === 'none' ? null : defaultChainTemplateId,
+    artifactRetentionDays: artifactRetention === 'forever' ? null : parseInt(artifactRetention, 10),
+  }
+
+  const dirty =
+    patch.name !== project.name ||
+    patch.description !== (project.description ?? null) ||
+    patch.defaultStepMode !== (project.defaultStepMode ?? null) ||
+    patch.defaultChainTemplateId !== (project.defaultChainTemplateId ?? null) ||
+    patch.artifactRetentionDays !== (project.artifactRetentionDays ?? null)
 
   const save = async () => {
-    if (!name.trim()) return
+    if (!patch.name) return
     setSaving(true)
     setStatus('idle')
     try {
       const res = await fetch(`/api/projects/${project.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || null }),
+        body: JSON.stringify(patch),
       })
       if (!res.ok) {
         setStatus('error')
         return
       }
-      onProjectUpdated({ name: name.trim(), description: description.trim() || null })
+      onProjectUpdated(patch)
       setStatus('saved')
     } catch {
       setStatus('error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const deleteProject = async () => {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
+      if (res.ok) onProjectDeleted()
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -141,14 +191,95 @@ function GeneralTab({
           rows={2}
         />
       </div>
+
+      <div className="rounded-lg border border-border/30 p-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Task Defaults</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Applied when creating new tasks. The default mode dispatches agent-assigned tasks without steps;
+            the default chain prefills the step builder.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <label htmlFor="settings-default-mode" className="text-xs font-medium">Default step mode</label>
+            <Select value={defaultStepMode} onValueChange={setDefaultStepMode}>
+              <SelectTrigger id="settings-default-mode" className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-xs">develop (built-in default)</SelectItem>
+                {modes.map((m) => (
+                  <SelectItem key={m.id} value={m.name} className="text-xs">{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <label htmlFor="settings-default-chain" className="text-xs font-medium">Default chain template</label>
+            <Select value={defaultChainTemplateId} onValueChange={setDefaultChainTemplateId}>
+              <SelectTrigger id="settings-default-chain" className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" className="text-xs">None</SelectItem>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={t.id} className="text-xs">{t.icon} {t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid gap-1.5">
+          <label htmlFor="settings-artifact-retention" className="text-xs font-medium">Artifact retention (DONE tasks)</label>
+          <Select value={artifactRetention} onValueChange={setArtifactRetention}>
+            <SelectTrigger id="settings-artifact-retention" className="h-8 text-xs w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ARTIFACT_RETENTION_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
-        <Button size="sm" onClick={save} disabled={saving || !dirty || !name.trim()}>
+        <Button size="sm" onClick={save} disabled={saving || !dirty || !patch.name}>
           {saving ? 'Saving…' : 'Save changes'}
         </Button>
         {status === 'saved' && !dirty && <span className="text-xs text-emerald-400">Saved.</span>}
         {status === 'error' && <span className="text-xs text-[var(--op-red,#F87171)]">Failed to save — try again.</span>}
       </div>
+
       {children}
+
+      <div className="rounded-lg border border-[var(--op-red-dim,rgba(248,113,113,0.2))] bg-[var(--op-red-bg,rgba(248,113,113,0.05))] p-4 space-y-2">
+        <p className="text-sm font-medium text-[var(--op-red,#F87171)]">Danger Zone</p>
+        <p className="text-xs text-muted-foreground">
+          Deleting a project removes its agents, tasks, steps, artifacts, and history. This cannot be undone.
+          Type <strong className="text-foreground">{project.name}</strong> to confirm.
+        </p>
+        <div className="flex items-center gap-2">
+          <Input
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            placeholder={project.name}
+            className="h-8 text-xs flex-1"
+            aria-label="Type the project name to confirm deletion"
+          />
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-8 text-xs"
+            disabled={deleteConfirm !== project.name || deleting}
+            onClick={deleteProject}
+          >
+            {deleting ? 'Deleting…' : 'Delete project'}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -166,7 +297,7 @@ export function SettingsDialog({
   copyToClipboard, rotateProjectApiKey, rotateAgentApiKey, migrateLegacyKeys,
   expandedAgentStats, setExpandedAgentStats,
   openEditAgentDialog, handleDeleteAgent, resetAgentForm, setAgentDialogOpen,
-  onProjectUpdated,
+  onProjectUpdated, onProjectDeleted,
 }: SettingsDialogProps) {
   return (
     <Dialog open={settingsTab !== null} onOpenChange={(open) => !open && setSettingsTab(null)}>
@@ -193,7 +324,14 @@ export function SettingsDialog({
           <div className="mt-4 overflow-y-auto max-h-[50vh]">
             <TabsContent value="general" className="mt-0">
               {currentProject && (
-                <GeneralTab key={currentProject.id} project={currentProject} onProjectUpdated={onProjectUpdated}>
+                <GeneralTab
+                  key={currentProject.id}
+                  project={currentProject}
+                  modes={projectModes}
+                  templates={chainTemplates}
+                  onProjectUpdated={onProjectUpdated}
+                  onProjectDeleted={onProjectDeleted}
+                >
                   <div className="grid gap-2">
                     <span className="text-sm font-medium">Tasks Summary</span>
                     <div className="grid grid-cols-5 gap-2 text-center">

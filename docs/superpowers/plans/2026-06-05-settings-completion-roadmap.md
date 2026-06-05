@@ -36,7 +36,10 @@
 
 ## Epics (priority order)
 
-### Epic S1 — Project lifecycle settings *(highest value, smallest surface)*
+### Epic S1 — Project lifecycle settings ✅ SHIPPED 2026-06-05
+See `2026-06-05-settings-s1-project-lifecycle.md` for the executed plan.
+
+*(original scope below)*
 General tab grows up: default mode + default chain for new tasks (consumed by task
 creation), artifact/step retention with background purge (activity-log retention as the
 pattern), and delete-project with type-the-name confirmation. *Touches:* settings-dialog
