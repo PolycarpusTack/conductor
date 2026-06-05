@@ -8,6 +8,12 @@
 
 **Tech Stack:** Prisma 7, SQLite, TypeScript 5, Zod 4, Node.js `crypto`, Bun 1.3.4
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - `assertSameOrigin` throws the codebase's existing `ApiError(403)` (via `forbidden()`), so routes wrapped in `withErrorHandling` need no try/catch; only the unwrapped wizard compose route maps it manually.
+> - Env schema uses the real variable names (`AGENTBOARD_ADMIN_PASSWORD`, `AGENTBOARD_ADMIN_SESSION_SECRET`, WS secrets) instead of the plan's `SESSION_SECRET`; `DATABASE_URL` stays optional because `db.ts` has a SQLite fallback. Admin password is hard-required in production only.
+> - `ApiKey` model gained a `revokedAt` column; revoked keys fail validation but remain listed for audit.
+> - Added the `/api/admin/api-keys` REST route (GET list / POST issue / DELETE revoke) from the File Map, plus `listApiKeys`/`revokeApiKey` service functions and env validation tests.
+
 ---
 
 ## File Map
@@ -33,7 +39,7 @@
 
 `SameSite=Lax` blocks cross-site form POSTs in browsers but does not protect API routes called from non-browser clients or older browsers. An explicit origin check is the defense-in-depth layer.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/lib/server/__tests__/csrf.test.ts`:
 
@@ -66,7 +72,7 @@ describe('assertSameOrigin', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 bun test src/lib/server/__tests__/csrf.test.ts
@@ -74,7 +80,7 @@ bun test src/lib/server/__tests__/csrf.test.ts
 
 Expected: FAIL — `assertSameOrigin` not found.
 
-- [ ] **Step 3: Write `src/lib/csrf.ts`**
+- [x] **Step 3: Write `src/lib/csrf.ts`**
 
 ```typescript
 import { NextResponse } from 'next/server'
@@ -98,7 +104,7 @@ export function assertSameOrigin(request: Request): void {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 bun test src/lib/server/__tests__/csrf.test.ts
@@ -106,7 +112,7 @@ bun test src/lib/server/__tests__/csrf.test.ts
 
 Expected: 4 pass, 0 fail.
 
-- [ ] **Step 5: Apply `assertSameOrigin` to admin mutation routes**
+- [x] **Step 5: Apply `assertSameOrigin` to admin mutation routes**
 
 The routes that perform state-changing operations and are authenticated via session (not API key) need this guard. Add it as the first call after `requireAdminSession` in each:
 
@@ -127,7 +133,7 @@ try { assertSameOrigin(request) } catch {
 }
 ```
 
-- [ ] **Step 6: Type-check and full test run**
+- [x] **Step 6: Type-check and full test run**
 
 ```bash
 bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
@@ -136,7 +142,7 @@ bun test
 
 Expected: no new errors, all tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/csrf.ts src/lib/server/__tests__/csrf.test.ts
@@ -154,7 +160,7 @@ git commit -m "feat(security): add CSRF origin check to all admin mutation route
 
 A missing `SESSION_SECRET` or `DATABASE_URL` should kill the process at boot, not cause a confusing runtime error on the first request.
 
-- [ ] **Step 1: Write `src/lib/env.ts`**
+- [x] **Step 1: Write `src/lib/env.ts`**
 
 ```typescript
 import { z } from 'zod'
@@ -179,7 +185,7 @@ export const env = serverEnvSchema.parse({
 })
 ```
 
-- [ ] **Step 2: Create or modify `src/instrumentation.ts`**
+- [x] **Step 2: Create or modify `src/instrumentation.ts`**
 
 Next.js calls `register()` from `instrumentation.ts` once at server startup. Importing `@/lib/env` here triggers the validation.
 
@@ -195,7 +201,7 @@ export async function register() {
 }
 ```
 
-- [ ] **Step 3: Verify no type errors**
+- [x] **Step 3: Verify no type errors**
 
 ```bash
 bun run type-check 2>&1 | grep "env.ts\|instrumentation"
@@ -203,7 +209,7 @@ bun run type-check 2>&1 | grep "env.ts\|instrumentation"
 
 Expected: no output.
 
-- [ ] **Step 4: Verify the validation throws on a bad input (manual test)**
+- [x] **Step 4: Verify the validation throws on a bad input (manual test)**
 
 ```bash
 node -e "process.env.DATABASE_URL=''; require('./src/lib/env.ts')" 2>&1 | head -5
@@ -211,7 +217,7 @@ node -e "process.env.DATABASE_URL=''; require('./src/lib/env.ts')" 2>&1 | head -
 
 Expected: Zod validation error mentioning `DATABASE_URL`.
 
-- [ ] **Step 5: Add `.env.example`**
+- [x] **Step 5: Add `.env.example`**
 
 ```bash
 cat > .env.example << 'EOF'
@@ -227,7 +233,7 @@ LOG_LEVEL=info
 EOF
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/env.ts src/instrumentation.ts .env.example
@@ -241,7 +247,7 @@ git commit -m "feat(security): add Zod startup env validation and .env.example"
 **Files:**
 - Modify: `prisma/schema.prisma`
 
-- [ ] **Step 1: Add `ApiKey` model to schema**
+- [x] **Step 1: Add `ApiKey` model to schema**
 
 ```prisma
 model ApiKey {
@@ -255,7 +261,7 @@ model ApiKey {
 }
 ```
 
-- [ ] **Step 2: Push and regenerate**
+- [x] **Step 2: Push and regenerate**
 
 ```bash
 bun run db:push && bun run db:generate
@@ -263,7 +269,7 @@ bun run db:push && bun run db:generate
 
 Expected: `Your database is now in sync with your Prisma schema.`
 
-- [ ] **Step 3: Verify no type errors**
+- [x] **Step 3: Verify no type errors**
 
 ```bash
 bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
@@ -271,7 +277,7 @@ bun run type-check 2>&1 | grep -v "help-page\|trigger-evaluator"
 
 Expected: no new errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add prisma/schema.prisma src/generated/prisma/
@@ -286,7 +292,7 @@ git commit -m "feat(schema): add ApiKey model for scoped API key management"
 - Create: `src/lib/server/scoped-api-keys.ts`
 - Create: `src/lib/server/__tests__/scoped-api-keys.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/lib/server/__tests__/scoped-api-keys.test.ts`:
 
@@ -331,7 +337,7 @@ describe('validateApiKey', () => {
 })
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 ```bash
 bun test src/lib/server/__tests__/scoped-api-keys.test.ts
@@ -339,7 +345,7 @@ bun test src/lib/server/__tests__/scoped-api-keys.test.ts
 
 Expected: FAIL.
 
-- [ ] **Step 3: Write `src/lib/server/scoped-api-keys.ts`**
+- [x] **Step 3: Write `src/lib/server/scoped-api-keys.ts`**
 
 ```typescript
 import { createHash, randomBytes } from 'crypto'
@@ -385,7 +391,7 @@ export async function validateApiKey(
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 bun test src/lib/server/__tests__/scoped-api-keys.test.ts
@@ -393,7 +399,7 @@ bun test src/lib/server/__tests__/scoped-api-keys.test.ts
 
 Expected: 3 pass, 0 fail.
 
-- [ ] **Step 5: Full test run**
+- [x] **Step 5: Full test run**
 
 ```bash
 bun test
@@ -401,7 +407,7 @@ bun test
 
 Expected: all tests pass, 0 fail.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/server/scoped-api-keys.ts src/lib/server/__tests__/scoped-api-keys.test.ts

@@ -409,3 +409,16 @@ model Reaction {
 
   @@index([triggerId, order])
 }
+
+// Scoped API keys for external integrations (CI, scripts, webhooks).
+// The raw key is shown once at issue time; only prefix + SHA-256 hash are stored.
+model ApiKey {
+  id         String    @id @default(cuid())
+  prefix     String    @unique // first 8 chars of the raw key, plaintext — for O(1) lookup
+  keyHash    String    @unique // SHA-256 of the full raw key — never store the raw key
+  label      String
+  scopes     String    @default("[]") // JSON: ["read", "write", "mcp:execute"]
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+}
