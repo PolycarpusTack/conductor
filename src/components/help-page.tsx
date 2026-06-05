@@ -23,6 +23,7 @@ const TOC: TocGroup[] = [
   {
     label: 'Release notes',
     items: [
+      { id: 'help-release-0-6', title: "What's new in 0.6" },
       { id: 'help-release-0-5', title: "What's new in 0.5" },
       { id: 'help-release-0-4', title: "What's new in 0.4" },
       { id: 'help-release-0-3', title: "What's new in 0.3" },
@@ -449,6 +450,50 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             {/* ════════════════════════════════════════════════════════════════
                 RELEASE NOTES
                ════════════════════════════════════════════════════════════════ */}
+
+            <Section
+              id="help-release-0-6"
+              title="What's new in 0.6"
+              subtitle="Security hardening, durable execution, tracing, and operational polish."
+            >
+              <Callout tone="neon" title="The headline">
+                <p>
+                  0.6 is the &ldquo;production-ready&rdquo; release. CSRF protection and scoped API keys harden the
+                  surface, the execution pipeline gained an audit trail with exponential backoff and a dead-letter
+                  queue, OpenTelemetry traces follow a task from HTTP request to LLM call, and a health endpoint
+                  plus install guide make self-hosting verifiable.
+                </p>
+              </Callout>
+
+              <H3 id="help-release-0-6-security">Security pass</H3>
+              <Bullets>
+                <li><strong>CSRF origin checks</strong> — every session-authenticated mutation route rejects cross-origin requests.</li>
+                <li><strong>Startup env validation</strong> — a misconfigured deployment fails at boot with a readable message instead of a runtime surprise; see <code>.env.example</code>.</li>
+                <li><strong>Scoped API keys</strong> — issue keys with <code>read</code>/<code>write</code> scopes from <code>/api/admin/api-keys</code>; only an 8-char prefix and a SHA-256 hash are stored. CI and webhooks can pull activity/analytics and create tasks without a browser session.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-6-hardening">Execution hardening</H3>
+              <Bullets>
+                <li><strong>Step event log</strong> — an append-only audit trail per step (<code>leased</code>, <code>started</code>, <code>succeeded</code>, <code>failed</code>, <code>retry_scheduled</code>, <code>dead_lettered</code>), visible in the execution history panel.</li>
+                <li><strong>Exponential backoff</strong> — retries now back off with jitter (capped at 1 hour) instead of a fixed delay.</li>
+                <li><strong>Dead-letter queue</strong> — steps that exhaust retries (and their fallback agent) are snapshotted; review and requeue them from <em>Settings &rarr; Activity</em>.</li>
+                <li><strong>Race-safe dispatch</strong> — two workers can no longer run the same attempt; the loser aborts cleanly.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-6-observability">Tracing &amp; health</H3>
+              <Bullets>
+                <li><strong>OpenTelemetry</strong> — route and adapter spans with model, token, and cost attributes; set <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> to export. Trace context follows a step from the creating request through dispatch to the daemon.</li>
+                <li><strong>Health endpoints</strong> — <code>GET /api/health</code> for load balancers (DB + env checks), and a per-runtime LLM connectivity ping for admins.</li>
+                <li><strong>Install guide</strong> — <code>INSTALL.md</code> documents setup end to end, including the optional Postgres + pgvector and realtime services.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-6-tests">Test coverage</H3>
+              <p>
+                The suite grew from 180 to 250+ tests, including endpoint-level auth tests that catch any route
+                missing its session check, CSRF coverage on mutation routes, and unit tests for every new
+                security and hardening module.
+              </p>
+            </Section>
 
             <Section
               id="help-release-0-5"
