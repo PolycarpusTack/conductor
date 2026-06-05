@@ -5,7 +5,7 @@ import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { activityQuerySchema } from '@/lib/server/contracts'
 import { purgeProjectLogs } from '@/lib/server/activity-logger'
-import { purgeProjectArtifacts } from '@/lib/server/retention'
+import { purgeDeletedTasks, purgeProjectArtifacts } from '@/lib/server/retention'
 
 export const GET = withErrorHandling('api/activity', async (request: Request) => {
   // Admin session OR a scoped API key with "read" — integration-friendly
@@ -21,19 +21,27 @@ export const GET = withErrorHandling('api/activity', async (request: Request) =>
     component: searchParams.get('component') || undefined,
     search: searchParams.get('search') || undefined,
     traceId: searchParams.get('traceId') || undefined,
+    from: searchParams.get('from') || undefined,
+    to: searchParams.get('to') || undefined,
   })
 
   if (!parsed.success) {
     throw badRequest(parsed.error.issues[0]?.message || 'Invalid activity query')
   }
 
-  const { projectId, limit, agentId, level, component, search, traceId } = parsed.data
+  const { projectId, limit, agentId, level, component, search, traceId, from, to } = parsed.data
 
   const where: Record<string, unknown> = { projectId }
   if (agentId) where.agentId = agentId
   if (level) where.level = level
   if (component) where.component = component
   if (traceId) where.traceId = traceId
+  if (from || to) {
+    where.createdAt = {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    }
+  }
   if (search) {
     where.OR = [
       { action: { contains: search } },
@@ -55,6 +63,7 @@ export const GET = withErrorHandling('api/activity', async (request: Request) =>
   // policy configured.
   void purgeProjectLogs(projectId)
   void purgeProjectArtifacts(projectId)
+  void purgeDeletedTasks(projectId)
 
   return NextResponse.json(activities)
 })

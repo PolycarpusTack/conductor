@@ -35,6 +35,7 @@ export async function GET(request: Request) {
     const inProgressTask = await db.task.findFirst({
       where: {
         projectId: agent.projectId,
+        deletedAt: null,
         agentId: agent.id,
         status: 'IN_PROGRESS',
       },
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
       (await db.task.findFirst({
         where: {
           projectId: agent.projectId,
+          deletedAt: null,
           agentId: agent.id,
           status: 'BACKLOG',
         },
@@ -57,6 +59,7 @@ export async function GET(request: Request) {
       (await db.task.findFirst({
         where: {
           projectId: agent.projectId,
+          deletedAt: null,
           agentId: null,
           status: 'BACKLOG',
         },

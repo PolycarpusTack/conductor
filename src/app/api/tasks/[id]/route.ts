@@ -110,7 +110,14 @@ export const DELETE = withErrorHandling(
 
     if (!task) throw notFound('Task not found')
 
-    await db.task.delete({ where: { id } })
+    // Soft delete (Epic S3): 30-day grace period with restore from
+    // Settings → Activity. Live read/dispatch paths filter deletedAt: null;
+    // releasing leases stops any in-flight pickup immediately.
+    await db.task.update({ where: { id }, data: { deletedAt: new Date() } })
+    await db.taskStep.updateMany({
+      where: { taskId: id },
+      data: { leasedBy: null, leasedAt: null },
+    })
 
     broadcastProjectEvent(task.projectId, 'task-deleted', task.id)
 

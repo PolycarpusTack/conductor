@@ -27,6 +27,7 @@ export const GET = withErrorHandling(
           select: agentSummarySelect,
         },
         tasks: {
+          where: { deletedAt: null },
           include: {
             agent: {
               select: agentSummarySelect,

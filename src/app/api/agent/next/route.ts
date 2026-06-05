@@ -57,6 +57,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
     const inProgressTask = await db.task.findFirst({
       where: {
         projectId: agent.projectId,
+        deletedAt: null,
         agentId: agent.id,
         status: 'IN_PROGRESS',
       },
@@ -79,6 +80,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
     const assignedBacklogTask = await db.task.findFirst({
       where: {
         projectId: agent.projectId,
+        deletedAt: null,
         agentId: agent.id,
         status: 'BACKLOG',
       },
@@ -102,6 +104,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
     const unassignedTask = await db.task.findFirst({
       where: {
         projectId: agent.projectId,
+        deletedAt: null,
         agentId: null,
         status: 'BACKLOG',
       },

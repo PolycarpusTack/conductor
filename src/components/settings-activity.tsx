@@ -87,6 +87,35 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
       .catch(() => {})
   }, [projectId])
 
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  // Recently deleted tasks (Epic S3) — 30-day restore window
+  const [deletedTasks, setDeletedTasks] = useState<Array<{ id: string; title: string; deletedAt: string }>>([])
+  const [restoringId, setRestoringId] = useState<string | null>(null)
+
+  const fetchDeletedTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/deleted-tasks`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        setDeletedTasks(data.tasks)
+      }
+    } catch {}
+  }, [projectId])
+
+  useEffect(() => { void fetchDeletedTasks() }, [fetchDeletedTasks])
+
+  const restoreTask = async (taskId: string) => {
+    setRestoringId(taskId)
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/restore`, { method: 'POST' })
+      if (res.ok) setDeletedTasks(prev => prev.filter(t => t.id !== taskId))
+    } finally {
+      setRestoringId(null)
+    }
+  }
+
   const fetchLogs = useCallback(async () => {
     setLoading(true)
     try {
@@ -94,12 +123,14 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
       if (filterLevel !== 'all') params.set('level', filterLevel)
       if (filterComponent !== 'all') params.set('component', filterComponent)
       if (search) params.set('search', search)
+      if (fromDate) params.set('from', fromDate)
+      if (toDate) params.set('to', `${toDate}T23:59:59`)
       const res = await fetch(`/api/activity?${params}`)
       if (res.ok) setEntries(await res.json())
     } finally {
       setLoading(false)
     }
-  }, [projectId, filterLevel, filterComponent, search])
+  }, [projectId, filterLevel, filterComponent, search, fromDate, toDate])
 
   useEffect(() => { void fetchLogs() }, [fetchLogs])
 
@@ -143,6 +174,8 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
 
   const exportLogs = (format: 'jsonl' | 'csv') => {
     const params = new URLSearchParams({ projectId, format, limit: '50000' })
+    if (fromDate) params.set('from', fromDate)
+    if (toDate) params.set('to', `${toDate}T23:59:59`)
     window.open(`/api/activity/export?${params}`, '_blank')
   }
 
@@ -150,6 +183,37 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
     <div className="space-y-5">
       {/* Exhausted steps awaiting operator attention (hidden when empty) */}
       <DeadLetterPanel projectId={projectId} />
+
+      {/* Recently deleted tasks — 30-day restore window (Epic S3) */}
+      {deletedTasks.length > 0 && (
+        <div className="rounded-lg border border-border p-4 space-y-2">
+          <div>
+            <p className="text-sm font-medium">Recently Deleted Tasks</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Restorable for 30 days after deletion, then purged permanently.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {deletedTasks.map((task) => (
+              <div key={task.id} className="flex items-center gap-2 p-2 rounded bg-muted/20">
+                <span className="text-xs flex-1 truncate">{task.title}</span>
+                <span className="text-[10px] text-muted-foreground/60 shrink-0">
+                  deleted {new Date(task.deletedAt).toLocaleDateString()}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs"
+                  disabled={restoringId === task.id}
+                  onClick={() => restoreTask(task.id)}
+                >
+                  {restoringId === task.id ? 'Restoring…' : 'Restore'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Retention settings */}
       <div className="rounded-lg border border-border p-4 space-y-3">
@@ -200,6 +264,21 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
             onKeyDown={e => e.key === 'Enter' && handleSearchCommit()}
           />
         </div>
+
+        <Input
+          type="date"
+          aria-label="From date"
+          className="h-8 text-xs w-36"
+          value={fromDate}
+          onChange={e => setFromDate(e.target.value)}
+        />
+        <Input
+          type="date"
+          aria-label="To date"
+          className="h-8 text-xs w-36"
+          value={toDate}
+          onChange={e => setToDate(e.target.value)}
+        />
 
         <Select value={filterLevel} onValueChange={setFilterLevel}>
           <SelectTrigger className="w-28 h-8 text-xs">

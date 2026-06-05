@@ -4,22 +4,26 @@ import { describe, test, expect, mock, beforeEach } from 'bun:test'
 // each factory must expose the full export surface of the real module.
 const mockProjectFindUnique = mock(() => Promise.resolve(null)) as any
 const mockArtifactDeleteMany = mock(() => Promise.resolve({ count: 0 })) as any
+const mockTaskDeleteMany = mock(() => Promise.resolve({ count: 0 })) as any
 
 mock.module('@/lib/db', () => ({
   db: {
     project: { findUnique: mockProjectFindUnique },
     stepArtifact: { deleteMany: mockArtifactDeleteMany },
+    task: { deleteMany: mockTaskDeleteMany },
   },
   isPostgresDb: false,
 }))
 
-import { purgeProjectArtifacts } from '../retention'
+import { purgeDeletedTasks, purgeProjectArtifacts } from '../retention'
 
 beforeEach(() => {
   mockProjectFindUnique.mockReset()
   mockProjectFindUnique.mockResolvedValue(null)
   mockArtifactDeleteMany.mockReset()
   mockArtifactDeleteMany.mockResolvedValue({ count: 0 })
+  mockTaskDeleteMany.mockReset()
+  mockTaskDeleteMany.mockResolvedValue({ count: 0 })
 })
 
 describe('purgeProjectArtifacts', () => {
@@ -48,5 +52,23 @@ describe('purgeProjectArtifacts', () => {
     mockProjectFindUnique.mockResolvedValue({ artifactRetentionDays: 7 })
     mockArtifactDeleteMany.mockRejectedValueOnce(new Error('db down'))
     expect(await purgeProjectArtifacts('p-1')).toBeNull()
+  })
+})
+
+describe('purgeDeletedTasks', () => {
+  test('hard-deletes tasks past the 30-day grace period', async () => {
+    mockTaskDeleteMany.mockResolvedValue({ count: 2 })
+    const count = await purgeDeletedTasks('p-1')
+    expect(count).toBe(2)
+    const call = mockTaskDeleteMany.mock.calls[0][0]
+    expect(call.where.projectId).toBe('p-1')
+    const cutoff: Date = call.where.deletedAt.lt
+    const expectedMs = Date.now() - 30 * 24 * 60 * 60 * 1000
+    expect(Math.abs(cutoff.getTime() - expectedMs)).toBeLessThan(5_000)
+  })
+
+  test('swallows failures', async () => {
+    mockTaskDeleteMany.mockRejectedValueOnce(new Error('db down'))
+    expect(await purgeDeletedTasks('p-1')).toBeNull()
   })
 })

@@ -21,8 +21,9 @@ export async function pollAndDispatch(projectId?: string) {
   const leaseExpiry = new Date(now.getTime() - LEASE_TIMEOUT_MS)
 
   // Optional project scope — when called from a project-specific scheduler,
-  // only dispatch steps belonging to that project.
-  const projectFilter = projectId ? { task: { projectId } } : {}
+  // only dispatch steps belonging to that project. Soft-deleted tasks never
+  // dispatch (Epic S3).
+  const projectFilter = { task: { deletedAt: null, ...(projectId ? { projectId } : {}) } }
 
   // Find steps that are active and either:
   // 1. Not leased and not delayed (leasedAt is null or in the past)
@@ -62,7 +63,7 @@ export async function pollAndDispatch(projectId?: string) {
       status: 'pending',
       agent: { runtimeId: { not: null } },
       mode: { not: 'human' },
-      task: { status: 'IN_PROGRESS', ...(projectId ? { projectId } : {}) },
+      task: { status: 'IN_PROGRESS', deletedAt: null, ...(projectId ? { projectId } : {}) },
     },
     select: {
       id: true,

@@ -160,6 +160,8 @@ export const activityQuerySchema = z.object({
   component: logComponentSchema.optional(),
   search: z.string().trim().max(200).optional(),
   traceId: z.string().trim().min(1).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
 })
 
 export const cliActionSchema = z.enum(['claim', 'start', 'done', 'note', 'review'])

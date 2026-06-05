@@ -1227,13 +1227,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
               <H3>Delete</H3>
               <p>
-                Hover a card and hit the trash icon (or delete from the drawer). You&apos;ll get a confirmation —
-                deletion is <strong>permanent</strong> and takes the task&apos;s steps, executions, and artifacts
-                with it. The activity log keeps the historical record of what happened while it lived.
+                Hover a card and hit the trash icon. You&apos;ll get a confirmation, and then a safety net:
+                deleted tasks go into a <strong>30-day grace period</strong> — restore them any time from
+                <em> Settings &rarr; Activity &rarr; Recently Deleted Tasks</em>. After 30 days the purge is
+                permanent (steps, executions, and artifacts included).
               </p>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S3)">
-                <p>Soft-delete with a 30-day resurrect window — tracked in the settings-completion roadmap.</p>
-              </Callout>
             </Section>
 
             <Section id="help-task-states" title="Task state machine">
@@ -2634,9 +2632,10 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li><strong>Retention &amp; purge</strong> — pick how long entries live (7 days to forever); old rows purge automatically, or purge now with a button.</li>
                 <li><strong>Dead-lettered steps</strong> — exhausted steps appear at the top of this tab with their last error and a one-click <em>Requeue</em>.</li>
               </Bullets>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S3)">
-                <p>Task soft-delete with resurrect, and a date-range filter in the UI (the export API already supports from/to).</p>
-              </Callout>
+              <p className="text-sm">
+                Also here: <strong>Recently Deleted Tasks</strong> (30-day restore window) and{' '}
+                <strong>from/to date filters</strong> that apply to both the log view and exports.
+              </p>
             </Section>
 
             <Section id="help-settings-modes" title="Settings · Modes">

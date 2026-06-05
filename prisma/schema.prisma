@@ -81,6 +81,8 @@ model Agent {
   invocationMode   AgentInvocationMode @default(HTTP)
 }
 
+// NOTE: deletedAt (Epic S3) — soft delete with a 30-day grace period; all
+// live read/dispatch paths filter deletedAt: null, hard purge is lazy.
 model Task {
   id          String        @id @default(cuid())
   title       String
@@ -98,12 +100,14 @@ model Task {
   updatedAt   DateTime      @updatedAt
   startedAt   DateTime? // When agent started working
   completedAt DateTime? // When task was completed
+  deletedAt   DateTime? // Soft delete (Epic S3); hard-purged after 30 days
   order            Int           @default(0)
   runtimeOverride  String?       // Per-task runtime override (claude-code | codex | copilot)
   activities       ActivityLog[]
   steps            TaskStep[]
 
   @@index([projectId, status])
+  @@index([projectId, deletedAt])
 }
 
 model ActivityLog {

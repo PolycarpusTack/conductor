@@ -52,7 +52,7 @@ configurable session TTL, and agent duplicate action. *Depends on:* deciding to 
 admin password from env to DB (or layering: env var bootstraps, DB overrides). Design
 needed before code — this changes the auth bootstrap story.
 
-### Epic S3 — Soft-delete & activity ergonomics
+### Epic S3 — Soft-delete & activity ergonomics ✅ SHIPPED 2026-06-05
 Task soft-delete (`deletedAt`) with a 30-day resurrect window surfaced in the Activity tab,
 plus a date-range filter in the activity UI (API already supports it). The help originally
 *claimed* soft-delete existed; users will expect it.
