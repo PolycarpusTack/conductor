@@ -252,6 +252,59 @@ function Callout({ tone = 'cobalt', title, children }: { tone?: Tone; title?: Re
   )
 }
 
+// --- Head First / For Dummies signature boxes -------------------------------
+// These wrap Callout with a consistent, recognisable visual language:
+// readers learn to skim for the icon they need.
+
+function PlainEnglish({ children }: { children: React.ReactNode }) {
+  return <Callout tone="neon" title="🗣 In plain English">{children}</Callout>
+}
+
+function TipBox({ children }: { children: React.ReactNode }) {
+  return <Callout tone="teal" title="💡 Tip">{children}</Callout>
+}
+
+function WatchIt({ children }: { children: React.ReactNode }) {
+  return <Callout tone="amber" title="⚠️ Watch it!">{children}</Callout>
+}
+
+function RememberBox({ children }: { children: React.ReactNode }) {
+  return <Callout tone="purple" title="🧠 Remember">{children}</Callout>
+}
+
+function TechStuff({ children }: { children: React.ReactNode }) {
+  return <Callout tone="cobalt" title="🤓 Technical stuff (safe to skip)">{children}</Callout>
+}
+
+/** Head First-style Q&A block. Pass [question, answer] pairs. */
+function DumbQuestions({ items }: { items: Array<[React.ReactNode, React.ReactNode]> }) {
+  return (
+    <div className="rounded-lg border border-[var(--op-purple-dim)] bg-[var(--op-purple-bg)] px-4 py-3 space-y-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--op-purple)]">
+        🙋 There are no dumb questions
+      </div>
+      {items.map(([q, a], i) => (
+        <div key={i} className="space-y-1">
+          <p className="text-sm font-semibold text-foreground/90">Q: {q}</p>
+          <p className="text-sm leading-[1.6] text-foreground/80">A: {a}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Head First-style exercise box. */
+function TryIt({ title = 'Sharpen your pencil', children }: { title?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-dashed border-[var(--op-teal-dim)] bg-[var(--op-teal-bg)] px-4 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wider mb-1 text-[var(--op-teal)]">
+        ✏️ {title}
+      </div>
+      <div className="text-foreground/85 space-y-2 text-sm leading-[1.6]">{children}</div>
+    </div>
+  )
+}
+
 function Steps({ children }: { children: React.ReactNode }) {
   return <ol className="list-decimal space-y-3 pl-5 marker:text-muted-foreground/50 marker:font-semibold">{children}</ol>
 }
@@ -774,148 +827,151 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-overview"
               title="What is Conductor?"
-              subtitle="An orchestration platform for AI agents, built around a board you already know how to use."
+              subtitle="Relax. It's a Kanban board — with AI workers attached. You already know how to use half of it."
             >
               <p>
-                Conductor is a <strong>control room for AI agents</strong>. Instead of running one chatbot at a time
-                and pasting output into another tool, you define a cast of agents, give each one a role
-                (analyse, verify, develop, review, draft), and then chain them together into workflows. The platform
-                dispatches work to the right agent at the right time, pauses for a human whenever you want approval,
-                and keeps a full audit trail of what every agent did.
+                Picture a restaurant kitchen. Orders come in, the head chef puts each ticket on the rail, and
+                different cooks grab the tickets they know how to make. Nobody yells the whole menu at one
+                overwhelmed cook. <strong>Conductor is that ticket rail — for AI agents.</strong> You write the
+                ticket (a task), your cast of agents picks it up, each does the part it&apos;s good at, and you
+                taste the dish before it leaves the kitchen.
               </p>
 
-              <Callout tone="cobalt" title="The problem it solves">
+              <PlainEnglish>
                 <p>
-                  Most AI work today is either one shot (paste a prompt, get a response) or glued together with
-                  scripts and cron jobs that break quietly. Conductor turns that ad-hoc glue into a visible,
-                  inspectable process: every task is a card on a board, every agent has a status light, and every
-                  decision — automated or human — leaves a timestamped record. You can see what&apos;s running,
-                  what&apos;s blocked, and where to step in.
+                  Conductor lets you run a <em>team</em> of AI agents instead of one chatbot. Each agent gets a
+                  job description. Tasks flow across a board you can see. You approve anything important before
+                  it ships. Everything gets written down.
                 </p>
-              </Callout>
+              </PlainEnglish>
 
-              <H3>What Conductor is good at</H3>
+              <p>
+                Why does this beat the copy-paste-between-chatbots routine you&apos;ve probably been doing? Because
+                copy-paste has three silent killers: you forget a step, you lose track of which version was the
+                good one, and nobody can tell afterwards what actually happened. Conductor fixes all three: every
+                task is a card on a board, every agent has a status light, and every decision — automated or
+                human — leaves a timestamped record.
+              </p>
+
+              <H3>Conductor shines when…</H3>
               <Bullets>
-                <li><strong>Long, multi-step work</strong> — research &rarr; draft &rarr; review &rarr; ship, handed between different agents with clear boundaries.</li>
-                <li><strong>Work that needs a human checkpoint</strong> — an agent does 90% and a person approves the last mile.</li>
-                <li><strong>Mixing AI providers</strong> — one project can use Claude for analysis, a local model for coding, and GPT for copy, all managed from the same board.</li>
-                <li><strong>Auditable AI operations</strong> — every step&apos;s input, output, tool calls, and approvals are recorded.</li>
+                <li><strong>The work has stages</strong> — research &rarr; draft &rarr; review &rarr; ship, with a different specialist at each stage. (Sound like your job? Exactly.)</li>
+                <li><strong>A human needs the final say</strong> — the agent does 90%, you approve the last mile. No surprises in production.</li>
+                <li><strong>You mix providers</strong> — Claude for analysis, a local model for code, GPT for copy. One board, many brains.</li>
+                <li><strong>Someone will ask &ldquo;what happened?&rdquo;</strong> — every prompt, output, tool call, and approval is on the record.</li>
               </Bullets>
 
-              <H3>What Conductor is not</H3>
+              <H3>And what it&apos;s not (so you don&apos;t buy the wrong thing)</H3>
               <Bullets>
-                <li>Not a chat UI. If you want to talk to a model, use the provider&apos;s own client.</li>
-                <li>Not a replacement for your project-management tool. Tasks on the Conductor board are <em>work units for agents</em>, not the canonical backlog of your team.</li>
-                <li>Not a training platform. It orchestrates models you already have access to; it doesn&apos;t fine-tune them.</li>
+                <li><strong>Not a chat window.</strong> Want to chat with a model? Use the provider&apos;s own app. Conductor is for <em>work</em>, not conversation.</li>
+                <li><strong>Not your team&apos;s Jira.</strong> Cards here are work units <em>for agents</em>. Keep your human backlog where it lives today.</li>
+                <li><strong>Not a model gym.</strong> Conductor orchestrates models you already have keys for. It doesn&apos;t train or fine-tune anything.</li>
               </Bullets>
+
+              <RememberBox>
+                <p>
+                  One sentence to keep: <strong>Conductor owns the work; agents do the work; you approve the
+                  work.</strong> Every feature in this guide is just a variation on that sentence.
+                </p>
+              </RememberBox>
             </Section>
 
-            <Section id="help-audience" title="Who is this for?">
+            <Section id="help-audience" title="Who is this for?" subtitle="Find yourself below and we'll tell you which chapters to read (and which to happily skip).">
               <p>
-                The guide is written with three kinds of reader in mind:
+                Nobody reads documentation cover to cover — and you shouldn&apos;t either. Pick your character:
               </p>
               <Bullets>
-                <li><strong>Operators and project leads</strong> who set up projects, create agents, and approve work. Most of this guide is for you — stay on Getting Started, The Board, Agents, Modes, and Chains.</li>
-                <li><strong>Power users</strong> who want internal automation rules and reusable templates. Read Automation and Templates.</li>
-                <li><strong>Developers</strong> building their own agents against Conductor&apos;s APIs. Jump to Daemon mode, APIs (advanced), and Security.</li>
+                <li><strong>&ldquo;I run the show&rdquo;</strong> (operators, project leads) — you set up projects, hire the agent cast, and approve their work. Read Getting Started, The Board, Agents, Modes, and Chains. That&apos;s your whole world.</li>
+                <li><strong>&ldquo;I automate everything I touch twice&rdquo;</strong> (power users) — add Automation, Templates, and Integrations to the list above. You&apos;ll be dangerous within an hour.</li>
+                <li><strong>&ldquo;I write code that talks to this thing&rdquo;</strong> (developers) — jump straight to Daemon mode, APIs (advanced), and Security. That trio is the developer guide.</li>
               </Bullets>
-              <Callout tone="teal" title="No code required for most of it">
+              <TipBox>
                 <p>
-                  Everything in Getting Started through Observability is clickable in the UI. You only need the
-                  Advanced APIs section if you&apos;re writing a new agent from scratch or scripting integrations.
+                  Zero code needed until the APIs section. Everything from Getting Started through Observability
+                  is point-and-click. If you can use Trello, you can drive Conductor.
                 </p>
-              </Callout>
+              </TipBox>
+              <DumbQuestions
+                items={[
+                  ['Do I need to know how LLMs work to use this?', 'No. You need to know what you want done and how to recognize whether it was done well. The agents handle the AI part — you handle the judgement part.'],
+                  ['I’m a developer. Can I skip the beginner chapters?', 'Skim Core concepts first — five minutes. The API docs use those nouns constantly, and guessing what a "mode" is from endpoint names is harder than just reading the table.'],
+                ]}
+              />
             </Section>
 
             <Section
               id="help-concepts"
               title="Core concepts"
-              subtitle="The nouns Conductor uses. Skim this now, come back when a term confuses you."
+              subtitle="Eleven nouns. We'll use a film-studio analogy for all of them, because your brain remembers stories better than schemas."
             >
-              <H3>Workspace</H3>
               <p>
-                The top-level container. A workspace is usually one team or one organisation. Switch workspaces from
-                the dropdown next to the Conductor logo. Everything below — projects, agents, chains, skills — lives
-                inside a workspace.
+                Here&apos;s the whole mental model in one go: <strong>Conductor is a film studio.</strong> Keep
+                that picture in your head and every term below clicks into place.
               </p>
 
-              <H3>Project</H3>
+              <Table
+                head={['Conductor says…', 'The studio version', 'One-liner']}
+                rows={[
+                  ['Workspace', 'The studio lot', 'Top-level container. One team or company. Everything lives inside one.'],
+                  ['Project', 'A film in production', 'One product, codebase, or campaign. Own board, own cast, own keys.'],
+                  ['Task', 'A scene to shoot', 'One unit of work — a card on the board, moving left to right.'],
+                  ['Agent', 'A crew member', 'A configured worker: name, specialty, toolkit, badge.'],
+                  ['Mode', 'The hat they’re wearing today', 'ANALYZE, DEVELOP, REVIEW… same person, different job, different permissions.'],
+                  ['Chain', 'The shooting schedule', 'Ordered steps: who does what, in what order, with which approvals.'],
+                  ['Skill', 'The studio handbook', 'Reusable know-how any crew member can pull off the shelf mid-scene.'],
+                  ['Runtime', 'The camera equipment', 'The credentialed line to an AI provider. No equipment, no footage.'],
+                  ['MCP connection', 'Props & special effects', 'External tools agents can use during a scene — files, tickets, browsers.'],
+                  ['Artifact', 'The footage', 'Files an agent produced. Stored with the task, reviewable any time.'],
+                  ['Activity', 'The production log', 'Who did what, when. Your audit trail when the director asks questions.'],
+                ]}
+              />
+
+              <H3>The four that matter most (read these twice)</H3>
+
               <p>
-                A bounded unit of work inside a workspace: one product, one codebase, one campaign. Each project has
-                its own board, its own agents, its own API keys, and its own MCP connections. You can have as many
-                projects as you like.
+                <strong>Task.</strong> A card on the board. It moves through states — <Term>BACKLOG</Term>,
+                <Term>IN_PROGRESS</Term>, <Term>WAITING</Term>, <Term>REVIEW</Term>, <Term>DONE</Term> — as agents
+                and humans act on it. Title, optional description, priority, optional agent. That&apos;s it.
               </p>
 
-              <H3>Task</H3>
               <p>
-                A single unit of work, shown as a card on the board. Tasks move through states (<Term>BACKLOG</Term>,
-                <Term>IN_PROGRESS</Term>, <Term>WAITING</Term>, <Term>REVIEW</Term>, <Term>DONE</Term>) as agents
-                and humans act on them. Every task has a title, an optional description, a priority, and an
-                optional agent assignment.
+                <strong>Agent.</strong> A configured worker: name, emoji, role, an AI provider (its
+                <em> runtime</em>), a system prompt, and the modes it&apos;s allowed to run. Two flavours:
+                <Term>HTTP</Term> (Conductor calls it) and <Term>DAEMON</Term> (it calls Conductor) — the
+                difference matters later, in <Ref href="#help-agent-invocation">HTTP vs. Daemon</Ref>.
               </p>
 
-              <H3>Agent</H3>
               <p>
-                A configured worker. An agent has a name, an emoji, a role, an AI provider (its <em>runtime</em>),
-                a system prompt, and a set of modes it supports. Agents come in two invocation flavours:
-                <Term>HTTP</Term> (the server calls the agent) and <Term>DAEMON</Term> (the agent calls the server
-                for work). More on this in <Ref href="#help-agent-invocation">HTTP vs. Daemon</Ref>.
+                <strong>Mode.</strong> The hat an agent wears <em>right now</em>. The same agent in
+                <Term> ANALYZE</Term> mode can only read; in <Term>DEVELOP</Term> mode it can write. Modes change
+                the prompt, the tools, and the expected output. Full story in <Ref href="#help-modes">Modes</Ref>.
               </p>
 
-              <H3>Mode</H3>
               <p>
-                A role the agent is playing <em>right now</em>. Built-in modes are <Term>ANALYZE</Term>,
-                <Term>VERIFY</Term>, <Term>DEVELOP</Term>, <Term>REVIEW</Term>, and <Term>DRAFT</Term>. Modes
-                control the agent&apos;s system prompt, which tools it can use, and what kind of output it produces.
-                See <Ref href="#help-modes">Modes</Ref>.
+                <strong>Chain.</strong> Steps in a row: &ldquo;analyse with Alice, then develop with Bob, then a
+                human signs off.&rdquo; Save one as a template, reuse it forever. This is where Conductor earns
+                its keep.
               </p>
 
-              <H3>Chain</H3>
-              <p>
-                An ordered workflow of steps. Each step pairs a mode with an agent (&ldquo;analyse with Alice, then
-                develop with Bob, then have a human review&rdquo;). Chains can be saved as templates and re-used on
-                new tasks.
-              </p>
-
-              <H3>Skill</H3>
-              <p>
-                A reusable fragment — a prompt, a snippet, a playbook — stored in the workspace-wide skills library.
-                Agents can retrieve skills by semantic similarity when answering a task. Think of it as long-term
-                memory shared across agents.
-              </p>
-
-              <H3>Runtime</H3>
-              <p>
-                A credentialed connection to an AI provider: Anthropic, OpenAI, OpenRouter, Azure, local (Ollama),
-                etc. Agents pick a runtime when they&apos;re created; runtimes are managed in <em>Settings &rarr; Runtimes</em>.
-              </p>
-
-              <H3>MCP connection</H3>
-              <p>
-                A link to a Model Context Protocol server. An MCP server exposes tools (functions) that an agent
-                can call during a step — read a file, query a database, open a ticket. Each project picks which
-                MCP connections its agents can see.
-              </p>
-
-              <H3>Artifact</H3>
-              <p>
-                A file produced by an agent during a step — a diff, a document, a CSV, an image. Artifacts are
-                stored against the task and viewable from the task drawer.
-              </p>
-
-              <H3>Activity</H3>
-              <p>
-                Every state change (task created, claimed, started, completed, approved, rejected) is written to
-                the activity log with a timestamp, an actor (agent or user), and any payload. Activity is your
-                audit trail.
-              </p>
+              <RememberBox>
+                <p>
+                  Don&apos;t memorize this section. Skim it, move on, and come back when a term trips you —
+                  the glossary at the bottom of this page has every word too. Repetition beats cramming.
+                </p>
+              </RememberBox>
             </Section>
 
             <Section
               id="help-quickstart"
               title="10-minute quick start"
-              subtitle="The fastest path from zero to seeing an agent complete a task."
+              subtitle="Zero to 'an agent just did a thing' in seven steps. Set a timer — seriously, racing the clock makes it stick."
             >
+              <PlainEnglish>
+                <p>
+                  The recipe: sign in &rarr; make a project &rarr; plug in an AI provider &rarr; hire one agent
+                  &rarr; write one task &rarr; hand it over &rarr; watch. Each step is one screen.
+                </p>
+              </PlainEnglish>
               <Steps>
                 <Step title="Sign in to the admin panel.">
                   {' '}Open Conductor in your browser, click <em>Sign in</em> in the top bar, and enter the admin password.
@@ -949,23 +1005,34 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 </Step>
               </Steps>
 
-              <Callout tone="amber" title="If it doesn't move">
+              <WatchIt>
                 <p>
-                  The top bar shows a <Term>Live</Term> badge. If it&apos;s <Term>Offline</Term>, the WebSocket
-                  isn&apos;t connected — the board won&apos;t update in real-time but dispatch still works; refresh
-                  after a few seconds. If the task sits in <Term>BACKLOG</Term> for more than a minute, see
-                  <Ref href="#help-trouble-agent">An agent won&apos;t claim</Ref>.
+                  Card not moving? Don&apos;t panic — check the <Term>Live</Term> badge in the top bar first. If it
+                  says <Term>Offline</Term>, the board just isn&apos;t updating in real time (dispatch still works);
+                  refresh after a few seconds. Still parked in <Term>BACKLOG</Term> after a minute? That&apos;s a
+                  five-minute fix: <Ref href="#help-trouble-agent">An agent won&apos;t claim</Ref>.
                 </p>
-              </Callout>
+              </WatchIt>
+
+              <TryIt>
+                <p>
+                  Before moving on, do the loop ONE more time with a different prompt — maybe &ldquo;list three
+                  risks in our deploy process&rdquo;. The second run takes 90 seconds and turns &ldquo;I followed
+                  a tutorial&rdquo; into &ldquo;I know how this works&rdquo;. That&apos;s the whole trick of
+                  learning this stuff.
+                </p>
+              </TryIt>
             </Section>
 
             <Section
               id="help-first-project"
               title="Your first project, step by step"
-              subtitle="A detailed walkthrough — click, what-you-see, why."
+              subtitle="The quick start with training wheels: every click, what you'll see, and why it matters."
             >
               <p>
-                The quick start above is terse. This section is for readers who want every click documented.
+                Did the quick start feel like drinking from a firehose? This is the same journey at walking pace.
+                No step assumes you guessed anything. (If the quick start worked fine for you, skip ahead — really,
+                go. We won&apos;t be offended.)
               </p>
 
               <H3>Step 1 · Sign in</H3>
@@ -1002,13 +1069,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li>Save. The runtime appears in the list with a green dot once a test call succeeds.</li>
               </Bullets>
 
-              <Callout tone="amber" title="Key hygiene">
+              <WatchIt>
                 <p>
-                  Treat runtime API keys as secrets. Conductor encrypts them on disk, but anyone with admin access to
-                  the server can trigger calls that burn your quota. Rotate keys on a schedule and revoke runtimes
-                  you no longer use from this same screen.
+                  API keys are money. Treat them like your credit card number — Conductor encrypts them on disk,
+                  but anyone with admin access can trigger calls that burn your quota. Rotate on a schedule,
+                  revoke runtimes you no longer use, and never paste a key anywhere except this screen.
                 </p>
-              </Callout>
+              </WatchIt>
 
               <H3>Step 4 · Create an agent</H3>
               <Bullets>
@@ -1040,12 +1107,14 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <li>When the agent finishes, the task moves to <Term>REVIEW</Term> (if the step requires approval) or <Term>DONE</Term>.</li>
               </Bullets>
 
-              <Callout tone="teal" title="You're live">
+              <Callout tone="neon" title="🎉 You're live — and here's the secret">
                 <p>
-                  That&apos;s the full loop: project &rarr; runtime &rarr; agent &rarr; task &rarr; dispatched work &rarr;
-                  review &rarr; done. Everything else in this guide is either <em>more of the same at scale</em>
-                  (chains instead of single dispatches, daemons instead of HTTP, multiple providers, integrations)
-                  or <em>tools to see what&apos;s happening</em> (observability, activity log, step output viewer).
+                  That was the full loop: project &rarr; runtime &rarr; agent &rarr; task &rarr; work &rarr; review
+                  &rarr; done. Here&apos;s the secret nobody tells you: <strong>there is nothing else.</strong>{' '}
+                  Every remaining chapter is either <em>this loop at scale</em> (chains instead of single
+                  dispatches, daemons instead of HTTP, five agents instead of one) or <em>binoculars for
+                  watching the loop run</em> (observability, activity log, step output viewer). You already know
+                  Conductor. The rest is details.
                 </p>
               </Callout>
             </Section>
@@ -1089,12 +1158,20 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-board"
               title="The Kanban board"
-              subtitle="Four columns, drag-and-drop, real-time updates. The main view."
+              subtitle="Four columns, drag-and-drop, live updates. If you've used Trello, you've done the tutorial already."
             >
               <p>
-                The board is deliberately familiar. If you&apos;ve used Trello, Jira, Linear, or any Kanban-style
-                tool, you already know most of it. Cards flow left to right. Columns are states.
+                Good news: the board is deliberately boring. Cards flow left to right. Columns are states. The only
+                new idea is <em>who</em> moves the cards — here, it&apos;s mostly the agents, and your job is to
+                watch the river flow and fish out anything that snags.
               </p>
+
+              <PlainEnglish>
+                <p>
+                  Left side = &ldquo;to do&rdquo;. Middle = &ldquo;robots working&rdquo;. Right side = &ldquo;needs
+                  your eyeballs, then done&rdquo;. When in doubt, look right — that&apos;s where you&apos;re needed.
+                </p>
+              </PlainEnglish>
 
               <H3>The four columns</H3>
               <Table
@@ -1181,14 +1258,22 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 ]}
               />
 
-              <Callout tone="amber" title="Illegal transitions">
+              <WatchIt>
                 <p>
-                  Dragging from <Term>DONE</Term> back to <Term>IN_PROGRESS</Term> is allowed (the task is re-queued),
-                  but dragging from <Term>BACKLOG</Term> straight to <Term>DONE</Term> is refused — closing a task
-                  without any agent activity is almost always a mistake. If you truly need to do it, click the card
-                  and use <em>Drawer &rarr; ⋯ menu &rarr; Force close</em>, which writes a reason to the activity log.
+                  The board will let you drag <Term>DONE</Term> back to <Term>IN_PROGRESS</Term> (re-queues the
+                  task — handy). It will <em>refuse</em> <Term>BACKLOG</Term> straight to <Term>DONE</Term>,
+                  because closing a task no agent ever touched is almost always a misclick. Genuinely need it?
+                  <em> Drawer &rarr; ⋯ menu &rarr; Force close</em> — which makes you leave a reason in the
+                  activity log, because Future You will ask.
                 </p>
-              </Callout>
+              </WatchIt>
+
+              <DumbQuestions
+                items={[
+                  ['Why can’t I just edit the state in a dropdown like other tools?', 'Because every transition is validated server-side and recorded — the board is a window onto a state machine, not a free-form spreadsheet. That discipline is what makes the audit trail trustworthy.'],
+                  ['What happens if an agent and I move a card at the same time?', 'The server picks a winner (first write), the loser gets a 409, and the board re-syncs in a second. Nobody loses data; worst case you re-drag.'],
+                ]}
+              />
             </Section>
 
             <Section id="help-task-drawer" title="Task detail drawer">
@@ -1216,13 +1301,21 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-review-gates"
               title="Human review gates"
-              subtitle="The &ldquo;pause for approval&rdquo; checkpoint that makes AI work safe to ship."
+              subtitle="The single most important feature in this app. Yes, really."
             >
               <p>
-                Any step in a chain can be marked as <em>requires human approval</em>. When that step finishes, the
-                task moves to <Term>REVIEW</Term> and the chain pauses. Nothing downstream runs until a human clicks
-                <em>Approve</em> or <em>Reject</em>.
+                Think of a review gate as the <strong>&ldquo;sign here before we ship it&rdquo;</strong> line on a
+                delivery form. Any step in a chain can be marked <em>requires human approval</em>. When that step
+                finishes, the task parks in <Term>REVIEW</Term>, the chain holds its breath, and <em>nothing</em>
+                downstream runs until a human clicks <em>Approve</em> or <em>Reject</em>.
               </p>
+
+              <PlainEnglish>
+                <p>
+                  Gates are how you let agents be fast without letting them be reckless. The agent does the work;
+                  you keep the veto.
+                </p>
+              </PlainEnglish>
 
               <H3>When to gate</H3>
               <Bullets>
@@ -1245,14 +1338,22 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 prompt. The task re-enters <Term>IN_PROGRESS</Term> and the step runs again.
               </p>
 
-              <Callout tone="purple" title="Budget limits">
+              <WatchIt>
                 <p>
-                  To stop an agent&apos;s rejection loop burning your quota, each step has a <em>max attempts</em>
-                  counter (default 3). After that, the task parks in <Term>REVIEW</Term> permanently with a red
-                  &ldquo;exhausted&rdquo; banner — a human has to intervene to move it. Tune this in
+                  Reject-retry-reject-retry is a money fire. Each step has a <em>max attempts</em> counter
+                  (default 3) so an agent can&apos;t loop on your dime forever. After the limit, the task parks in
+                  <Term> REVIEW</Term> with a red &ldquo;exhausted&rdquo; banner and waits for a human. Tune it in
                   <em> Settings &rarr; Modes &rarr; [mode] &rarr; Max attempts</em>.
                 </p>
-              </Callout>
+              </WatchIt>
+
+              <TipBox>
+                <p>
+                  Rollout recipe that works: gate <em>everything</em> for the first week. You&apos;ll learn each
+                  agent&apos;s failure modes fast and cheap. Then remove gates one at a time, starting with the
+                  steps that bored you most. Trust is earned per-step, not granted per-agent.
+                </p>
+              </TipBox>
             </Section>
 
             {/* ════════════════════════════════════════════════════════════════
@@ -1265,21 +1366,29 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               subtitle="A configured worker that can claim tasks, run modes, and call tools."
             >
               <p>
-                An agent in Conductor is not a process. It&apos;s a <em>record</em>: a name, an emoji, a runtime, a
-                set of supported modes, a system prompt, and an API key. The actual work runs either in
-                Conductor&apos;s own worker pool (for HTTP agents) or in a separate long-running process you start
-                yourself (for daemon agents). The record tells Conductor <em>who</em> the worker is and
-                <em>what</em> it&apos;s allowed to do.
+                Surprise: an agent is not a program. It&apos;s an <strong>employee file</strong>. Name, photo
+                (okay, emoji), job description, toolkit, security badge. The actual work happens either in
+                Conductor&apos;s own worker pool (HTTP agents) or in a process you run yourself (daemon agents) —
+                but the <em>file</em> is what tells Conductor who this worker is and what they&apos;re allowed
+                to do.
               </p>
 
-              <Callout tone="teal" title="Mental model">
+              <PlainEnglish>
                 <p>
-                  Think of an agent like a job posting plus the employee who fills it. The record describes the job
-                  (&ldquo;Alice is a developer who uses Claude Sonnet and can run ANALYZE and DEVELOP modes&rdquo;).
-                  The runtime is Alice&apos;s toolkit. The system prompt is her onboarding document. The API key is
-                  her badge.
+                  &ldquo;Alice is a developer. She thinks with Claude Sonnet. She&apos;s allowed to analyse and
+                  write code, but not to deploy. Here&apos;s her badge.&rdquo; — that&apos;s an agent record,
+                  in five sentences.
                 </p>
-              </Callout>
+              </PlainEnglish>
+
+              <RememberBox>
+                <p>
+                  The record describes the job. The <strong>runtime</strong> is the toolkit. The <strong>system
+                  prompt</strong> is the onboarding doc. The <strong>API key</strong> is the badge. Lose the badge
+                  → rotate it; change the job → edit the record. The employee never gets confused, because the
+                  employee IS the file.
+                </p>
+              </RememberBox>
 
               <H3>What an agent record holds</H3>
               <Bullets>
@@ -1323,14 +1432,22 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 </Step>
               </Steps>
 
-              <Callout tone="amber" title="System prompt footguns">
+              <WatchIt>
                 <p>
-                  Keep the base prompt short. Long prompts cost tokens on every call and overwhelm smaller models.
-                  Move mode-specific guidance into the per-mode override, and move reusable playbooks into the
-                  <Ref href="#help-skills"> skills library</Ref> so agents can retrieve them on demand instead of
-                  always carrying them.
+                  The #1 rookie mistake: a 2,000-word system prompt. You pay for those tokens on <em>every single
+                  call</em>, and smaller models drown in them. Keep the base prompt to 2–3 sentences (voice +
+                  hard rules), push mode-specific guidance into per-mode overrides, and park reusable playbooks
+                  in the <Ref href="#help-skills">skills library</Ref> where agents fetch them only when needed.
+                  Shorter prompt, sharper agent, smaller bill.
                 </p>
-              </Callout>
+              </WatchIt>
+
+              <DumbQuestions
+                items={[
+                  ['Can two agents share one runtime?', 'Absolutely — runtimes are meant to be shared. Twenty agents can all think with the same Anthropic key. What they can’t share is an API key (their badge): one badge per agent, or your audit trail turns to soup.'],
+                  ['What makes a good agent name?', 'Whatever helps you scan the board at 9am. "Alice Analyst 🔬" beats "agent-prod-2". The emoji shows up on every task card — pick distinct ones.'],
+                ]}
+              />
             </Section>
 
             <Section id="help-agent-roles" title="Agent roles">
@@ -1465,14 +1582,22 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-modes"
               title="What are modes?"
-              subtitle="Different hats an agent can wear. Changes the prompt, the toolset, and the output contract."
+              subtitle="Different hats for the same head. The hat decides what the agent may touch."
             >
               <p>
-                A mode is a named <em>role</em> the agent is playing right now: analyst, verifier, developer,
-                reviewer, writer. Modes are important because the same agent often behaves very differently
-                depending on what you&apos;re asking it to do. <Term>DEVELOP</Term> mode can touch the filesystem;
-                <Term>REVIEW</Term> mode only reads.
+                Picture a surgeon. In the operating room: scalpel privileges. On the review board: read-the-chart
+                privileges, <em>no scalpel</em>. Same person, same training — different hat, different permissions.
+                That&apos;s a mode. <Term>DEVELOP</Term> mode can touch the filesystem; <Term>REVIEW</Term> mode
+                can only read. Same agent, different hat.
               </p>
+
+              <PlainEnglish>
+                <p>
+                  A mode answers three questions at once: <em>what should the agent focus on</em> (the prompt),
+                  <em> what is it allowed to use</em> (the tools), and <em>what should come back</em> (the output
+                  shape). Change the mode, change all three.
+                </p>
+              </PlainEnglish>
 
               <p>
                 When Conductor dispatches a task, it combines three prompt layers:
@@ -1500,11 +1625,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 ]}
               />
 
-              <H3>Why they exist</H3>
+              <H3>Why bother? (a fair question)</H3>
               <p>
-                A raw LLM will happily conflate these. Ask it to &ldquo;fix this bug&rdquo; and it will sometimes
-                plan, sometimes code, sometimes review its own code — all mixed. Splitting the work into modes
-                gives you three practical wins:
+                Because a raw LLM is an enthusiastic intern with no job description. Ask it to &ldquo;fix this
+                bug&rdquo; and it&apos;ll plan a little, code a little, grade its own homework, and declare victory
+                — all in one breath. Modes split that mush into stages with contracts. Three practical wins:
               </p>
               <Bullets>
                 <li><strong>Predictable outputs</strong> — each mode has a stable output contract the next step can parse.</li>
@@ -1578,21 +1703,32 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-chains"
               title="What is a chain?"
-              subtitle="An ordered workflow of steps. The unit of automation above a single dispatch."
+              subtitle="A relay race for agents. Each runner carries the baton one leg, then hands it off."
             >
               <p>
-                A chain is a list of steps, each paired with a mode and an agent, plus success/failure transitions.
-                Chains are how Conductor does real work — single dispatches are fine for smoke tests, but any task
-                worth automating is usually two or three steps minimum: <em>analyse &rarr; develop &rarr; review</em>.
+                A chain is a relay race: an ordered list of steps, each pairing a <em>mode</em> with an
+                <em> agent</em>, plus rules for what happens on success or failure. The baton — each step&apos;s
+                output — gets handed to the next runner automatically. Single dispatches are fine for smoke
+                tests, but any task worth automating is usually a relay:
+                <em> analyse &rarr; develop &rarr; review</em>.
               </p>
 
-              <Callout tone="cobalt" title="The smallest useful chain">
+              <PlainEnglish>
                 <p>
-                  <Term>ANALYZE</Term> &rarr; <Term>DEVELOP</Term> &rarr; <Term>REVIEW</Term> with a human gate on
-                  the last step. Three steps, three agents, one approval checkpoint. This single chain covers
-                  most &ldquo;have an AI do it but let me approve&rdquo; workflows.
+                  &ldquo;First Alice figures out what to do. Then Bob does it. Then Carol checks it. Then I sign
+                  off.&rdquo; Write that sentence down and you&apos;ve designed a chain — the builder is just
+                  that sentence as a form.
                 </p>
-              </Callout>
+              </PlainEnglish>
+
+              <TipBox>
+                <p>
+                  Memorize ONE chain and you&apos;re covered for most of real life:
+                  <Term> ANALYZE</Term> &rarr; <Term>DEVELOP</Term> &rarr; <Term>REVIEW</Term> with a human gate
+                  on the last step. Three steps, one checkpoint. Start every new workflow as a copy of this and
+                  mutate from there.
+                </p>
+              </TipBox>
 
               <H3>Chain anatomy</H3>
               <Bullets>
@@ -1729,13 +1865,14 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 The skills library is per-workspace, so every project in a workspace shares the same pool.
               </p>
 
-              <Callout tone="cobalt" title="Why a library instead of giant prompts">
+              <PlainEnglish>
                 <p>
-                  LLM context windows are finite and every token costs money. Cramming your entire playbook into
-                  every agent&apos;s system prompt is wasteful and makes smaller models worse. Storing playbooks as
-                  skills lets agents retrieve only the ones they need for the task at hand.
+                  Skills are the office bookshelf. You don&apos;t make every employee carry the entire company
+                  handbook to every meeting — you put it on a shelf and they grab the chapter they need. Same
+                  deal: stuffing playbooks into every system prompt costs tokens on every call; skills get
+                  fetched only when relevant.
                 </p>
-              </Callout>
+              </PlainEnglish>
 
               <H3>What&apos;s in a skill</H3>
               <Bullets>
@@ -1804,10 +1941,24 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 discovers them, passes their schemas to the model, and executes the ones the model calls.
               </p>
 
-              <p>
-                Think of MCP as the &ldquo;USB-C for LLM tools&rdquo;. Instead of writing one integration per agent
-                and per provider, you write one MCP server and every MCP-capable client can use it.
-              </p>
+              <PlainEnglish>
+                <p>
+                  MCP is USB-C for AI tools. Before USB-C: every gadget had its own cable, every drawer was
+                  chaos. Before MCP: every agent needed its own integration with every tool. Now you write one
+                  MCP server and every MCP-speaking client — Conductor, Claude Desktop, whatever comes next —
+                  can plug into it.
+                </p>
+              </PlainEnglish>
+
+              <WatchIt>
+                <p>
+                  Tool <em>results</em> come from outside your control — a compromised or mischievous MCP server
+                  could embed &ldquo;ignore your instructions&rdquo; text in a response. Conductor scans every
+                  tool result for prompt-injection patterns and quarantines flagged content in an explicit
+                  data-only wrapper before the model sees it again. You&apos;ll find the warnings in the activity
+                  log when it happens.
+                </p>
+              </WatchIt>
 
               <H3>Why Conductor uses it</H3>
               <Bullets>
@@ -2039,10 +2190,18 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               title="Triggers & Reactions overview"
               subtitle="Connect AgentBoard events to the outside world."
             >
+              <PlainEnglish>
+                <p>
+                  Triggers and Reactions are &ldquo;when this, do that&rdquo; — the same recipe as IFTTT or
+                  Zapier, living inside your project. <strong>When</strong> a chain completes / a step fails /
+                  Sentry coughs up a new error, <strong>do</strong> post to Slack, file a Jira ticket, call a
+                  webhook, send an email. In that order, as many as you like.
+                </p>
+              </PlainEnglish>
+
               <p>
-                Integrations let a project react automatically to what happens inside AgentBoard — or to events
-                from external services like Sentry. A <strong>Trigger</strong> watches for an event and fires a
-                chain of <strong>Reactions</strong> when its conditions are met.
+                Formally: a <strong>Trigger</strong> watches for an event (internal, or polled from Sentry) and
+                fires its ordered list of <strong>Reactions</strong> when every filter matches.
               </p>
               <p>
                 Configure everything in <em>Settings &rarr; Integrations</em>. No code required — each Trigger
@@ -2226,11 +2385,14 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-obs-runtime"
               title="Runtime dashboard"
-              subtitle="The live operations view."
+              subtitle="Mission control. When something feels slow or weird, you look here first."
             >
               <p>
-                Open it from the <Kbd>📈</Kbd> icon in the top bar. The runtime dashboard is where you look when
-                something feels slow or stuck.
+                Open it from the <Kbd>📈</Kbd> icon in the top bar. Think of it as the dashboard of your car:
+                you don&apos;t stare at it while everything&apos;s fine, but when the engine makes <em>that
+                noise</em>, this is where the gauges are. Three tabs: <strong>Daemons</strong> (worker
+                processes), <strong>Hosts</strong> (the machines they run on), and <strong>Sessions</strong>
+                (live terminal sessions with output you can actually read — watch-only, by design).
               </p>
 
               <H3>What it shows</H3>
@@ -2370,8 +2532,15 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-settings-general"
               title="Settings · General"
-              subtitle="Project-level defaults and retention."
+              subtitle="The grand tour of the gear icon starts here. One short stop per tab — bring comfortable shoes."
             >
+              <TipBox>
+                <p>
+                  The Settings dialog is tabbed: each section below matches one tab. You&apos;ll visit Runtimes
+                  and Agents constantly, Activity when debugging, and the rest about once a quarter. Skim
+                  accordingly.
+                </p>
+              </TipBox>
               <Bullets>
                 <li><strong>Project name, colour, description</strong> — shown in the project selector and sidebar.</li>
                 <li><strong>Default mode</strong> — the mode used when a task is dispatched without one.</li>
@@ -2521,15 +2690,32 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-daemon"
               title="Daemon mode overview"
-              subtitle="Long-lived agent processes that pull work. For CLI-backed and stateful agents."
+              subtitle="Welcome to the developer guide! It starts here. Grab a coffee — this is the fun part."
             >
+              <PlainEnglish>
+                <p>
+                  HTTP agents are like food delivery: Conductor calls, the agent answers, transaction over.
+                  A daemon is a <strong>chef who lives in your kitchen</strong>: always there, knives already
+                  sharp, pulls the next order off the rail whenever it&apos;s free.
+                </p>
+              </PlainEnglish>
+
               <p>
-                A daemon-mode agent is a process you run yourself — on your laptop, in a VM, or in a container.
-                It registers with Conductor on startup, heartbeats periodically, and pulls steps from a queue when
-                it&apos;s idle. This is the right fit when your agent is a CLI tool (Claude Code, Aider, OpenCode,
-                Codex) that benefits from process reuse or needs local state (a checked-out repository, a warm
-                local model).
+                Concretely: a daemon-mode agent is a process <em>you</em> run — on your laptop, a VM, a container.
+                It registers with Conductor on startup, heartbeats every 30 seconds (&ldquo;still alive!&rdquo;),
+                and pulls steps off a queue when it&apos;s idle. It&apos;s the right fit when your agent is a CLI
+                tool (Claude Code, Aider, Codex) that benefits from a warm process, or needs local state — a
+                checked-out repo, a GPU, a local model.
               </p>
+
+              <TipBox>
+                <p>
+                  Want to see a complete, working daemon in ~300 lines before writing your own?
+                  <code> mini-services/conductor-daemon</code> in the repo implements the entire protocol —
+                  register, heartbeat, poll, sessions, completion — and its README documents every endpoint it
+                  calls. Steal liberally; that&apos;s what it&apos;s for.
+                </p>
+              </TipBox>
 
               <H3>How it differs from HTTP mode</H3>
               <Bullets>
@@ -2625,11 +2811,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             <Section
               id="help-api-cli"
               title="CLI-style API"
-              subtitle="A simple text-based endpoint for shell-script agents."
+              subtitle="The whole agent protocol in one endpoint and four verbs. You could build an agent in bash before lunch."
             >
               <p>
-                The CLI API is the smallest possible surface for an agent: one endpoint, four verbs, text bodies.
-                Good for quick scripts and for wrapping non-HTTP tools.
+                Here&apos;s a secret that makes Conductor much less intimidating: <strong>an agent is just a loop
+                that asks for work, does it, and reports back.</strong> The CLI API is that loop with zero
+                ceremony — one endpoint, four verbs, plain bodies. If you can write a shell script, you can write
+                an agent. (The curl example below IS a complete agent. Really.)
               </p>
 
               <H3>Endpoint</H3>
@@ -2691,7 +2879,17 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
               </p>
             </Section>
 
-            <Section id="help-api-auth" title="Authentication">
+            <Section id="help-api-auth" title="Authentication" subtitle="Three kinds of credentials. Pick the right badge for the door you're opening.">
+              <PlainEnglish>
+                <p>
+                  Three doors, three badges. <strong>Agent key</strong>: &ldquo;I&apos;m Alice, give me work.&rdquo;
+                  <strong> Admin session</strong>: &ldquo;I&apos;m the human in the browser.&rdquo;
+                  <strong> Scoped API key</strong>: &ldquo;I&apos;m the CI pipeline / a webhook — let me read
+                  metrics or file tasks, nothing else.&rdquo; Use the wrong badge and you get a polite 401, not
+                  a partial success — by design.
+                </p>
+              </PlainEnglish>
+
               <p>
                 Every agent-side request carries:
               </p>
@@ -2701,22 +2899,33 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
                 </pre>
               </Callout>
               <p>
-                The key is the agent&apos;s API key. Conductor looks it up, resolves the agent record, and uses that
-                to authorise the call. There&apos;s no separate &ldquo;scope&rdquo; system — the agent record itself
-                carries the scope (supported modes, tool allowlist, MCP connections).
+                For agent routes the key is the agent&apos;s API key. Conductor looks it up, resolves the agent
+                record, and the record itself is the permission set: supported modes, tool allowlist, MCP
+                connections. The badge <em>is</em> the job description.
               </p>
 
               <H3>Admin-only endpoints</H3>
               <p>
-                Endpoints under <code>/api/admin/*</code> require a valid admin session cookie, not an agent key.
-                These are the ones the UI hits when you&apos;re signed in.
+                Endpoints under <code>/api/admin/*</code> (and most mutating routes) require the admin session
+                cookie — these are what the UI hits when you&apos;re signed in. Mutations also enforce a
+                same-origin check, so a malicious website can&apos;t ride your cookie.
               </p>
 
-              <H3>Project-scoped endpoints</H3>
+              <H3>Scoped API keys (for integrations)</H3>
               <p>
-                A small set of endpoints (<code>/api/projects/:id/*</code>) accept a project-level API key. Use this
-                for glue scripts that should act on behalf of the project rather than a specific agent.
+                Issue these from <code>/api/admin/api-keys</code> for CI pipelines, webhooks, and dashboards.
+                Each key carries explicit scopes — <code>read</code> lets it pull activity, analytics, hosts, and
+                sessions; <code>write</code> lets it create tasks. The raw key is shown exactly once at issue
+                time; only a prefix and a hash are stored. Revoked keys stay listed for audit.
               </p>
+
+              <WatchIt>
+                <p>
+                  A presented Bearer token is <em>authoritative</em>: if you send a scoped key and it&apos;s wrong,
+                  you get a 401 — Conductor never silently falls back to your browser session. Debugging tip:
+                  a mysterious 401 with a valid session usually means a stale token header is tagging along.
+                </p>
+              </WatchIt>
             </Section>
 
             {/* ════════════════════════════════════════════════════════════════
@@ -2788,7 +2997,14 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
                 TROUBLESHOOTING
                ════════════════════════════════════════════════════════════════ */}
 
-            <Section id="help-trouble-ws" title="WebSocket shows Offline">
+            <Section id="help-trouble-ws" title="WebSocket shows Offline" subtitle="Don't panic. Nothing is lost — you've just lost the live ticker.">
+              <PlainEnglish>
+                <p>
+                  The grey badge means the board stopped getting push updates. The work itself is fine — agents
+                  keep working, dispatch keeps dispatching. You&apos;re watching a delayed broadcast, that&apos;s
+                  all. Refresh to catch up while you fix the connection.
+                </p>
+              </PlainEnglish>
               <p>
                 Symptom: the <Term>Live</Term> badge is grey, board doesn&apos;t update in real time. Tasks still
                 dispatch, but you have to refresh to see new cards.
@@ -2802,10 +3018,18 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
               </Bullets>
             </Section>
 
-            <Section id="help-trouble-stuck" title="A task is stuck">
+            <Section id="help-trouble-stuck" title="A task is stuck" subtitle="The doctor will see you now. Symptom, diagnosis, cure — in that order.">
               <p>
                 Symptom: a task sits in <Term>IN_PROGRESS</Term> for hours, no activity, no completion.
               </p>
+              <TipBox>
+                <p>
+                  Before touching anything: stuck tasks are almost never <em>lost</em> tasks. The lease system
+                  means a dead worker&apos;s step gets reclaimed automatically after the timeout, and exhausted
+                  steps land in the dead-letter panel (<em>Settings &rarr; Activity</em>) with a one-click
+                  Requeue. Diagnose first; the cure is usually one button.
+                </p>
+              </TipBox>
               <H3>Diagnosis</H3>
               <Bullets>
                 <li>Open the task drawer &rarr; <em>Steps</em> tab. Which step is current?</li>
@@ -2875,49 +3099,19 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
                 REFERENCE
                ════════════════════════════════════════════════════════════════ */}
 
-            <Section id="help-faq" title="FAQ">
-              <H3>Is Conductor a chat UI?</H3>
-              <p>
-                No. Conductor dispatches work to agents and tracks the outcomes. If you want to chat with a model
-                directly, use that provider&apos;s own client.
-              </p>
-
-              <H3>Do I need Docker / Postgres?</H3>
-              <p>
-                No. Conductor ships with SQLite as the default — zero config. You gain semantic skill search and
-                better concurrency with Postgres + pgvector, but everything else works on SQLite.
-              </p>
-
-              <H3>Can I run it on my laptop?</H3>
-              <p>
-                Yes. <code>bun install &amp;&amp; bun run db:push &amp;&amp; bun run dev</code>. You&apos;ll need an
-                API key for at least one runtime (Anthropic, OpenAI, OpenRouter, or local Ollama).
-              </p>
-
-              <H3>Can multiple people use the same Conductor at the same time?</H3>
-              <p>
-                Yes. The activity log records who did what, and the WebSocket pushes changes to every open
-                browser instantly. There&apos;s one shared admin password today — per-user accounts land in 0.4.
-              </p>
-
-              <H3>Does Conductor train the models?</H3>
-              <p>
-                No. Conductor is a dispatcher. It sends prompts to whatever model your runtime points at. The
-                models themselves are run and maintained by their providers (Anthropic, OpenAI, you on Ollama, etc.).
-              </p>
-
-              <H3>Can an agent talk to another agent directly?</H3>
-              <p>
-                Not directly — always through Conductor. This is intentional: having agents communicate only via
-                tasks and the chain keeps every hand-off auditable. If you want an agent&apos;s output to feed
-                another&apos;s input, build a chain.
-              </p>
-
-              <H3>How much does it cost to run?</H3>
-              <p>
-                Infrastructure: small. A single server and a database. The AI provider bills are the dominant cost;
-                set <em>Max cost per step</em> and keep an eye on the Observability dashboard&apos;s cost tile.
-              </p>
+            <Section id="help-faq" title="FAQ" subtitle="The questions everyone asks in week one. Asked and answered, no judgement.">
+              <DumbQuestions
+                items={[
+                  ['Is Conductor a chat UI?', <>No. Conductor dispatches work to agents and tracks the outcomes. Want to chat with a model? Use the provider&apos;s own client — it&apos;s better at chatting than we&apos;ll ever try to be.</>],
+                  ['Do I need Docker or Postgres?', <>Nope. SQLite is the zero-config default and runs everything. Postgres + pgvector buys you semantic skill search and better concurrency when you outgrow a single file — and not a day before.</>],
+                  ['Can I run it on my laptop?', <><code>bun install &amp;&amp; bun run db:push &amp;&amp; bun run dev</code> — that&apos;s the whole install. You need one API key for one runtime (Anthropic, OpenAI, OpenRouter, or a local Ollama). Run <code>bun run doctor</code> afterwards and it will tell you what, if anything, is missing.</>],
+                  ['Can several people use it at once?', <>Yes — the WebSocket pushes changes to every open browser, and the activity log records who did what. One caveat: there&apos;s a single shared admin password today; per-user accounts are on the roadmap.</>],
+                  ['Does Conductor train models?', <>No. It&apos;s a dispatcher. Prompts go to whatever model your runtime points at; the providers run the models. Your data goes where your runtimes send it — choose them accordingly.</>],
+                  ['Can agents talk to each other?', <>Yes — through Conductor&apos;s message inboxes, never directly. Agents send task-aware messages via their API keys; every message is durable, scanned for prompt injection, and visible to admins in the task drawer. For passing <em>work output</em> downstream, a chain is still the right tool — messages are for questions and handoffs, not the pipeline itself.</>],
+                  ['What does it cost to run?', <>Infrastructure: peanuts — one server, one database. The AI provider bills are the real line item. Set <em>Max cost per step</em>, watch the Observability cost tile, and remember that a runaway retry loop is the most expensive bug you can have. (The dead-letter queue and backoff exist precisely for this.)</>],
+                  ['Something broke. Where do I look, in order?', <>1) The task drawer&apos;s step output viewer — the rendered prompt is the answer 90% of the time. 2) The step&apos;s Evidence panel — what did the agent actually rely on? 3) <em>Settings &rarr; Activity</em> — warnings and dead letters. 4) <code>bun run doctor</code> — config and connectivity. In four stops you&apos;ve seen everything Conductor knows.</>],
+                ]}
+              />
             </Section>
 
             <Section id="help-glossary" title="Glossary">
