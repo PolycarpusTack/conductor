@@ -10,6 +10,11 @@
 
 **Tech Stack:** TypeScript 5, Bun test
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - The wrapper also neutralizes nested `</external-content>` tags in the body (escaped to entities) so wrapped content cannot fake an early envelope close and smuggle "trusted" text after it — not in the original design but an obvious bypass otherwise.
+> - `wrapExternalContent` always wraps when called (`wrapped: true`); the scan-first/wrap-when-flagged decision lives at the call sites, which keeps the module honest about what it did.
+> - Reaction templates get `{{security.categories}}` in addition to `{{security.flagged}}`.
+
 ---
 
 ## File Map
@@ -27,27 +32,27 @@
 ---
 
 ### Task 1: content-safety module (TDD)
-- [ ] Failing tests: flags for "ignore previous instructions", "disregard all prior", role-hijack ("you are now …", "\nHuman:"/"\nAssistant:" markers, `<system>`), exfiltration ("reveal/print your system prompt"), tool-abuse ("call the … tool with"); clean text → no flags; wrapper produces envelope with source/sender/trust attrs + banner; flags returned; `wrapped=true` only when wrapping applied; never throws on weird input.
-- [ ] Implement; tests green; commit.
+- [x] Failing tests: flags for "ignore previous instructions", "disregard all prior", role-hijack ("you are now …", "\nHuman:"/"\nAssistant:" markers, `<system>`), exfiltration ("reveal/print your system prompt"), tool-abuse ("call the … tool with"); clean text → no flags; wrapper produces envelope with source/sender/trust attrs + banner; flags returned; `wrapped=true` only when wrapping applied; never throws on weird input.
+- [x] Implement; tests green; commit.
 
 ### Task 2: MCP tool results
-- [ ] In `executeMcpTool`: scan joined text; if flagged → wrap (`source: mcp:<connection>/<tool>`, `trust: 'external'`) + `log.warn` with categories; return wrapped text. Unflagged results unchanged.
-- [ ] Unit test via the existing mcp-resolver test file's mock-fetch pattern.
-- [ ] Commit.
+- [x] In `executeMcpTool`: scan joined text; if flagged → wrap (`source: mcp:<connection>/<tool>`, `trust: 'external'`) + `log.warn` with categories; return wrapped text. Unflagged results unchanged.
+- [x] Unit test via the existing mcp-resolver test file's mock-fetch pattern.
+- [x] Commit.
 
 ### Task 3: Scoped-key task creation
-- [ ] `authorizeAdminOrScopedKey(request, scope)` → `{ ok: true, via: 'session' | 'key', keyId? } | { ok: false, response }`; `requireAdminOrScopedKey` delegates.
-- [ ] In tasks POST: when `via === 'key'`, scan title+description+step instructions; if flagged → wrap description (`source: 'api:tasks'`, `trust: 'external'`) before storing + `activityLog` warning entry (action `content_safety_flagged`, level warn).
-- [ ] Endpoint test: flagged body via key → 200, stored description wrapped, activity entry written; same body via admin session → stored verbatim.
-- [ ] Commit.
+- [x] `authorizeAdminOrScopedKey(request, scope)` → `{ ok: true, via: 'session' | 'key', keyId? } | { ok: false, response }`; `requireAdminOrScopedKey` delegates.
+- [x] In tasks POST: when `via === 'key'`, scan title+description+step instructions; if flagged → wrap description (`source: 'api:tasks'`, `trust: 'external'`) before storing + `activityLog` warning entry (action `content_safety_flagged`, level warn).
+- [x] Endpoint test: flagged body via key → 200, stored description wrapped, activity entry written; same body via admin session → stored verbatim.
+- [x] Commit.
 
 ### Task 4: Trigger payloads
-- [ ] In `executeReactions`: scan `JSON.stringify(eventPayload)` once; if flagged → `log.warn` + put `{ flagged: true, categories }` at `context.security` (available to reaction templates); unflagged → `context.security = { flagged: false }`.
-- [ ] Unit test in reaction-executor test file.
-- [ ] Commit.
+- [x] In `executeReactions`: scan `JSON.stringify(eventPayload)` once; if flagged → `log.warn` + put `{ flagged: true, categories }` at `context.security` (available to reaction templates); unflagged → `context.security = { flagged: false }`.
+- [x] Unit test in reaction-executor test file.
+- [x] Commit.
 
 ### Task 5: Wrap-up
-- [ ] Full verification; checkboxes; deviations; commit.
+- [x] Full verification; checkboxes; deviations; commit.
 
 ## Out of scope
 - `ProjectMcpConnection.trusted` flag (skip wrapping for marked-trusted tools) — add when someone hits a false positive; scan-always/wrap-when-flagged keeps the blast radius small meanwhile.

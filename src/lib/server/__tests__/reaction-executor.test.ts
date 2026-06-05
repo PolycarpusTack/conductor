@@ -157,7 +157,7 @@ describe('executeReactions — content safety context', () => {
     )
 
     expect(mockExecuteSlack).toHaveBeenCalledTimes(1)
-    const config = mockExecuteSlack.mock.calls[0][0]
+    const config = (mockExecuteSlack.mock.calls[0] as unknown[])[0] as { text: string }
     expect(config.text).toBe('flagged=true')
   })
 
@@ -169,7 +169,7 @@ describe('executeReactions — content safety context', () => {
     ])
     await executeReactions(trigger as any, { message: 'deploy finished' }, 'task-1')
 
-    const config = mockExecuteSlack.mock.calls[0][0]
+    const config = (mockExecuteSlack.mock.calls[0] as unknown[])[0] as { text: string }
     expect(config.text).toBe('flagged=false')
   })
 })
