@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/select'
 import { X, Plus, GitBranch, GitMerge, ArrowRight, Trash2, Zap } from 'lucide-react'
 import { AgentBadge } from '@/components/agent-badge'
+import type { Agent } from '@/types/board'
+import type { ProjectMode } from '@/types/settings'
 
 export type { StepCondition, StepEdge }
 
@@ -31,22 +33,6 @@ export interface DagStep {
   // Layout
   column: number
   row: number
-}
-
-interface Agent {
-  id: string
-  name: string
-  emoji: string
-  color?: string | null
-  role?: string | null
-  personality?: string | null
-}
-
-interface ProjectMode {
-  id: string
-  name: string
-  label: string
-  color: string
 }
 
 interface WorkflowEditorProps {

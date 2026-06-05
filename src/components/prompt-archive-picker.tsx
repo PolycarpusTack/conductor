@@ -43,7 +43,6 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
 
   useEffect(() => {
     if (!open) return
-    setLibrary({ status: 'loading' })
     fetch('/api/prompt-library')
       .then((r) => r.json())
       .then((data) => {
@@ -52,6 +51,17 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
       })
       .catch(() => setLibrary({ status: 'error', message: 'Failed to load prompt library' }))
   }, [open])
+
+  // Reset to the idle (loading) state on close so reopening shows a fresh fetch, not stale results
+  function handleOpenChange(next: boolean) {
+    if (!next) {
+      setLibrary({ status: 'idle' })
+      setSelected(null)
+      setPreview({ status: 'idle' })
+      setFilter('')
+    }
+    onOpenChange(next)
+  }
 
   function handleSelectEntry(entry: PromptLibraryEntry) {
     setSelected(entry)
@@ -68,11 +78,11 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
   function handleUseAsBase() {
     if (preview.status !== 'ok' || !selected) return
     onSelect(preview.data.content, selected)
-    onOpenChange(false)
+    handleOpenChange(false)
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full max-w-4xl flex flex-col p-0">
         <SheetHeader className="px-6 pt-6 pb-4 border-b">
           <SheetTitle>Prompt Archive</SheetTitle>
@@ -95,7 +105,7 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
               </div>
             )}
             <ScrollArea className="flex-1">
-              {library.status === 'loading' && (
+              {(library.status === 'idle' || library.status === 'loading') && (
                 <div className="flex items-center justify-center p-8">
                   <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
                 </div>

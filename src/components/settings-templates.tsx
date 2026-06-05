@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Trash2, Pencil, Plus, X } from 'lucide-react'
+import type { ChainTemplate, ProjectMode } from '@/types/settings'
 
 interface TemplateStep {
   agentRole?: string
@@ -12,22 +13,6 @@ interface TemplateStep {
   mode: string
   instructions?: string
   autoContinue: boolean
-}
-
-interface ChainTemplate {
-  id: string
-  name: string
-  description?: string | null
-  icon?: string | null
-  steps: unknown
-}
-
-interface ProjectMode {
-  id: string
-  name: string
-  label: string
-  color: string
-  icon?: string | null
 }
 
 interface SettingsTemplatesProps {

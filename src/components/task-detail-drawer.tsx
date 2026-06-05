@@ -10,7 +10,9 @@ import {
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { AgentBadge } from '@/components/agent-badge'
+import type { Task } from '@/types/board'
 
+// Full step detail fetched from /api/tasks/[id] — richer than TaskStepSummary on the board Task
 interface TaskStep {
   id: string
   order: number
@@ -26,22 +28,6 @@ interface TaskStep {
   startedAt?: string | null
   completedAt?: string | null
   agent?: { id: string; name: string; emoji: string; color?: string | null; role?: string | null; personality?: string | null } | null
-}
-
-interface Task {
-  id: string
-  title: string
-  description?: string | null
-  status: string
-  priority: string
-  tag?: string | null
-  notes?: string | null
-  output?: string | null
-  agent?: { id: string; name: string; emoji: string; color: string; role?: string | null; personality?: string | null } | null
-  steps?: TaskStep[]
-  startedAt?: string | null
-  completedAt?: string | null
-  createdAt?: string
 }
 
 interface TaskDetailDrawerProps {

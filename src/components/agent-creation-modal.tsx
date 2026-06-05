@@ -14,49 +14,12 @@ import { toast } from 'sonner'
 import { AgentMemoryPanel } from '@/components/agent-memory-panel'
 import { PromptArchivePicker } from '@/components/prompt-archive-picker'
 import { MAX_PROMPT_CONTENT_CHARS, type PromptLibraryEntry } from '@/types/prompt-library'
+import type { ProjectMode, ProjectRuntime, ProjectMcpConnection } from '@/types/settings'
+import type { Agent as BoardAgent } from '@/types/board'
 
-interface Agent {
-  id: string
-  name: string
-  emoji: string
-  color: string
-  description?: string | null
-  personality?: string | null
-  role?: string | null
-  capabilities?: string | null
-  maxConcurrent: number
-  supportedModes?: string | null
-  modeInstructions?: string | null
-  runtimeId?: string | null
-  runtimeModel?: string | null
-  systemPrompt?: string | null
-  mcpConnectionIds?: string | null
-  invocationMode?: string | null
-  isActive: boolean
-  lastSeen?: string | null
+// Board agent plus the plaintext API key returned once on creation
+interface Agent extends BoardAgent {
   apiKey?: string | null
-}
-
-interface ProjectMode {
-  id: string
-  name: string
-  label: string
-  color: string
-  icon?: string | null
-}
-
-interface ProjectRuntime {
-  id: string
-  adapter: string
-  name: string
-  models: string
-}
-
-interface ProjectMcpConnection {
-  id: string
-  name: string
-  type: string
-  icon?: string | null
 }
 
 interface AgentCreationModalProps {

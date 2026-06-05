@@ -5,19 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Trash2, Pencil, Plus } from 'lucide-react'
-
-interface McpConnection {
-  id: string
-  name: string
-  type: string
-  icon?: string | null
-  endpoint?: string | null
-}
+import type { ProjectMcpConnection } from '@/types/settings'
 
 interface SettingsMcpProps {
   projectId: string
-  connections: McpConnection[]
-  onConnectionsChange: (connections: McpConnection[]) => void
+  connections: ProjectMcpConnection[]
+  onConnectionsChange: (connections: ProjectMcpConnection[]) => void
 }
 
 const TYPE_OPTIONS = [
@@ -55,7 +48,7 @@ export function SettingsMcp({ projectId, connections, onConnectionsChange }: Set
     setError(null)
   }
 
-  const startEdit = (conn: McpConnection) => {
+  const startEdit = (conn: ProjectMcpConnection) => {
     setEditing(conn.id)
     setName(conn.name)
     setType(conn.type)

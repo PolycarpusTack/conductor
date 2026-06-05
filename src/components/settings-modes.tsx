@@ -5,15 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Trash2, Pencil, Plus } from 'lucide-react'
-
-interface ProjectMode {
-  id: string
-  name: string
-  label: string
-  color: string
-  icon?: string | null
-  instructions?: string | null
-}
+import type { ProjectMode } from '@/types/settings'
 
 interface SettingsModesProps {
   projectId: string

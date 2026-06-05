@@ -19,7 +19,7 @@ interface ProjectScheduler {
 
 // Global scheduler state (per-process singleton)
 const schedulers = new Map<string, ProjectScheduler>()
-let globalInitialized = false
+let globalCheckInterval: ReturnType<typeof setInterval> | null = null
 let checkInProgress = false
 
 function isWithinSchedule(schedule: ScheduleWindow): boolean {
@@ -189,9 +189,7 @@ async function checkScheduledProjects() {
  * and begins the schedule checker for 'scheduled' projects.
  */
 export async function initializeScheduler() {
-  if (globalInitialized) return
-  globalInitialized = true
-
+  if (globalCheckInterval) return
   log.info('initializing automation scheduler')
 
   // Start projects with 'startup' or 'always' mode
@@ -208,7 +206,7 @@ export async function initializeScheduler() {
   await checkScheduledProjects()
 
   // Check scheduled projects every 60 seconds
-  setInterval(checkScheduledProjects, 60000)
+  globalCheckInterval = setInterval(checkScheduledProjects, 60000)
 
   log.info('initialized', { autoStartProjects: autoStartProjects.length })
 }
@@ -217,10 +215,13 @@ export async function initializeScheduler() {
  * Cleanup all schedulers (for graceful shutdown).
  */
 export function shutdownScheduler() {
+  if (globalCheckInterval) {
+    clearInterval(globalCheckInterval)
+    globalCheckInterval = null
+  }
   for (const [projectId] of schedulers) {
     stopPolling(projectId)
   }
   schedulers.clear()
-  globalInitialized = false
   log.info('all schedulers stopped')
 }

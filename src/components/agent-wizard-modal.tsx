@@ -99,7 +99,6 @@ export function AgentWizardModal({ open, onOpenChange, projectId, onAgentCreated
         setStep('review')
       })
       .catch((err: Error) => setComposeError(err.message))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, retryCount])
 
   function handleCancel() {

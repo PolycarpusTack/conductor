@@ -6,26 +6,12 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Trash2, Pencil, Plus, RefreshCw } from 'lucide-react'
-
-interface RuntimeModel {
-  id: string
-  name: string
-  tier?: string
-}
-
-interface Runtime {
-  id: string
-  adapter: string
-  name: string
-  models: unknown
-  apiKeyEnvVar?: string | null
-  endpoint?: string | null
-}
+import type { RuntimeModel, ProjectRuntime } from '@/types/settings'
 
 interface SettingsRuntimesProps {
   projectId: string
-  runtimes: Runtime[]
-  onRuntimesChange: (runtimes: Runtime[]) => void
+  runtimes: ProjectRuntime[]
+  onRuntimesChange: (runtimes: ProjectRuntime[]) => void
 }
 
 const ADAPTER_OPTIONS = [
@@ -80,7 +66,7 @@ export function SettingsRuntimes({ projectId, runtimes, onRuntimesChange }: Sett
     setShowDiscovered(false)
   }
 
-  const startEdit = (runtime: Runtime) => {
+  const startEdit = (runtime: ProjectRuntime) => {
     setEditing(runtime.id)
     setAdapter(runtime.adapter)
     setName(runtime.name)

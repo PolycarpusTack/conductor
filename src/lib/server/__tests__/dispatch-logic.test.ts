@@ -326,6 +326,55 @@ describe('rewindChain', () => {
 
     await expect(rewindChain('task-1', 'proj-1', 'nonexistent', 'note')).rejects.toThrow('Target step not found')
   })
+
+  test('DAG merge point: resets both sibling branches and their shared ancestor', async () => {
+    // Diamond DAG:  step-a → step-b ─┐
+    //                        step-c ─┴→ step-d (merge point)
+    const dagStepA = {
+      id: 'step-a', taskId: 'task-1', order: 1,
+      nextSteps: JSON.stringify([{ targetStepId: 'step-b' }, { targetStepId: 'step-c' }]),
+      prevSteps: JSON.stringify([]),
+      isMergePoint: false,
+    }
+    const dagStepB = {
+      id: 'step-b', taskId: 'task-1', order: 2,
+      nextSteps: JSON.stringify([{ targetStepId: 'step-d' }]),
+      prevSteps: JSON.stringify(['step-a']),
+      isMergePoint: false,
+    }
+    const dagStepC = {
+      id: 'step-c', taskId: 'task-1', order: 3,
+      nextSteps: JSON.stringify([{ targetStepId: 'step-d' }]),
+      prevSteps: JSON.stringify(['step-a']),
+      isMergePoint: false,
+    }
+    const dagStepD = {
+      id: 'step-d', taskId: 'task-1', order: 4,
+      nextSteps: null,
+      prevSteps: JSON.stringify(['step-b', 'step-c']),
+      isMergePoint: true,
+    }
+
+    mockTaskStepFindUnique.mockResolvedValue({
+      ...dagStepD,
+      agent: { id: 'agent-1', runtimeId: null },
+    })
+    mockTaskStepFindMany.mockResolvedValue([dagStepA, dagStepB, dagStepC, dagStepD])
+
+    await rewindChain('task-1', 'proj-1', 'step-d', 'Merge result rejected')
+
+    // All three ancestors (both branches + their shared parent) must be reset
+    const updateManyCall = mockTaskStepUpdateMany.mock.calls.find((call: unknown[]) => {
+      const arg = call[0] as { where?: { id?: { in?: string[] } } }
+      return Array.isArray(arg?.where?.id?.in)
+    })
+    const resetIds: string[] = updateManyCall?.[0]?.where?.id?.in ?? []
+
+    expect(resetIds).toContain('step-b')
+    expect(resetIds).toContain('step-c')
+    expect(resetIds).toContain('step-a')
+    expect(resetIds).not.toContain('step-d') // target itself is handled separately
+  })
 })
 
 // ===========================================================================

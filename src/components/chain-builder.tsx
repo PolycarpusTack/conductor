@@ -14,49 +14,8 @@ import {
 import { X, Plus, Save, LayoutTemplate, GitBranch } from 'lucide-react'
 import { AgentBadge } from '@/components/agent-badge'
 import { WorkflowEditor, type DagStep, type StepEdge } from '@/components/workflow-editor'
-
-interface StepDraft {
-  agentId?: string | null
-  humanLabel?: string
-  mode: string
-  instructions?: string
-  autoContinue: boolean
-  maxRetries?: number
-  retryDelayMs?: number
-  timeoutMs?: number
-  // DAG fields
-  nextSteps?: StepEdge[]
-  prevSteps?: string[]
-  isParallelRoot?: boolean
-  isMergePoint?: boolean
-  fallbackAgentId?: string | null
-}
-
-interface Agent {
-  id: string
-  name: string
-  emoji: string
-  color?: string | null
-  role?: string | null
-  personality?: string | null
-  supportedModes?: string | null
-}
-
-interface ProjectMode {
-  id: string
-  name: string
-  label: string
-  color: string
-  icon?: string | null
-}
-
-interface ChainTemplate {
-  id: string
-  name: string
-  description?: string | null
-  icon: string
-  steps: string
-}
+import type { StepDraft, ChainTemplate, ProjectMode } from '@/types/settings'
+import type { Agent } from '@/types/board'
 
 interface ChainBuilderProps {
   projectId: string
