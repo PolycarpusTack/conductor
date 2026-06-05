@@ -23,6 +23,7 @@ const TOC: TocGroup[] = [
   {
     label: 'Release notes',
     items: [
+      { id: 'help-release-0-1-0', title: "What's new in 0.1.0" },
       { id: 'help-release-0-6', title: "What's new in 0.6" },
       { id: 'help-release-0-5', title: "What's new in 0.5" },
       { id: 'help-release-0-4', title: "What's new in 0.4" },
@@ -450,6 +451,40 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             {/* ════════════════════════════════════════════════════════════════
                 RELEASE NOTES
                ════════════════════════════════════════════════════════════════ */}
+
+            <Section
+              id="help-release-0-1-0"
+              title="What's new in 0.1.0"
+              subtitle="The operations layer: hosts, live sessions, and terminal-backed execution."
+            >
+              <Callout tone="neon" title="The headline">
+                <p>
+                  0.1.0 makes daemon agents visible as live workers instead of black-box pollers. Machines are
+                  first-class <strong>Hosts</strong>, daemons report observable <strong>execution sessions</strong> with
+                  live output, and workflow steps can run inside persistent local sessions declared by runtime policy —
+                  all watch-only from the browser, by design.
+                </p>
+              </Callout>
+
+              <H3 id="help-release-0-1-0-hosts">Host presence</H3>
+              <Bullets>
+                <li><strong>Hosts tab</strong> — every machine running a daemon, with online/stale/offline status, capability badges, trust level, and daemon counts. Daemons carry a persisted installation ID so a machine keeps one identity across re-registrations.</li>
+                <li><strong>Heartbeat metrics</strong> — CPU/memory/in-flight work folded into host metadata.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-1-0-sessions">Session observation</H3>
+              <Bullets>
+                <li><strong>Sessions tab + task drawer</strong> — each daemon-reported session shows status, backend, command, and a bounded output tail with <strong>secrets redacted before storage and broadcast</strong>.</li>
+                <li><strong>Watch-only</strong> — there is deliberately no way to type into a session from the browser.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-1-0-terminal">Terminal-backed execution</H3>
+              <Bullets>
+                <li><strong>Session policies</strong> — runtime config declares <code>ephemeral</code> / <code>persistent-agent</code> / <code>persistent-task</code> / <code>persistent-step</code> with a command template; the server computes session keys so reuse semantics live in one place.</li>
+                <li><strong>Audit parity</strong> — daemon steps now write the same started/succeeded/failed/retry event trail as HTTP dispatch, with the executing session linked.</li>
+                <li><strong>Reference daemon</strong> — <code>mini-services/conductor-daemon</code> proves the whole protocol; its safety default never executes step instructions as shell.</li>
+              </Bullets>
+            </Section>
 
             <Section
               id="help-release-0-6"

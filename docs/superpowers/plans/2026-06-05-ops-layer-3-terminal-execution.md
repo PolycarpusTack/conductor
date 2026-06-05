@@ -10,6 +10,12 @@
 
 **Tech Stack:** TypeScript 5, Zod 4, Bun (daemon runtime), Next.js 16 App Router, Bun test
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - The `started` event in `steps/next` is deduped per lease (daemon re-polls the same leased step until completion — emitting unconditionally would spam the event log). One indexed `stepEvent.findFirst` against `leasedAt` gates it.
+> - The reference daemon's graceful-shutdown session marking was dropped — the server's status derivation and lease-expiry stealing already cover dead daemons, and the exit handler couldn't reliably flush in-flight HTTP on SIGKILL anyway. Sessions report `exited`/`failed` per step instead.
+> - Reference daemon registration is admin-cookie-assisted (registration is deliberately admin-gated server-side); the README documents the copy-cookie flow. A cleaner one-time-token enrollment flow is a good candidate for the doctor epic.
+> - Daemon-steps route tests mock the db deeply enough to satisfy the REAL dispatch module's advanceChain/resolveTaskStatus queries — dispatch must never be module-mocked (it has real unit tests elsewhere).
+
 ---
 
 ## File Map
@@ -28,52 +34,52 @@
 
 ### Task 1: Session policy module (TDD)
 
-- [ ] **Step 1: Failing tests** for `src/lib/server/session-policy.ts`:
+- [x] **Step 1: Failing tests** for `src/lib/server/session-policy.ts`:
   - `parseSessionPolicy(null)` → defaults `{ sessionPolicy: 'ephemeral', sessionBackend: 'process', idleRequiredBeforeCommand: false, maxOutputPreviewChars: 5000 }`
   - parses a full config JSON; unknown values fall back to defaults (never throw)
   - `sessionKeyForStep(policy, ids)`: ephemeral→`step-{stepId}`, persistent-agent→`agent-{agentId}`, persistent-task→`task-{taskId}`, persistent-step→`step-{stepId}`; persistent-agent without agentId falls back to step key
   - `resolveCommandTemplate(template, vars)` substitutes `{{agent.runtimeModel}}`-style tokens, leaves unknown tokens empty
-- [ ] **Step 2:** Implement (pure, no DB). Zod-validate the config shape leniently (`.catch()` semantics — bad config degrades to defaults, logged once).
-- [ ] **Step 3:** Tests green; commit.
+- [x] **Step 2:** Implement (pure, no DB). Zod-validate the config shape leniently (`.catch()` semantics — bad config degrades to defaults, logged once).
+- [x] **Step 3:** Tests green; commit.
 
 ---
 
 ### Task 2: steps/next session block + started event
 
-- [ ] **Step 1:** Extend the select with `agent.runtimeModel` and `agent.runtime { adapter, config }`; compute `policy = parseSessionPolicy(runtime.config)`; respond with
+- [x] **Step 1:** Extend the select with `agent.runtimeModel` and `agent.runtime { adapter, config }`; compute `policy = parseSessionPolicy(runtime.config)`; respond with
   `session: { policy, backend, sessionKey, command, workingDirectoryPolicy, idleRequiredBeforeCommand, maxOutputPreviewChars }` (command = resolved template or null).
-- [ ] **Step 2:** Append `started` StepEvent `{ source: 'daemon', daemonId, attempt }` when a step is handed out (the daemon path's first audit-trail entry).
-- [ ] **Step 3:** Commit.
+- [x] **Step 2:** Append `started` StepEvent `{ source: 'daemon', daemonId, attempt }` when a step is handed out (the daemon path's first audit-trail entry).
+- [x] **Step 3:** Commit.
 
 ---
 
 ### Task 3: Completion linkage + step events
 
-- [ ] **Step 1:** `POST /api/daemon/steps` accepts optional `sessionId`. When present: 403 unless the session is owned by the calling daemon; stamp `session.taskId/stepId` if missing.
-- [ ] **Step 2:** Append `succeeded` / `failed` StepEvents with `{ source: 'daemon', daemonId, sessionId?, willRetry? }` in the respective branches (`retry_scheduled` for willRetry).
-- [ ] **Step 3:** Route tests: sessionId owned by another daemon → 403; complete with sessionId → event carries it; fail with willRetry → `retry_scheduled` + `failed` events.
-- [ ] **Step 4:** Commit.
+- [x] **Step 1:** `POST /api/daemon/steps` accepts optional `sessionId`. When present: 403 unless the session is owned by the calling daemon; stamp `session.taskId/stepId` if missing.
+- [x] **Step 2:** Append `succeeded` / `failed` StepEvents with `{ source: 'daemon', daemonId, sessionId?, willRetry? }` in the respective branches (`retry_scheduled` for willRetry).
+- [x] **Step 3:** Route tests: sessionId owned by another daemon → 403; complete with sessionId → event carries it; fail with willRetry → `retry_scheduled` + `failed` events.
+- [x] **Step 4:** Commit.
 
 ---
 
 ### Task 4: Reference daemon (`mini-services/conductor-daemon`)
 
-- [ ] **Step 1:** `index.ts` — single-file bun daemon:
+- [x] **Step 1:** `index.ts` — single-file bun daemon:
   - Config via env: `CONDUCTOR_URL`, `CONDUCTOR_DAEMON_TOKEN` (or `--register` flow printing a token once), `DAEMON_CAPABILITY` (default `claude-code`), poll interval.
   - Persists an installation ID in `~/.conductor-daemon/installation-id`.
   - Register (admin-token-assisted, one-time) → heartbeat loop (30s, with runningTasks/activeSessions) → poll `steps/next` (5s).
   - On step: upsert session (policy-derived key/backend from the response), spawn the resolved command (default safe echo runner when no commandTemplate configured), stream stdout/stderr chunks as session output events (bounded), report status transitions, then POST completion with `sessionId`.
   - Graceful shutdown: mark sessions exited.
-- [ ] **Step 2:** `package.json` (no deps — bun built-ins only) + `README.md` documenting env vars, the register flow, and the **safety default** (without an explicit commandTemplate the daemon never executes step instructions as shell).
-- [ ] **Step 3:** `bun build`-check the file compiles under the repo type-check (excluded from Next build; included in tsconfig? mini-services/board-ws precedent — match it).
-- [ ] **Step 4:** Commit.
+- [x] **Step 2:** `package.json` (no deps — bun built-ins only) + `README.md` documenting env vars, the register flow, and the **safety default** (without an explicit commandTemplate the daemon never executes step instructions as shell).
+- [x] **Step 3:** `bun build`-check the file compiles under the repo type-check (excluded from Next build; included in tsconfig? mini-services/board-ws precedent — match it).
+- [x] **Step 4:** Commit.
 
 ---
 
 ### Task 5: Wrap-up + v0.1.0 release
 
-- [ ] **Step 1:** Full verification; mark checkboxes; deviations note.
-- [ ] **Step 2:** Release v0.1.0 — Epics 1–3 are the "live operations" story (version bump, help page section, release commit).
+- [x] **Step 1:** Full verification; mark checkboxes; deviations note.
+- [x] **Step 2:** Release v0.1.0 — Epics 1–3 are the "live operations" story (version bump, help page section, release commit).
 
 ## Out of scope
 
