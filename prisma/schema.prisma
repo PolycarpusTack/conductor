@@ -262,6 +262,7 @@ model StepExecution {
   status      String    @default("running")
   output      String?
   error       String?
+  evidence    String? // JSON: retrieval context captured at dispatch (memoryHits, workingMemory)
   tokensUsed  Int?
   cost        Float?
   durationMs  Int?

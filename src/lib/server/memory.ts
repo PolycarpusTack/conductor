@@ -159,8 +159,21 @@ export async function buildRelevantMemory(opts: {
   query: string
   limit?: number
 }): Promise<string> {
+  return (await buildRelevantMemoryWithHits(opts)).text
+}
+
+/**
+ * Like buildRelevantMemory, but preserves WHICH memories were injected —
+ * dispatch records them as retrieval evidence on the execution.
+ */
+export async function buildRelevantMemoryWithHits(opts: {
+  agentId: string
+  projectId: string
+  query: string
+  limit?: number
+}): Promise<{ text: string; hits: Array<{ id: string; category: string }> }> {
   const hits = await searchMemories(opts)
-  if (hits.length === 0) return ''
+  if (hits.length === 0) return { text: '', hits: [] }
 
   // Fire-and-forget reinforcement: we don't need its result, and blocking on
   // N Prisma updates would delay every dispatch. Failures are logged, not rethrown.
@@ -173,5 +186,8 @@ export async function buildRelevantMemory(opts: {
   )
 
   const lines = hits.map((h) => `- [${h.category}] ${h.content}`)
-  return `Persistent memory (things you've learned on this project):\n${lines.join('\n')}`
+  return {
+    text: `Persistent memory (things you've learned on this project):\n${lines.join('\n')}`,
+    hits: hits.map((h) => ({ id: h.id, category: h.category })),
+  }
 }

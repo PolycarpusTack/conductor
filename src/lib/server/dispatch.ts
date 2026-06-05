@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { getAdapter } from '@/lib/server/adapters/registry'
-import { buildWorkingMemory, buildRelevantMemory } from '@/lib/server/memory'
+import { buildWorkingMemory, buildRelevantMemoryWithHits } from '@/lib/server/memory'
 import { resolvePrompt } from '@/lib/server/resolve-prompt'
 import { fireProjectEvent as broadcastProjectEvent } from '@/lib/server/project-event'
 import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
@@ -146,18 +146,19 @@ export async function dispatchStep(stepId: string) {
     .filter(Boolean)
     .join('\n')
 
-  const [workingMemory, relevantMemory] = await Promise.all([
+  const [workingMemory, relevantMemoryResult] = await Promise.all([
     buildWorkingMemory({
       agentId: agent.id,
       projectId: step.task.projectId,
     }),
-    buildRelevantMemory({
+    buildRelevantMemoryWithHits({
       agentId: agent.id,
       projectId: step.task.projectId,
       query: memoryQuery,
       limit: 5,
     }),
   ])
+  const relevantMemory = relevantMemoryResult.text
 
   const systemPrompt = resolvePrompt(agent.systemPrompt || '', {
     task: { title: step.task.title, description: step.task.description },
@@ -231,6 +232,21 @@ export async function dispatchStep(stepId: string) {
   }
 
   await appendStepEvent(stepId, 'started', { attempt: attemptNumber, executionId: execution.id })
+
+  // Retrieval evidence: which memories were injected into this prompt exists
+  // only here — persist it on the execution. Best-effort: evidence capture
+  // must never block dispatch.
+  void db.stepExecution
+    .update({
+      where: { id: execution.id },
+      data: {
+        evidence: JSON.stringify({
+          memoryHits: relevantMemoryResult.hits,
+          workingMemory: workingMemory.length > 0,
+        }),
+      },
+    })
+    .catch(() => {})
 
   if (attemptNumber === 1) {
     await db.taskStep.updateMany({
