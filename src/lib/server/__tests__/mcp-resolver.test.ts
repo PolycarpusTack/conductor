@@ -10,7 +10,7 @@ mock.module('@/lib/db', () => ({
 }))
 
 // Import AFTER mocking
-import { executeMcpTool } from '../mcp-resolver'
+import { executeMcpTool, resolveMcpTools } from '../mcp-resolver'
 import { db } from '@/lib/db'
 
 const originalFetch = globalThis.fetch
@@ -244,5 +244,48 @@ describe('executeMcpTool', () => {
 
     await executeMcpTool('myserver__tool__with__underscores', {}, ['conn1'])
     expect(capturedBody?.params?.name).toBe('tool__with__underscores')
+  })
+})
+
+describe('resolveMcpTools — per-tool scopes allowlist (Epic S5)', () => {
+  const TOOLS_RESPONSE = {
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        result: {
+          tools: [
+            { name: 'read_file', description: 'Read' },
+            { name: 'write_file', description: 'Write' },
+            { name: 'list_dir', description: 'List' },
+          ],
+        },
+      }),
+  } as Response
+
+  test('null scopes exposes all tools (back-compat)', async () => {
+    ;(db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockResolvedValue([
+      { id: 'conn1', name: 'fs', endpoint: 'http://localhost:3001', scopes: null },
+    ])
+    setMockFetch(() => Promise.resolve(TOOLS_RESPONSE))
+    const tools = await resolveMcpTools(['conn1'], 'develop')
+    expect(tools.map(t => t.name).sort()).toEqual(['fs__list_dir', 'fs__read_file', 'fs__write_file'])
+  })
+
+  test('scopes allowlist filters to listed raw tool names', async () => {
+    ;(db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockResolvedValue([
+      { id: 'conn1', name: 'fs', endpoint: 'http://localhost:3001', scopes: '["read_file","list_dir"]' },
+    ])
+    setMockFetch(() => Promise.resolve(TOOLS_RESPONSE))
+    const tools = await resolveMcpTools(['conn1'], 'develop')
+    expect(tools.map(t => t.name).sort()).toEqual(['fs__list_dir', 'fs__read_file'])
+  })
+
+  test('empty scopes array disables every tool', async () => {
+    ;(db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockResolvedValue([
+      { id: 'conn1', name: 'fs', endpoint: 'http://localhost:3001', scopes: '[]' },
+    ])
+    setMockFetch(() => Promise.resolve(TOOLS_RESPONSE))
+    const tools = await resolveMcpTools(['conn1'], 'develop')
+    expect(tools).toEqual([])
   })
 })

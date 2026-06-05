@@ -25,6 +25,17 @@ interface McpConnection {
   scopes?: string | null
 }
 
+/** Parses the scopes allowlist; null means "no restriction". */
+export function parseScopes(raw: string | null | undefined): string[] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 // Mode-based tool filtering: which tool operations are allowed per mode
 const MODE_TOOL_FILTERS: Record<string, (toolName: string) => boolean> = {
   analyze: (name) => !name.includes('write') && !name.includes('create') && !name.includes('delete') && !name.includes('update'),
@@ -97,7 +108,15 @@ async function fetchToolsFromMcp(connection: McpConnection): Promise<McpTool[]> 
     const data = await res.json()
 
     // MCP protocol response format
-    const tools = data.result?.tools || data.tools || []
+    let tools = data.result?.tools || data.tools || []
+
+    // Per-tool allowlist (Epic S5): `scopes` holds enabled raw tool names.
+    // null = no restriction (back-compat), [] = everything disabled.
+    const scopes = parseScopes(connection.scopes)
+    if (scopes !== null) {
+      const allowed = new Set(scopes)
+      tools = tools.filter((tool: { name: string }) => allowed.has(tool.name))
+    }
 
     return tools.map((tool: { name: string; description?: string; inputSchema?: Record<string, unknown> }) => ({
       name: `${connection.name}__${tool.name}`,  // Namespace tools by connection
