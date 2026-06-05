@@ -6,8 +6,8 @@
 > codebase as it actually is at that moment — the stale-plan problem from the 2026-04-29 batch
 > taught us that lesson.
 
-**Status:** Roadmap approved-pending-review · Epic 1 plan drafted
-**Baseline:** v0.0.6 (2026-06-05)
+**Status:** ✅ COMPLETE — all 7 epics implemented and released (Epics 1–3 → v0.1.0, Epics 4–7 → v0.2.0, both 2026-06-05). Each epic's plan doc carries its implementation notes and deviations.
+**Baseline:** v0.0.6 (2026-06-05) → **Delivered:** v0.2.0 (2026-06-05)
 
 ---
 
