@@ -984,7 +984,8 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 </Step>
                 <Step title="Add or confirm a runtime.">
                   {' '}Open <em>Settings &rarr; Runtimes</em>. If none exist, add one: pick a provider (Anthropic,
-                  OpenAI, …), paste your API key, give it a label. Your agents will use this to reach a model.
+                  OpenAI, …) and enter the <em>name</em> of the env var that holds your API key on the server
+                  (e.g. <code>ANTHROPIC_API_KEY</code>). Your agents will use this to reach a model.
                 </Step>
                 <Step title="Create an agent.">
                   {' '}<em>Settings &rarr; Agents &rarr; + New Agent</em>. Name it, pick an emoji, choose the runtime
@@ -1061,19 +1062,20 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 settings. You need at least one before agents can do anything.
               </p>
               <Bullets>
-                <li>Click the <Kbd>⚙</Kbd> Settings icon in the top bar &rarr; <em>Runtimes</em> tab.</li>
-                <li>Click <em>+ Add Runtime</em>.</li>
-                <li>Choose a <strong>Provider</strong> (Anthropic, OpenAI, OpenRouter, Ollama, …). Each provider exposes slightly different fields.</li>
-                <li>Paste your <strong>API key</strong>. Keys are stored encrypted at rest and never shown again after save.</li>
-                <li>Pick a default model (e.g. <code>claude-sonnet-4-6</code>). Agents can override this per-agent.</li>
-                <li>Save. The runtime appears in the list with a green dot once a test call succeeds.</li>
+                <li>First, put your provider key in the server&apos;s environment: add <code>ANTHROPIC_API_KEY=sk-…</code> (or your provider&apos;s equivalent) to <code>.env</code> and restart.</li>
+                <li>Click the <Kbd>⚙</Kbd> Settings icon in the top bar &rarr; <em>Runtimes</em> tab &rarr; <em>+ Add Runtime</em>.</li>
+                <li>Choose an <strong>adapter</strong> (Anthropic, OpenAI, Z.ai, Google Gemini, or a custom webhook).</li>
+                <li>Enter the <strong>env var name</strong> — the name, never the key itself. Conductor stores only the reference.</li>
+                <li>Click <strong>discover</strong> to fetch the live model list from the provider, and pick the models agents may use.</li>
+                <li>Save. The runtime appears in the agent-creation picker immediately.</li>
               </Bullets>
 
               <WatchIt>
                 <p>
-                  API keys are money. Treat them like your credit card number — Conductor encrypts them on disk,
-                  but anyone with admin access can trigger calls that burn your quota. Rotate on a schedule,
-                  revoke runtimes you no longer use, and never paste a key anywhere except this screen.
+                  API keys are money — which is exactly why Conductor never stores them. The database holds the
+                  env var <em>name</em>; the secret stays in your server&apos;s environment. Still: anyone with
+                  admin access can trigger calls that burn your quota, so guard the admin password like the
+                  keys themselves, and rotate provider keys on a schedule (just update the env var and restart).
                 </p>
               </WatchIt>
 
@@ -1225,16 +1227,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
               <H3>Delete</H3>
               <p>
-                <em>Drawer &rarr; ⋯ menu &rarr; Delete</em>. Tasks are soft-deleted and kept in the activity log for 30 days,
-                so you can resurrect them from <em>Settings &rarr; Activity</em>.
+                Hover a card and hit the trash icon (or delete from the drawer). You&apos;ll get a confirmation —
+                deletion is <strong>permanent</strong> and takes the task&apos;s steps, executions, and artifacts
+                with it. The activity log keeps the historical record of what happened while it lived.
               </p>
-
-              <H3>Bulk operations</H3>
-              <p>
-                Shift-click cards to multi-select, then use the floating action bar at the bottom to reassign,
-                re-prioritise, or bulk-delete. Bulk moves respect the state machine — an illegal transition is
-                refused with a red toast.
-              </p>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S3)">
+                <p>Soft-delete with a 30-day resurrect window — tracked in the settings-completion roadmap.</p>
+              </Callout>
             </Section>
 
             <Section id="help-task-states" title="Task state machine">
@@ -2056,14 +2055,29 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </Section>
 
             <Section id="help-runtimes-add" title="Adding a runtime">
+              <PlainEnglish>
+                <p>
+                  Plot twist: you never paste an API key into Conductor. You tell it the <em>name of the
+                  environment variable</em> that holds the key (e.g. <code>ANTHROPIC_API_KEY</code>) on the
+                  server. The secret stays in your environment; the database only ever stores the name. This is
+                  more secure than encrypted storage — there&apos;s nothing to leak.
+                </p>
+              </PlainEnglish>
               <Steps>
-                <Step title="Open Settings → Runtimes.">{' '}Click <em>+ Add Runtime</em>.</Step>
-                <Step title="Pick a provider.">{' '}Each provider reveals the fields it needs (API key, endpoint, region, etc.).</Step>
-                <Step title="Paste your key.">{' '}Stored encrypted. Once saved, the key is masked — rotating requires pasting a fresh one.</Step>
-                <Step title="Pick a default model.">{' '}This is what agents use unless they override. Pick carefully — changing the default later doesn&apos;t migrate existing agents.</Step>
-                <Step title="Test.">{' '}Click <em>Test call</em>. Conductor pings the provider with a short prompt. Green check = ready.</Step>
+                <Step title="Set the env var on the server.">{' '}e.g. <code>ANTHROPIC_API_KEY=sk-…</code> in your <code>.env</code>, then restart.</Step>
+                <Step title="Open Settings → Runtimes → + Add Runtime."></Step>
+                <Step title="Pick an adapter.">{' '}Anthropic, OpenAI, Z.ai, Google Gemini, or Custom Webhook.</Step>
+                <Step title="Enter the env var NAME.">{' '}The name, not the key: <code>ANTHROPIC_API_KEY</code>.</Step>
+                <Step title="Discover models.">{' '}For providers that support it, click the discover button — Conductor fetches the live model list with your key so you pick from real options instead of guessing strings.</Step>
                 <Step title="Save.">{' '}Runtime is immediately available in the agent creation picker.</Step>
               </Steps>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S5)">
+                <p>
+                  A one-click connectivity test (the backend ping exists at
+                  <code> /api/admin/runtimes/[id]/health</code> — it just needs a button) and per-runtime usage
+                  rollups.
+                </p>
+              </Callout>
 
               <Callout tone="teal" title="Multiple runtimes per provider are fine">
                 <p>
@@ -2542,12 +2556,16 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 </p>
               </TipBox>
               <Bullets>
-                <li><strong>Project name, colour, description</strong> — shown in the project selector and sidebar.</li>
-                <li><strong>Default mode</strong> — the mode used when a task is dispatched without one.</li>
-                <li><strong>Default chain</strong> — attached to new tasks automatically if no other chain is specified.</li>
-                <li><strong>Retention</strong> — how long to keep activity log entries, artifacts, and step records. Shorter retention saves disk at the cost of debuggability.</li>
-                <li><strong>Delete project</strong> — irreversible. Nuke the whole project, its agents, and all its history. Requires typing the project name to confirm.</li>
+                <li><strong>Project name &amp; description</strong> — editable right here; <em>Save changes</em> updates the selector and sidebar immediately.</li>
+                <li><strong>Tasks summary</strong> — live card counts per column, for a quick health glance without closing the dialog.</li>
               </Bullets>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S1)">
+                <p>
+                  Default mode &amp; default chain for new tasks, artifact/step retention controls, and a
+                  type-the-name delete-project flow. Tracked in
+                  <code> docs/superpowers/plans/2026-06-05-settings-completion-roadmap.md</code>.
+                </p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-agents" title="Settings · Agents">
@@ -2557,11 +2575,14 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 idle, and muted</Ref>.
               </p>
               <Bullets>
-                <li>Table of agents with status dot, active toggle, current task count.</li>
-                <li>Row click opens the agent editor.</li>
-                <li>Per-row menu: rotate key, view activity, duplicate, delete.</li>
-                <li><em>+ New Agent</em> opens the creation wizard.</li>
+                <li>One card per agent with emoji, name, Active badge, and description.</li>
+                <li>Per-row buttons: <strong>activity</strong> (expands an inline dashboard), <strong>edit</strong>, <strong>delete</strong> (with confirmation — deletion also wipes the agent&apos;s key).</li>
+                <li>Key rotation lives on the <em>API Keys</em> tab, next to the keys themselves.</li>
+                <li><em>+ Add Agent</em> opens the creation modal — disabled (with a pointer) until you&apos;ve added a runtime.</li>
               </Bullets>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S2)">
+                <p>Agent duplication (clone a working config) is planned.</p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-api" title="Settings · API keys">
@@ -2577,12 +2598,23 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 button. Full keys are shown exactly once, at rotation time.
               </p>
 
+              <H3>Integration keys (scoped)</H3>
+              <p>
+                For CI pipelines, webhooks, and dashboards — credentials that aren&apos;t an agent and
+                aren&apos;t you. Issue with a label and explicit scopes: <code>read</code> pulls activity,
+                analytics, hosts, and sessions; <code>write</code> creates tasks. The raw key is shown once;
+                revoked keys stay listed for audit.
+              </p>
+
               <H3>Admin session</H3>
               <p>
-                A session cookie issued when you sign in with the admin password. Expires after the configured
-                timeout (<em>Settings &rarr; General &rarr; Admin session timeout</em>). Rotating the admin password
-                invalidates all existing sessions.
+                A session cookie issued when you sign in with the admin password (set via the
+                <code> AGENTBOARD_ADMIN_PASSWORD</code> env var). Sessions last 12 hours. Changing the password
+                (and restarting) invalidates all existing sessions.
               </p>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S2)">
+                <p>In-UI password change and a configurable session timeout.</p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-activity" title="Settings · Activity">
@@ -2594,56 +2626,65 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
               <H3>Features</H3>
               <Bullets>
-                <li><strong>Filter</strong> by actor (agent or user), event type, task, date range.</li>
-                <li><strong>Search</strong> free text inside payloads.</li>
-                <li><strong>Export CSV</strong> — up to 10,000 most recent rows.</li>
-                <li><strong>Resurrect</strong> — for <Term>task.deleted</Term> rows, a button un-deletes the task (if within the retention window).</li>
+                <li><strong>Filter</strong> by level (debug/info/warn/error) and component (task/agent/daemon/wizard/runtime/system).</li>
+                <li><strong>Search</strong> free text across actions and payloads; trace-ID lookup links related events.</li>
+                <li><strong>Export</strong> — JSONL or CSV download of the log.</li>
+                <li><strong>Retention &amp; purge</strong> — pick how long entries live (7 days to forever); old rows purge automatically, or purge now with a button.</li>
+                <li><strong>Dead-lettered steps</strong> — exhausted steps appear at the top of this tab with their last error and a one-click <em>Requeue</em>.</li>
               </Bullets>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S3)">
+                <p>Task soft-delete with resurrect, and a date-range filter in the UI (the export API already supports from/to).</p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-modes" title="Settings · Modes">
               <p>
-                Manage built-in mode defaults and create custom modes. Built-in modes can&apos;t be deleted; you can
-                only override their defaults.
+                Manage the project&apos;s modes — the built-in five plus any custom ones you add.
               </p>
               <Bullets>
-                <li>Default instructions (markdown) merged into every prompt that uses this mode.</li>
-                <li>Tool allowlist shared by all agents when running in this mode.</li>
-                <li>Max attempts for chain steps in this mode.</li>
-                <li>Output format hint.</li>
+                <li><strong>Name, label, colour, icon</strong> — how the mode shows up in pickers and on steps.</li>
+                <li><strong>Instructions</strong> (markdown) — merged into every prompt that uses this mode.</li>
               </Bullets>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S4)">
+                <p>
+                  Per-mode tool allowlist editor (the dispatch-side filtering hook already exists), per-mode max
+                  attempts, and an output-format hint.
+                </p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-runtimes" title="Settings · Runtimes">
               <p>
-                Covered in <Ref href="#help-runtimes-add">Adding a runtime</Ref>. Same page lets you:
+                Covered in <Ref href="#help-runtimes-add">Adding a runtime</Ref>. Same page lets you edit a
+                runtime&apos;s adapter, env-var reference, endpoint, and model list (with live discovery), or
+                delete it. Remember: the key itself lives in the server&apos;s environment — this page stores
+                only the variable name.
               </p>
-              <Bullets>
-                <li>Rotate keys.</li>
-                <li>See recent usage (calls, tokens, cost if the provider reports it).</li>
-                <li>Archive a runtime to hide from pickers without deleting — breaks any agent that still points at it.</li>
-                <li>Delete a runtime — refused if any active agent still uses it.</li>
-              </Bullets>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S5)">
+                <p>Connectivity test button and per-runtime usage stats.</p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-mcp" title="Settings · MCP">
               <p>
-                Manage MCP connections. Covered in <Ref href="#help-mcp-connect">Connecting a server</Ref>. Also on
-                this page:
+                Manage MCP connections: name, type, icon, and the HTTP endpoint Conductor calls
+                <code> tools/list</code> / <code>tools/call</code> against. Agents pick which connections they
+                can see in their own settings.
               </p>
-              <Bullets>
-                <li>Discover refresh — re-fetch the tool list from the server (run after server-side updates).</li>
-                <li>Per-tool usage stats — how often each tool has been called, from which agent.</li>
-                <li>Disable a tool without removing the connection — useful for temporarily gating a risky operation.</li>
-              </Bullets>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S5)">
+                <p>Tool discovery preview in the UI, per-tool enable/disable, and per-tool usage stats.</p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-templates" title="Settings · Templates">
               <p>
-                The one-stop shop for task templates and chain templates. See
-                <Ref href="#help-templates"> Task templates</Ref> and
-                <Ref href="#help-chain-templates"> Chain templates</Ref>.
+                Chain templates live here: create, edit, and delete reusable workflows with a step editor
+                (mode + agent role + instructions per step). See <Ref href="#help-chain-templates">Chain
+                templates</Ref>.
               </p>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S6)">
+                <p>Task templates — saved task forms (title pattern, defaults, attached chain) surfaced in the board&apos;s create flow.</p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-analytics" title="Settings · Analytics">
@@ -2656,14 +2697,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
             <Section id="help-settings-automation" title="Settings · Automation">
               <p>
-                Where auto-dispatch rules live. See <Ref href="#help-automation-dispatch">Auto-dispatch rules</Ref>.
-                Also on this page:
+                The project scheduler: pick a mode (manual / startup / always / scheduled), a poll interval,
+                and — for scheduled mode — a weekly time window. Play/Stop controls the poller directly. Full
+                detail in <Ref href="#help-automation-dispatch">Configuring automation</Ref>.
               </p>
-              <Bullets>
-                <li><strong>Escalation rules</strong> — notify a channel if a <Term>REVIEW</Term> task ages past a threshold.</li>
-                <li><strong>Archive rules</strong> — auto-archive <Term>DONE</Term> tasks after N days.</li>
-                <li><strong>Retry policy defaults</strong> — default backoff and max-attempts applied when chain steps don&apos;t override.</li>
-              </Bullets>
+              <Callout tone="purple" title="🛣 On the roadmap (Epic S7)">
+                <p>A rules engine on top of the scheduler: auto-assign by tag/priority, auto-archive DONE tasks, review-gate escalation, retry-policy defaults.</p>
+              </Callout>
             </Section>
 
             <Section id="help-settings-integrations" title="Settings · Integrations">
@@ -2728,33 +2768,34 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
 
             <Section id="help-daemon-setup" title="Setting up the daemon">
               <Steps>
-                <Step title="Create the agent record.">
-                  {' '}Mark it <Term>DAEMON</Term> in the creation wizard. Conductor generates an API key.
+                <Step title="Create a DAEMON-mode agent.">
+                  {' '}In the agent creation modal, set <em>Invocation mode</em> to <Term>DAEMON</Term>.
                 </Step>
-                <Step title="Install the daemon.">
-                  {' '}Conductor ships a reference daemon (<code>conductor-agent</code>) as an npm package. Install
-                  with <code>bun add -g conductor-agent</code> (or npm). For custom daemons, see the SDK.
-                </Step>
-                <Step title="Configure the daemon.">
-                  {' '}Point it at your Conductor URL and paste the agent key:
-                  <Callout tone="cobalt" title="conductor-agent.config.json">
+                <Step title="Register the daemon (one-time, admin-assisted).">
+                  {' '}Registration is deliberately admin-gated. From <code>mini-services/conductor-daemon</code>:
+                  <Callout tone="cobalt" title="One-time registration">
                     <pre className="text-[11px] font-mono bg-surface/40 p-3 rounded border border-border/30 overflow-x-auto">
-{`{
-  "server": "https://your-conductor.example.com",
-  "agentKey": "ab_xxxxxxxx",
-  "maxConcurrent": 1,
-  "pollIntervalMs": 2000
-}`}
+{`CONDUCTOR_URL=http://localhost:3000 \\
+CONDUCTOR_ADMIN_COOKIE="agentboard_admin_session=…; agentboard_admin_nonce=…" \\
+bun index.ts --register`}
                     </pre>
                   </Callout>
+                  {' '}This prints <code>CONDUCTOR_DAEMON_TOKEN=cd_daemon.…</code> exactly once — save it. The
+                  daemon also persists an installation ID so your machine keeps one durable Host identity.
                 </Step>
-                <Step title="Start the daemon.">
-                  {' '}<code>conductor-agent --config conductor-agent.config.json</code>. It registers,
-                  heartbeats, and starts claiming work. The agent&apos;s status dot turns green in the UI.
+                <Step title="Run the daemon.">
+                  {' '}<code>CONDUCTOR_DAEMON_TOKEN=cd_daemon.… bun index.ts</code>. It heartbeats every 30s and
+                  polls for leased steps every 5s. Watch it appear under <em>Runtime dashboard &rarr; Hosts</em>.
+                </Step>
+                <Step title="(Optional) declare a session policy.">
+                  {' '}On the agent&apos;s runtime config, set <code>sessionPolicy</code> / <code>commandTemplate</code>
+                  {' '}to run steps inside persistent local sessions — output streams into the Sessions tab. Without
+                  a command template the reference daemon runs a safe no-op echo (it never executes step
+                  instructions as shell by default).
                 </Step>
                 <Step title="Keep it running.">
-                  {' '}Under a process manager (systemd, pm2, Windows service) for production, or just a terminal
-                  tab for development.
+                  {' '}Under a process manager (systemd, launchd, a Windows service) for production, or a terminal
+                  tab for development. The README in <code>mini-services/conductor-daemon</code> covers every env var.
                 </Step>
               </Steps>
             </Section>
@@ -2938,45 +2979,51 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
               subtitle="How authentication works in the browser."
             >
               <p>
-                Conductor is admin-password protected. The password is set during installation and changed from
-                <em> Settings &rarr; Security &rarr; Change password</em>. After signing in, your browser carries a
-                session cookie; the cookie is HttpOnly and SameSite=Lax.
+                Conductor is admin-password protected. The password lives in the
+                <code> AGENTBOARD_ADMIN_PASSWORD</code> env var (with an optional separate cookie-signing secret
+                in <code>AGENTBOARD_ADMIN_SESSION_SECRET</code>). After signing in, your browser carries a
+                session cookie — HttpOnly, SameSite=Lax, HMAC-signed.
               </p>
 
               <H3>Session lifetime</H3>
               <Bullets>
-                <li>Default timeout is 12 hours sliding — each request renews the cookie.</li>
-                <li>Change the timeout in <em>Settings &rarr; General</em>. Maximum is 30 days.</li>
-                <li>Changing the password rotates the signing secret, which invalidates every active session.</li>
+                <li>Sessions last 12 hours.</li>
+                <li>Changing the password (and restarting the server) invalidates every active session — the session token is derived from it.</li>
+                <li>Mutating requests additionally pass a same-origin CSRF check, so a malicious site can&apos;t ride your cookie.</li>
               </Bullets>
 
-              <Callout tone="amber" title="Multiple admins">
+              <WatchIt>
                 <p>
-                  Current releases have one shared admin password. Per-user accounts with roles are on the 0.4
-                  roadmap. Until then, share the password narrowly and rotate whenever someone with access
-                  leaves.
+                  Current releases have one shared admin password. Share it narrowly, rotate whenever someone
+                  with access leaves. In-UI password change and per-user accounts are on the roadmap
+                  (settings-completion Epic S2).
                 </p>
-              </Callout>
+              </WatchIt>
             </Section>
 
-            <Section id="help-security-keys" title="Key storage">
-              <p>
-                All sensitive values — runtime API keys, agent keys, MCP connection tokens — are encrypted at rest. Conductor uses a server-side encryption key stored in an
-                environment variable (<code>CONDUCTOR_ENCRYPTION_KEY</code>) or a local KMS endpoint.
-              </p>
+            <Section id="help-security-keys" title="Key storage" subtitle="The short version: Conductor stores hashes and names, never secrets it could leak.">
+              <PlainEnglish>
+                <p>
+                  Two strategies, both ending in &ldquo;the database can&apos;t betray you&rdquo;: keys Conductor
+                  <em> issues</em> (agent, project, integration keys) are stored as one-way hashes; keys Conductor
+                  <em> uses</em> (provider API keys, reaction credentials) are stored as env-var <em>names</em> —
+                  the values live only in the server&apos;s environment.
+                </p>
+              </PlainEnglish>
 
               <H3>What you see vs. what&apos;s stored</H3>
               <Bullets>
-                <li>Full key — shown once at creation or rotation, then never again.</li>
-                <li>Preview — the first 6 and last 4 characters, for identification (<code>ab_1234…abcd</code>).</li>
-                <li>Hash — stored for lookup.</li>
-                <li>Encrypted blob — stored for retrieval when Conductor needs to call out (only HTTP runtimes and MCP connections need to be decrypted at runtime).</li>
+                <li><strong>Full key</strong> — shown once at creation or rotation, then never again. Copy it then or rotate again.</li>
+                <li><strong>Preview</strong> — a short prefix/suffix for identification (<code>ab_1234…abcd</code>).</li>
+                <li><strong>Hash</strong> — SHA-256, stored for lookup and verification. One-way: a database dump can&apos;t reveal a key.</li>
+                <li><strong>Env-var reference</strong> — for provider/runtime keys and reaction secrets (Slack webhooks, Jira tokens, SMTP): the config stores the variable&apos;s <em>name</em>; the value is resolved from the environment at call time.</li>
               </Bullets>
 
-              <H3>Where the encryption key lives</H3>
+              <H3>What to back up</H3>
               <p>
-                Not in the database. If you redeploy with a new encryption key, all stored secrets become
-                unrecoverable and must be re-entered. Back up the key whenever you back up the database.
+                The database (hashes and config) and your <code>.env</code> (the actual provider secrets). Lose
+                the env file and your issued keys still work — but every runtime and reaction needs its secret
+                re-set in the new environment.
               </p>
             </Section>
 
@@ -2985,11 +3032,11 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
                 Rotate early, rotate often.
               </p>
               <Bullets>
-                <li><strong>Agent keys</strong> — <em>Settings &rarr; Agents &rarr; [agent] &rarr; Rotate key</em>. The old key becomes invalid the moment the new one is issued — there is no overlap window, so update the agent&apos;s config before you rotate.</li>
-                <li><strong>Runtime keys</strong> — <em>Settings &rarr; Runtimes &rarr; [runtime] &rarr; Edit &rarr; Paste new key</em>. Old key is discarded on save.</li>
-                <li><strong>Project API key</strong> — <em>Settings &rarr; API Keys &rarr; Rotate</em>. Breaks any external script still using the old key.</li>
-                <li><strong>Admin password</strong> — <em>Settings &rarr; Security &rarr; Change password</em>. Invalidates all active sessions.</li>
-                <li><strong>Encryption key</strong> — done at the filesystem/env-var level. Requires downtime and a one-time re-key of all encrypted rows; see the <em>Operations</em> section of the README.</li>
+                <li><strong>Agent keys</strong> — <em>Settings &rarr; API Keys &rarr; [agent row] &rarr; Rotate</em>. The old key dies the instant the new one is issued — no overlap window, so be ready to update the agent&apos;s config immediately.</li>
+                <li><strong>Project API key</strong> — same tab, <em>Rotate</em>. Breaks any external script still on the old key.</li>
+                <li><strong>Integration (scoped) keys</strong> — no rotation; revoke and issue a fresh one. Revoked keys stay listed for audit.</li>
+                <li><strong>Provider keys (runtimes, reactions)</strong> — rotate at the source: update the env var value on the server and restart. Nothing to change in Conductor — it only knows the variable&apos;s name.</li>
+                <li><strong>Admin password</strong> — change <code>AGENTBOARD_ADMIN_PASSWORD</code> and restart; all sessions are invalidated.</li>
               </Bullets>
             </Section>
 
