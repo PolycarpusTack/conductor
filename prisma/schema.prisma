@@ -342,6 +342,32 @@ model Workspace {
   projects  Project[]
   daemons   Daemon[]
   skills    Skill[]
+  hosts     Host[]
+}
+
+// A durable machine identity. A daemon is a process running on a host;
+// hosts survive daemon restarts and re-registrations (slug = daemon-persisted
+// installation ID, or normalized hostname for legacy daemons).
+model Host {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  slug        String
+  displayName String
+  hostname    String
+  platform    String
+  arch        String?
+  labels      String?   // JSON string[]
+  trustLevel  String    @default("local") // local | lan | remote | cloud
+  status      String    @default("offline") // online | stale | offline (derived; denormalized for list queries)
+  lastSeenAt  DateTime?
+  metadata    String?   // JSON: cpu/memory/os release + latest heartbeat metrics
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  daemons     Daemon[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, status])
 }
 
 enum AgentInvocationMode {
@@ -364,7 +390,12 @@ model Daemon {
   status       String    @default("offline") // offline | online | stale
   createdAt    DateTime  @default(now())
 
+  hostId              String?
+  host                Host?   @relation(fields: [hostId], references: [id], onDelete: SetNull)
+  sessionCapabilities String? // JSON — reserved for Epic 2 (session backends); written by register when provided
+
   @@index([workspaceId, status])
+  @@index([hostId])
 }
 
 // ─── Skills library ───────────────────────────────────────────────────────
