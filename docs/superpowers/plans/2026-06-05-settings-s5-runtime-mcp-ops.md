@@ -13,19 +13,19 @@
 ---
 
 ### Task 1: Scopes enforcement (TDD)
-- [ ] `fetchToolsFromMcp` filters raw tool names by parsed `connection.scopes` (null → all; `[]` → none; else allowlist). Tests in mcp-resolver test file via mock fetch + connection fixtures.
-- [ ] Commit.
+- [x] `fetchToolsFromMcp` filters raw tool names by parsed `connection.scopes` (null → all; `[]` → none; else allowlist). Tests in mcp-resolver test file via mock fetch + connection fixtures.
+- [x] Commit.
 
 ### Task 2: Discovery + usage endpoints
-- [ ] `POST /api/projects/[id]/mcp-connections/[cid]/discover` — admin; calls tools/list; returns `{tools: [{name, description, enabled}]}`; 404 foreign/unknown connection; 502 unreachable server.
-- [ ] `GET /api/projects/[id]/runtimes/usage` — admin; 30-day execution aggregation keyed by runtimeId.
-- [ ] Endpoint tests (auth + shapes).
-- [ ] Commit.
+- [x] `POST /api/projects/[id]/mcp-connections/[cid]/discover` — admin; calls tools/list; returns `{tools: [{name, description, enabled}]}`; 404 foreign/unknown connection; 502 unreachable server.
+- [x] `GET /api/projects/[id]/runtimes/usage` — admin; 30-day execution aggregation keyed by runtimeId.
+- [x] Endpoint tests (auth + shapes).
+- [x] Commit.
 
 ### Task 3: UI
-- [ ] settings-runtimes: per-runtime **Test** button (status dot + latency inline) and a usage line (`N runs · X tokens · $Y · 30d`) from the usage endpoint.
-- [ ] settings-mcp: per-connection **Tools** expander → discover → checkbox list → **Save** writes `scopes` via existing PUT (all-checked saves null to keep back-compat "no restriction").
-- [ ] Commit.
+- [x] settings-runtimes: per-runtime **Test** button (status dot + latency inline) and a usage line (`N runs · X tokens · $Y · 30d`) from the usage endpoint.
+- [x] settings-mcp: per-connection **Tools** expander → discover → checkbox list → **Save** writes `scopes` via existing PUT (all-checked saves null to keep back-compat "no restriction").
+- [x] Commit.
 
 ### Task 4: Wrap-up
-- [ ] Help (Runtimes/MCP settings sections + roadmap callouts) updated; roadmap S5 marked shipped; full verification; commit.
+- [x] Help (Runtimes/MCP settings sections + roadmap callouts) updated; roadmap S5 marked shipped; full verification; commit.

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Trash2, Pencil, Plus, RefreshCw } from 'lucide-react'
+import { Trash2, Pencil, Plus, RefreshCw, Stethoscope } from 'lucide-react'
 import type { RuntimeModel, ProjectRuntime } from '@/types/settings'
 
 interface SettingsRuntimesProps {
@@ -52,6 +52,34 @@ export function SettingsRuntimes({ projectId, runtimes, onRuntimesChange }: Sett
   const [discovering, setDiscovering] = useState(false)
   const [discoveredModels, setDiscoveredModels] = useState<RuntimeModel[]>([])
   const [showDiscovered, setShowDiscovered] = useState(false)
+
+  // S5 ops state: connectivity tests + 30-day usage rollups
+  const [healthResults, setHealthResults] = useState<Record<string, { status: string; latencyMs: number | null; error?: string }>>({})
+  const [testingId, setTestingId] = useState<string | null>(null)
+  const [usage, setUsage] = useState<Record<string, { executions: number; tokens: number; cost: number }>>({})
+
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/runtimes/usage`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => { if (data) setUsage(data.usage) })
+      .catch(() => {})
+  }, [projectId])
+
+  const testRuntime = async (runtimeId: string) => {
+    setTestingId(runtimeId)
+    try {
+      const res = await fetch(`/api/admin/runtimes/${runtimeId}/health`, { cache: 'no-store' })
+      const data = await res.json().catch(() => null)
+      setHealthResults(prev => ({
+        ...prev,
+        [runtimeId]: data ?? { status: 'error', latencyMs: null, error: 'No response' },
+      }))
+    } catch {
+      setHealthResults(prev => ({ ...prev, [runtimeId]: { status: 'error', latencyMs: null, error: 'Request failed' } }))
+    } finally {
+      setTestingId(null)
+    }
+  }
 
   const canDiscover = ADAPTER_OPTIONS.find(a => a.value === adapter)?.canDiscover && apiKeyEnvVar.trim()
 
@@ -201,9 +229,31 @@ export function SettingsRuntimes({ projectId, runtimes, onRuntimesChange }: Sett
               <div className="text-xs text-muted-foreground">
                 {parseModels(runtime.models).length} model{parseModels(runtime.models).length !== 1 ? 's' : ''}: {parseModels(runtime.models).map(m => m.name).join(', ')}
               </div>
+              {usage[runtime.id] && (
+                <div className="text-[10px] text-muted-foreground/60 mt-0.5 font-mono">
+                  30d: {usage[runtime.id].executions} runs · {usage[runtime.id].tokens.toLocaleString()} tokens
+                  {usage[runtime.id].cost > 0 ? ` · $${usage[runtime.id].cost.toFixed(2)}` : ''}
+                </div>
+              )}
+              {healthResults[runtime.id] && (
+                <div className={`text-[10px] mt-0.5 font-mono ${healthResults[runtime.id].status === 'ok' ? 'text-emerald-400' : 'text-[var(--op-red,#F87171)]'}`}>
+                  {healthResults[runtime.id].status === 'ok'
+                    ? `✓ reachable · ${healthResults[runtime.id].latencyMs}ms`
+                    : `✗ ${healthResults[runtime.id].error || healthResults[runtime.id].status}`}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Test connectivity (sends one tiny prompt)"
+              disabled={testingId === runtime.id}
+              onClick={() => testRuntime(runtime.id)}
+            >
+              <Stethoscope className={`h-3 w-3 ${testingId === runtime.id ? 'animate-pulse' : ''}`} />
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => startEdit(runtime)}>
               <Pencil className="h-3 w-3" />
             </Button>

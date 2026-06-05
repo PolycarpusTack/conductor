@@ -213,10 +213,13 @@ export const createProjectMcpSchema = z.object({
   scopes: z.array(z.string()).optional(),
 })
 
-export const updateProjectMcpSchema = createProjectMcpSchema.partial().refine(
-  (v) => Object.keys(v).length > 0,
-  'Provide at least one field',
-)
+export const updateProjectMcpSchema = createProjectMcpSchema
+  .extend({
+    // null clears the allowlist back to "no restriction"
+    scopes: z.array(z.string()).nullable().optional(),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
 
 export const chainTemplateStepSchema = z.object({
   agentId: z.string().optional().nullable(),

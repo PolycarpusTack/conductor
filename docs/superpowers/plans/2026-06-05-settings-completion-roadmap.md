@@ -62,7 +62,7 @@ Per-mode max attempts (feeding step defaults), per-mode tool allowlist editor (t
 enforcement hook in `resolveMcpTools` already filters by mode), output-format hint as
 prompt suffix. Makes modes the policy object the help always described.
 
-### Epic S5 — Runtime & MCP operations
+### Epic S5 — Runtime & MCP operations ✅ SHIPPED 2026-06-05 (per-tool usage stats deferred)
 Per-runtime test call (the `/api/admin/runtimes/[id]/health` ping from v0.0.6 — just needs
 a button!), per-runtime usage rollups from execution logs, MCP tool discovery UI
 (`tools/list` against the endpoint), and per-tool enable/disable persisted to the unused

@@ -2071,13 +2071,12 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <Step title="Discover models.">{' '}For providers that support it, click the discover button — Conductor fetches the live model list with your key so you pick from real options instead of guessing strings.</Step>
                 <Step title="Save.">{' '}Runtime is immediately available in the agent creation picker.</Step>
               </Steps>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S5)">
+              <TipBox>
                 <p>
-                  A one-click connectivity test (the backend ping exists at
-                  <code> /api/admin/runtimes/[id]/health</code> — it just needs a button) and per-runtime usage
-                  rollups.
+                  The stethoscope button on each runtime fires a one-prompt connectivity test and shows the
+                  latency inline; each card also shows its last-30-days usage (runs, tokens, cost).
                 </p>
-              </Callout>
+              </TipBox>
 
               <Callout tone="teal" title="Multiple runtimes per provider are fine">
                 <p>
@@ -2663,9 +2662,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 delete it. Remember: the key itself lives in the server&apos;s environment — this page stores
                 only the variable name.
               </p>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S5)">
-                <p>Connectivity test button and per-runtime usage stats.</p>
-              </Callout>
+              <p className="text-sm">
+                Each runtime card carries a <strong>connectivity test</strong> (one tiny prompt, latency shown
+                inline) and a <strong>30-day usage line</strong> — runs, tokens, and cost where the provider
+                reports it.
+              </p>
             </Section>
 
             <Section id="help-settings-mcp" title="Settings · MCP">
@@ -2674,8 +2675,14 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 <code> tools/list</code> / <code>tools/call</code> against. Agents pick which connections they
                 can see in their own settings.
               </p>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S5)">
-                <p>Tool discovery preview in the UI, per-tool enable/disable, and per-tool usage stats.</p>
+              <p className="text-sm">
+                The wrench button on each connection <strong>discovers the server&apos;s live tool list</strong>{' '}
+                and lets you enable/disable individual tools — unchecked tools are hidden from agents at
+                dispatch. All-checked means &ldquo;no restriction&rdquo;, so new server tools stay available
+                automatically.
+              </p>
+              <Callout tone="purple" title="🛣 Still on the roadmap (Epic S5 leftovers)">
+                <p>Per-tool usage stats.</p>
               </Callout>
             </Section>
 

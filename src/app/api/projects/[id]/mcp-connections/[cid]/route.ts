@@ -24,8 +24,10 @@ export const PUT = withErrorHandling(
     if (parsed.data.config) {
       data.config = JSON.stringify(parsed.data.config)
     }
-    if (parsed.data.scopes) {
-      data.scopes = JSON.stringify(parsed.data.scopes)
+    // scopes semantics: undefined = untouched, null = clear (all tools),
+    // [] = none enabled, [names] = allowlist
+    if (parsed.data.scopes !== undefined) {
+      data.scopes = parsed.data.scopes === null ? null : JSON.stringify(parsed.data.scopes)
     }
 
     const connection = await db.projectMcpConnection.update({
