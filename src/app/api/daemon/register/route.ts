@@ -6,6 +6,7 @@ import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { generateDaemonToken, extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { registerDaemonSchema } from '@/lib/server/daemon-contracts'
+import { upsertHostForDaemon } from '@/lib/server/host-presence'
 
 export const POST = withErrorHandling('api/daemon/register', async (request: Request) => {
   const unauth = await requireAdminSession()
@@ -18,7 +19,7 @@ export const POST = withErrorHandling('api/daemon/register', async (request: Req
     throw badRequest(parsed.error.issues[0]?.message || 'Invalid registration payload')
   }
 
-  const { hostname, platform, version, capabilities, workspaceId } = parsed.data
+  const { hostname, platform, version, capabilities, workspaceId, host, sessionCapabilities } = parsed.data
 
   let resolvedWorkspaceId = workspaceId
   if (!resolvedWorkspaceId) {
@@ -44,6 +45,22 @@ export const POST = withErrorHandling('api/daemon/register', async (request: Req
   const daemonId = randomUUID()
   const token = generateDaemonToken(daemonId)
 
+  // Durable machine identity — legacy daemons (no host block) register
+  // without one and keep hostId = null until they re-register with it.
+  const hostId = host
+    ? await upsertHostForDaemon({
+        workspaceId: resolvedWorkspaceId,
+        installationId: host.installationId,
+        hostname: host.hostname || hostname,
+        displayName: host.displayName,
+        platform,
+        arch: host.arch,
+        labels: host.labels,
+        trustLevel: host.trustLevel,
+        metadata: host.metadata,
+      })
+    : null
+
   const daemon = await db.daemon.create({
     data: {
       id: daemonId,
@@ -56,6 +73,8 @@ export const POST = withErrorHandling('api/daemon/register', async (request: Req
       tokenPreview: token.preview,
       status: 'online',
       lastSeenAt: new Date(),
+      hostId,
+      sessionCapabilities: sessionCapabilities ? JSON.stringify(sessionCapabilities) : null,
     },
   })
 
@@ -63,6 +82,7 @@ export const POST = withErrorHandling('api/daemon/register', async (request: Req
     daemonId: daemon.id,
     token: token.rawToken,
     workspaceId: resolvedWorkspaceId,
+    hostId,
     wsPath: '/api/daemon/ws',
   })
 })

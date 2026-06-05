@@ -5,6 +5,19 @@ export const daemonCapabilitySchema = z.object({
   path: z.string().max(500).optional(),
 })
 
+// Optional host identity block — lets the daemon link itself to a durable
+// machine record. installationId is a daemon-persisted UUID, stable across
+// hostname changes; absent for legacy daemons (slug falls back to hostname).
+export const registerHostSchema = z.object({
+  installationId: z.string().trim().min(1).max(100).optional(),
+  displayName: z.string().trim().min(1).max(255).optional(),
+  hostname: z.string().trim().min(1).max(255).optional(), // defaults to daemon hostname
+  arch: z.string().trim().max(40).optional(),
+  labels: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  trustLevel: z.enum(['local', 'lan', 'remote', 'cloud']).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
 export const registerDaemonSchema = z.object({
   hostname: z.string().trim().min(1).max(255),
   platform: z.enum(['darwin', 'linux', 'win32']),
@@ -14,12 +27,21 @@ export const registerDaemonSchema = z.object({
     daemonCapabilitySchema,
   ),
   workspaceId: z.string().trim().min(1).optional(),
+  host: registerHostSchema.optional(),
+  // Reserved for Epic 2 (session backends) — stored, not yet read
+  sessionCapabilities: z
+    .object({
+      backends: z.array(z.enum(['pty', 'tmux', 'process', 'container'])).max(4),
+      supportsStreaming: z.boolean().optional(),
+    })
+    .optional(),
 })
 
 export const daemonHealthSchema = z.object({
   cpuPct: z.number().min(0).max(100).optional(),
   memMb: z.number().min(0).optional(),
   runningTasks: z.number().int().min(0),
+  activeSessions: z.number().int().min(0).optional(),
 })
 
 export const liveAgentEventSchema = z.discriminatedUnion('type', [

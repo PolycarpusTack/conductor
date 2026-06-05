@@ -10,6 +10,7 @@ export interface DaemonAuthResult {
   workspaceId: string
   hostname: string
   status: string
+  hostId: string | null
 }
 
 function hashToken(value: string): string {
@@ -49,6 +50,7 @@ export async function resolveDaemonByToken(rawToken: string): Promise<DaemonAuth
       workspaceId: true,
       hostname: true,
       status: true,
+      hostId: true,
     },
   })
 
