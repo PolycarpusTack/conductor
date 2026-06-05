@@ -44,6 +44,11 @@ jobs:
         env:
           DATABASE_URL: file:./prisma/ci.db
 
+      - name: Doctor (offline)
+        run: bun scripts/doctor.ts --offline --json
+        env:
+          DATABASE_URL: file:./prisma/ci.db
+
       - name: Build
         run: bun run build
         env:

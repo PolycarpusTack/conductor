@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "test": "bun test",
     "type-check": "tsc --noEmit --incremental false",
+    "doctor": "bun scripts/doctor.ts",
+    "smoke-test": "bun scripts/doctor.ts --smoke",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

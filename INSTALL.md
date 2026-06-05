@@ -84,15 +84,29 @@ Without it the board falls back to manual refresh — everything else works.
 ## 6. Verify
 
 ```bash
-curl http://localhost:3000/api/health
+bun run doctor        # local checks + lenient network checks
+bun run smoke-test    # post-deploy gate: server + realtime must answer
 ```
 
-Expected: `{"status":"ok","db":"ok","env":"ok",...}` — returns HTTP 503 with
-the failing component when degraded.
+The doctor checks runtime, env validation, Prisma client, database
+connectivity, configured LLM runtimes, daemon presence, and (unless
+`--offline`) the live `/api/health` endpoint and the realtime service.
+Exit code 1 only on hard failures; `--json` for machines.
 
-Per-runtime LLM connectivity can be checked from an admin session via
-`GET /api/admin/runtimes/<id>/health` (fires one tiny echo prompt and
-reports latency).
+Raw health endpoint: `curl http://localhost:3000/api/health` (HTTP 503 with
+the failing component when degraded). Per-runtime LLM connectivity can be
+checked from an admin session via `GET /api/admin/runtimes/<id>/health`
+(fires one tiny echo prompt and reports latency).
+
+## 7. Daemons (optional)
+
+Daemon workers run steps on local machines (see
+`mini-services/conductor-daemon/README.md` for the reference implementation,
+registration flow, and session policies). Daemon and host status is visible
+via `bun run doctor`, the Runtime Dashboard's Hosts/Sessions tabs, and
+`GET /api/hosts`. Running the daemon as an OS service (systemd/launchd/
+Windows service) is a manual setup — wrap the `bun index.ts` start command
+in your service manager of choice.
 
 ## Upgrading
 

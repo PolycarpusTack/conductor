@@ -66,3 +66,10 @@ Template tokens: `{{agent.runtimeModel}}`, `{{task.id}}`, `{{step.id}}`, `{{step
 - `backends`: this reference implements `process` only. `pty`/`tmux` need
   native dependencies and are left to real daemon implementations.
 - Executes one step at a time (`busy` gate); concurrency is a real-daemon concern.
+
+## Status & operations
+
+Daemon and host presence is visible via `bun run doctor` (daemon census
+check), the Runtime Dashboard's Hosts/Sessions tabs, and `GET /api/hosts`.
+To run as an OS service, wrap `bun index.ts` in systemd/launchd/a Windows
+service — there is intentionally no installer script in v1.
