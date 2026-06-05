@@ -6,7 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { RefreshCw, Server, Cpu, HardDrive, Activity, Wifi, WifiOff, AlertTriangle } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DaemonLogViewer } from '@/components/daemon-log-viewer'
+import { HostsPanel } from '@/components/host-card'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
 
 interface DaemonInfo {
@@ -78,6 +80,17 @@ export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
   const { daemons, summary } = data
 
   return (
+    <Tabs defaultValue="daemons" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="daemons">Daemons</TabsTrigger>
+        <TabsTrigger value="hosts">Hosts</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="hosts">
+        <HostsPanel />
+      </TabsContent>
+
+      <TabsContent value="daemons">
     <div className="space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-4">
@@ -216,5 +229,7 @@ export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
         </div>
       )}
     </div>
+      </TabsContent>
+    </Tabs>
   )
 }
