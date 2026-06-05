@@ -1,0 +1,198 @@
+import { describe, test, expect, mock, beforeEach } from 'bun:test'
+
+// ---------------------------------------------------------------------------
+// Test target: src/app/api/daemon/steps/route.ts (completion endpoint)
+//
+// Epic 3 additions under test: optional sessionId linkage (ownership-checked)
+// and succeeded/failed/retry_scheduled step events on the daemon path.
+//
+// NOTE: the route imports the REAL dispatch module (advanceChain /
+// resolveTaskStatus) — dispatch has its own real unit tests and must not be
+// module-mocked. The db mock therefore also satisfies dispatch's queries.
+// ---------------------------------------------------------------------------
+
+const mockStepFindUnique = mock(() => Promise.resolve(null)) as any
+const mockStepUpdate = mock(() => Promise.resolve({})) as any
+const mockStepFindMany = mock(() => Promise.resolve([])) as any
+const mockTaskUpdate = mock(() => Promise.resolve({})) as any
+const mockSessionFindUnique = mock(() => Promise.resolve(null)) as any
+const mockSessionUpdate = mock(() => Promise.resolve({})) as any
+const mockStepEventCreate = mock(() => Promise.resolve({ id: 'evt-1' })) as any
+
+mock.module('@/lib/db', () => ({
+  db: {
+    taskStep: {
+      findUnique: mockStepFindUnique,
+      update: mockStepUpdate,
+      findMany: mockStepFindMany,
+      updateMany: () => Promise.resolve({ count: 0 }),
+    },
+    task: {
+      update: mockTaskUpdate,
+      findUnique: () => Promise.resolve(null),
+    },
+    agentSession: {
+      findUnique: mockSessionFindUnique,
+      update: mockSessionUpdate,
+    },
+    stepEvent: {
+      create: mockStepEventCreate,
+      findFirst: () => Promise.resolve(null),
+    },
+    activityLog: { create: () => Promise.resolve({}) },
+  },
+  isPostgresDb: false,
+}))
+
+const mockResolveDaemonByToken = mock(() => Promise.resolve(null)) as any
+const mockExtractDaemonToken = mock(() => 'fake-token') as any
+
+// Full export surface — bun's mock.module registry is shared across files
+mock.module('@/lib/server/daemon-auth', () => ({
+  extractDaemonToken: mockExtractDaemonToken,
+  resolveDaemonByToken: mockResolveDaemonByToken,
+  generateDaemonToken: () => ({ rawToken: 'mock', hash: 'mock', preview: 'mock' }),
+  updateDaemonHeartbeat: () => Promise.resolve(),
+  markDaemonOffline: () => Promise.resolve(),
+  markStaleDaemons: () => Promise.resolve(),
+  sweepStaleDaemonsThrottled: () => Promise.resolve(),
+}))
+
+mock.module('@/lib/server/realtime', () => ({
+  broadcastProjectEvent: mock(() => undefined),
+  isRealtimeConfigured: () => false,
+  createRealtimeToken: () => 'mock-token',
+  verifyRealtimeToken: () => null,
+}))
+
+// Import AFTER all mocks are in place
+import { POST } from '@/app/api/daemon/steps/route'
+
+const DAEMON = { id: 'daemon-1', workspaceId: 'ws-1', hostname: 'devbox', status: 'online', hostId: 'host-1' }
+
+const LEASED_STEP = {
+  id: 'step-1',
+  taskId: 'task-1',
+  status: 'active',
+  leasedBy: 'daemon-1',
+  retryDelayMs: 5000,
+  attempts: 0,
+  task: { projectId: 'p-1' },
+}
+
+beforeEach(() => {
+  mockStepFindUnique.mockReset()
+  mockStepFindUnique.mockResolvedValue(LEASED_STEP)
+  mockStepUpdate.mockReset()
+  mockStepUpdate.mockResolvedValue({})
+  mockStepFindMany.mockReset()
+  mockStepFindMany.mockResolvedValue([])
+  mockSessionFindUnique.mockReset()
+  mockSessionFindUnique.mockResolvedValue(null)
+  mockSessionUpdate.mockReset()
+  mockSessionUpdate.mockResolvedValue({})
+  mockStepEventCreate.mockReset()
+  mockStepEventCreate.mockResolvedValue({ id: 'evt-1' })
+  mockResolveDaemonByToken.mockReset()
+  mockResolveDaemonByToken.mockResolvedValue(DAEMON)
+  mockExtractDaemonToken.mockReset()
+  mockExtractDaemonToken.mockReturnValue('fake-token')
+})
+
+function makeRequest(body: Record<string, unknown>): Request {
+  return new Request('http://localhost/api/daemon/steps', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer fake-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+const params = { params: Promise.resolve({}) }
+
+function eventsOfType(type: string) {
+  return mockStepEventCreate.mock.calls.filter((c: any[]) => c[0].data.event === type)
+}
+
+describe('POST /api/daemon/steps — session linkage', () => {
+  test('403 when sessionId belongs to another daemon', async () => {
+    mockSessionFindUnique.mockResolvedValue({
+      id: 'sess-1', daemonId: 'daemon-OTHER', taskId: null, stepId: null,
+    })
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done', sessionId: 'sess-1' }),
+      params,
+    )
+    expect(res.status).toBe(403)
+    expect(mockStepUpdate).not.toHaveBeenCalled()
+  })
+
+  test('404 when sessionId is unknown', async () => {
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done', sessionId: 'nope' }),
+      params,
+    )
+    expect(res.status).toBe(404)
+  })
+
+  test('stamps task/step on an owned, unlinked session', async () => {
+    mockSessionFindUnique.mockResolvedValue({
+      id: 'sess-1', daemonId: 'daemon-1', taskId: null, stepId: null,
+    })
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done', sessionId: 'sess-1' }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    const update = mockSessionUpdate.mock.calls[0][0]
+    expect(update.data.stepId).toBe('step-1')
+    expect(update.data.taskId).toBe('task-1')
+  })
+})
+
+describe('POST /api/daemon/steps — step events', () => {
+  test('complete appends a succeeded event carrying the sessionId', async () => {
+    mockSessionFindUnique.mockResolvedValue({
+      id: 'sess-1', daemonId: 'daemon-1', taskId: 'task-1', stepId: 'step-1',
+    })
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done', sessionId: 'sess-1' }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    const succeeded = eventsOfType('succeeded')
+    expect(succeeded).toHaveLength(1)
+    const data = JSON.parse(succeeded[0][0].data.data)
+    expect(data.source).toBe('daemon')
+    expect(data.sessionId).toBe('sess-1')
+  })
+
+  test('fail with willRetry appends failed + retry_scheduled events', async () => {
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: true }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(eventsOfType('failed')).toHaveLength(1)
+    expect(eventsOfType('retry_scheduled')).toHaveLength(1)
+    const failData = JSON.parse(eventsOfType('failed')[0][0].data.data)
+    expect(failData.error).toBe('boom')
+    expect(failData.attempt).toBe(1)
+  })
+
+  test('terminal fail appends only the failed event', async () => {
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: false }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(eventsOfType('failed')).toHaveLength(1)
+    expect(eventsOfType('retry_scheduled')).toHaveLength(0)
+  })
+
+  test('403 when step is leased by another daemon', async () => {
+    mockStepFindUnique.mockResolvedValue({ ...LEASED_STEP, leasedBy: 'daemon-OTHER' })
+    const res = await POST(makeRequest({ stepId: 'step-1', action: 'complete', output: 'x' }), params)
+    expect(res.status).toBe(403)
+    expect(mockStepEventCreate).not.toHaveBeenCalled()
+  })
+})

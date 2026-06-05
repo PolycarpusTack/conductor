@@ -7,6 +7,7 @@ import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-au
 import { advanceChain, resolveTaskStatus } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
+import { appendStepEvent } from '@/lib/server/step-events'
 
 const log = getLogger('api/daemon/steps')
 
@@ -18,12 +19,13 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
     if (!daemon) throw unauthorized('Invalid daemon token')
 
     const body = await request.json()
-    const { stepId, action, output, error: errorMsg, willRetry } = body as {
+    const { stepId, action, output, error: errorMsg, willRetry, sessionId } = body as {
       stepId?: string
       action?: 'complete' | 'fail'
       output?: string
       error?: string
       willRetry?: boolean
+      sessionId?: string
     }
 
     if (!stepId || !action) throw badRequest('stepId and action are required')
@@ -36,6 +38,7 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
         status: true,
         leasedBy: true,
         retryDelayMs: true,
+        attempts: true,
         task: { select: { projectId: true } },
       },
     })
@@ -43,6 +46,28 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
     if (!step) throw notFound('Step not found')
 
     if (step.leasedBy !== daemon.id) throw forbidden('Step is not leased by this daemon')
+
+    // Optional session linkage — the durable step↔session evidence link.
+    // Only sessions owned by the calling daemon may be attached.
+    if (sessionId) {
+      const session = await db.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { id: true, daemonId: true, taskId: true, stepId: true },
+      })
+      if (!session) throw notFound('Session not found')
+      if (session.daemonId !== daemon.id) {
+        throw forbidden('Session is owned by a different daemon')
+      }
+      if (!session.stepId || !session.taskId) {
+        await db.agentSession.update({
+          where: { id: sessionId },
+          data: {
+            stepId: session.stepId ?? stepId,
+            taskId: session.taskId ?? step.taskId,
+          },
+        })
+      }
+    }
 
     if (action === 'complete') {
       const truncated = output ? output.length > 5000 : false
@@ -55,6 +80,12 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
           leasedBy: null,
           leasedAt: null,
         },
+      })
+
+      await appendStepEvent(stepId, 'succeeded', {
+        source: 'daemon',
+        daemonId: daemon.id,
+        ...(sessionId ? { sessionId } : {}),
       })
 
       broadcastProjectEvent(step.task.projectId, 'daemon-step-completed', {
@@ -85,6 +116,21 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
           leasedAt: willRetry && retryDelayMs > 0 ? new Date(Date.now() + retryDelayMs) : null,
         },
       })
+
+      await appendStepEvent(stepId, 'failed', {
+        source: 'daemon',
+        daemonId: daemon.id,
+        attempt: step.attempts + 1,
+        error: errorMsg?.slice(0, 500),
+        ...(sessionId ? { sessionId } : {}),
+      })
+      if (willRetry) {
+        await appendStepEvent(stepId, 'retry_scheduled', {
+          source: 'daemon',
+          attempt: step.attempts + 1,
+          delayMs: retryDelayMs,
+        })
+      }
 
       // Daemon-specific event for the runtime dashboard's live log
       broadcastProjectEvent(step.task.projectId, 'daemon-step-failed', {

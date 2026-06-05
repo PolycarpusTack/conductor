@@ -4,6 +4,8 @@ import { db } from '@/lib/db'
 import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { resolveRuntime } from '@/lib/server/daemon-dispatch'
+import { parseSessionPolicy, sessionKeyForStep, resolveCommandTemplate } from '@/lib/server/session-policy'
+import { appendStepEvent } from '@/lib/server/step-events'
 
 /**
  * Daemon polling endpoint. Returns the oldest `active` step that has been
@@ -42,6 +44,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         attempts: true,
         agentId: true,
         traceContext: true,
+        leasedAt: true,
         agent: {
           select: {
             id: true,
@@ -49,7 +52,8 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
             systemPrompt: true,
             modeInstructions: true,
             mcpConnectionIds: true,
-            runtime: { select: { adapter: true } },
+            runtimeModel: true,
+            runtime: { select: { adapter: true, config: true } },
           },
         },
         task: {
@@ -70,6 +74,47 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
 
     const runtime = await resolveRuntime(step.taskId, step.agent?.runtime?.adapter)
 
+    // Session policy from the agent's runtime config; the sessionKey is
+    // computed server-side so reuse semantics live in one place.
+    const policy = parseSessionPolicy(step.agent?.runtime?.config)
+    const session = {
+      policy: policy.sessionPolicy,
+      backend: policy.sessionBackend,
+      sessionKey: sessionKeyForStep(policy, {
+        agentId: step.agentId,
+        taskId: step.taskId,
+        stepId: step.id,
+      }),
+      command: resolveCommandTemplate(policy.commandTemplate, {
+        'agent.runtimeModel': step.agent?.runtimeModel,
+        'task.id': step.taskId,
+        'step.id': step.id,
+        'step.mode': step.mode,
+      }),
+      workingDirectoryPolicy: policy.workingDirectoryPolicy,
+      idleRequiredBeforeCommand: policy.idleRequiredBeforeCommand,
+      maxOutputPreviewChars: policy.maxOutputPreviewChars,
+    }
+
+    // First audit-trail entry on the daemon path (parity with HTTP dispatch).
+    // The daemon re-polls the same leased step until it completes — dedupe by
+    // only emitting once per lease (no started event newer than the lease).
+    const alreadyStarted = await db.stepEvent.findFirst({
+      where: {
+        stepId: step.id,
+        event: 'started',
+        ...(step.leasedAt ? { createdAt: { gte: step.leasedAt } } : {}),
+      },
+      select: { id: true },
+    })
+    if (!alreadyStarted) {
+      await appendStepEvent(step.id, 'started', {
+        source: 'daemon',
+        daemonId: daemon.id,
+        attempt: step.attempts + 1,
+      })
+    }
+
     return NextResponse.json({
       step: {
         id: step.id,
@@ -85,6 +130,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         // daemon continue the trace across the process boundary.
         traceContext: step.traceContext,
         runtime,
+        session,
         agent: step.agent
           ? {
               id: step.agent.id,
