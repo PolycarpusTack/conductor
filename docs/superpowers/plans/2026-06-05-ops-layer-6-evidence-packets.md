@@ -10,6 +10,11 @@
 
 **Tech Stack:** Prisma 7, Next.js 16 App Router, TypeScript 5, Bun test
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - Assembled-on-read instead of the design's stored-blob approach — everything except retrieval context already lives relationally, and a stored packet would go stale as messages/events arrive after execution. Only the ephemeral piece (memory hits) is persisted, on `StepExecution.evidence`.
+> - The Evidence toggle's label doesn't show counts (would require eager-fetching every step's packet); counts appear inside the expanded view instead.
+> - `skillHits` omitted — dispatch performs no skill retrieval today.
+
 ---
 
 ## File Map
@@ -27,26 +32,26 @@
 ---
 
 ### Task 1: Capture retrieval evidence at dispatch
-- [ ] `StepExecution.evidence String?` column; push + generate.
-- [ ] `buildRelevantMemoryWithHits(opts)` → `{ text, hits: Array<{id, category}> }`; `buildRelevantMemory` delegates (unchanged API for other callers/tests).
-- [ ] In `dispatchStep`: use the WithHits variant; after `createExecution`, persist `evidence` JSON `{ memoryHits, workingMemory: workingMemory.length > 0 }` (best-effort — failure must not block dispatch).
-- [ ] Memory tests still green; commit.
+- [x] `StepExecution.evidence String?` column; push + generate.
+- [x] `buildRelevantMemoryWithHits(opts)` → `{ text, hits: Array<{id, category}> }`; `buildRelevantMemory` delegates (unchanged API for other callers/tests).
+- [x] In `dispatchStep`: use the WithHits variant; after `createExecution`, persist `evidence` JSON `{ memoryHits, workingMemory: workingMemory.length > 0 }` (best-effort — failure must not block dispatch).
+- [x] Memory tests still green; commit.
 
 ### Task 2: Evidence assembler (TDD)
-- [ ] `assembleStepEvidence(taskId, stepId)` queries in parallel: executions (with parsed `evidence` + toolCalls), artifacts, step events (parsed data), sessions, task/step messages (with parsed `bodySecurity`).
-- [ ] Derives: `sessionIds` (from sessions + event data), `safetyFlags` (from message security verdicts), per-execution `memoryHits`.
-- [ ] Returns null when the step doesn't belong to the task (scoping).
-- [ ] Tests with mocked db (full-surface factory).
-- [ ] Commit.
+- [x] `assembleStepEvidence(taskId, stepId)` queries in parallel: executions (with parsed `evidence` + toolCalls), artifacts, step events (parsed data), sessions, task/step messages (with parsed `bodySecurity`).
+- [x] Derives: `sessionIds` (from sessions + event data), `safetyFlags` (from message security verdicts), per-execution `memoryHits`.
+- [x] Returns null when the step doesn't belong to the task (scoping).
+- [x] Tests with mocked db (full-surface factory).
+- [x] Commit.
 
 ### Task 3: API + UI
-- [ ] `GET /api/tasks/[id]/steps/[stepId]/evidence` — admin session; 404 unknown/foreign step.
-- [ ] Step viewer: "Evidence" toggle beside execution history; fetches once; renders compact groups (memory hits, tool calls with durations, sessions, messages, safety flags) — counts in the toggle label.
-- [ ] Endpoint auth test (401/200/404).
-- [ ] Commit.
+- [x] `GET /api/tasks/[id]/steps/[stepId]/evidence` — admin session; 404 unknown/foreign step.
+- [x] Step viewer: "Evidence" toggle beside execution history; fetches once; renders compact groups (memory hits, tool calls with durations, sessions, messages, safety flags) — counts in the toggle label.
+- [x] Endpoint auth test (401/200/404).
+- [x] Commit.
 
 ### Task 4: Wrap-up
-- [ ] Full verification; checkboxes; deviations; commit.
+- [x] Full verification; checkboxes; deviations; commit.
 
 ## Out of scope
 - `skillHits` — dispatch performs no skill retrieval today; add when it does.

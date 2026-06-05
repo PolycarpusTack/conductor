@@ -45,6 +45,20 @@ interface StepEventSummary {
   createdAt: string
 }
 
+interface StepEvidencePacket {
+  executions: Array<{
+    id: string
+    attempt: number
+    status: string
+    memoryHits: Array<{ id: string; category: string }>
+    workingMemory: boolean
+    toolCalls: Array<{ toolName: string; durationMs: number | null; error: string | null }>
+  }>
+  sessions: Array<{ id: string; sessionKey: string; backend: string; status: string }>
+  messages: Array<{ id: string; fromAddress: string; toAddress: string; flagged: boolean }>
+  safetyFlags: Array<{ source: string; category: string }>
+}
+
 interface StepArtifactSummary {
   id: string
   type: string
@@ -91,6 +105,8 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
   const [executionHistory, setExecutionHistory] = useState<Record<string, StepExecutionSummary[]>>({})
   const [stepEvents, setStepEvents] = useState<Record<string, StepEventSummary[]>>({})
   const [expandedExecutions, setExpandedExecutions] = useState<Set<string>>(new Set())
+  const [stepEvidence, setStepEvidence] = useState<Record<string, StepEvidencePacket>>({})
+  const [expandedEvidence, setExpandedEvidence] = useState<Set<string>>(new Set())
   const [stepArtifacts, setStepArtifacts] = useState<Record<string, StepArtifactSummary[]>>({})
 
   const fetchExecutions = useCallback(async (stepId: string) => {
@@ -117,12 +133,36 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
     }
   }, [taskId, executionHistory])
 
+  const fetchEvidence = useCallback(async (stepId: string) => {
+    if (stepEvidence[stepId]) {
+      setExpandedEvidence(prev => {
+        const next = new Set(prev)
+        if (next.has(stepId)) next.delete(stepId)
+        else next.add(stepId)
+        return next
+      })
+      return
+    }
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/steps/${stepId}/evidence`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        setStepEvidence(prev => ({ ...prev, [stepId]: data }))
+        setExpandedEvidence(prev => new Set(prev).add(stepId))
+      }
+    } catch (err) {
+      console.error('Error fetching evidence:', err)
+    }
+  }, [taskId, stepEvidence])
+
   // Clear stale execution/artifact data when task changes
   useEffect(() => {
     setExecutionHistory({})
     setStepEvents({})
     setExpandedExecutions(new Set())
     setStepArtifacts({})
+    setStepEvidence({})
+    setExpandedEvidence(new Set())
   }, [taskId])
 
   // Fetch full step data including outputs
@@ -494,6 +534,58 @@ export function StepOutputViewer({ taskId, taskTitle, steps, onClose, onRefresh 
                                   )}
                                 </div>
                               ))}
+
+                              {/* Evidence packet — what did this agent rely on? */}
+                              <button
+                                onClick={() => fetchEvidence(step.id)}
+                                className="text-[10px] font-mono text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                              >
+                                {expandedEvidence.has(step.id) ? '- Hide' : '+ Show'} evidence
+                              </button>
+
+                              {expandedEvidence.has(step.id) && stepEvidence[step.id] && (() => {
+                                const packet = stepEvidence[step.id]
+                                return (
+                                  <div className="rounded border border-border/20 bg-card/10 p-2 text-[10px] font-mono space-y-1.5">
+                                    {packet.executions.map((exec) => (
+                                      <div key={exec.id}>
+                                        <span className="font-bold">#{exec.attempt}</span>{' '}
+                                        <span className="text-muted-foreground">
+                                          {exec.memoryHits.length} memor{exec.memoryHits.length === 1 ? 'y' : 'ies'}
+                                          {exec.memoryHits.length > 0 && ` (${[...new Set(exec.memoryHits.map(h => h.category))].join(', ')})`}
+                                          {exec.workingMemory ? ' · working memory' : ''}
+                                          {exec.toolCalls.length > 0 && ` · ${exec.toolCalls.length} tool call${exec.toolCalls.length !== 1 ? 's' : ''}`}
+                                        </span>
+                                        {exec.toolCalls.map((t, i) => (
+                                          <div key={i} className="pl-3 text-muted-foreground/60">
+                                            {t.toolName}
+                                            {t.durationMs != null && ` · ${t.durationMs}ms`}
+                                            {t.error && <span className="text-[var(--op-red)]"> · {t.error}</span>}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ))}
+                                    {packet.sessions.length > 0 && (
+                                      <div className="text-muted-foreground">
+                                        sessions: {packet.sessions.map(s => `${s.sessionKey} (${s.backend}, ${s.status})`).join(', ')}
+                                      </div>
+                                    )}
+                                    {packet.messages.length > 0 && (
+                                      <div className="text-muted-foreground">
+                                        messages: {packet.messages.map(m => `${m.fromAddress}→${m.toAddress}${m.flagged ? ' ⚠' : ''}`).join(', ')}
+                                      </div>
+                                    )}
+                                    {packet.safetyFlags.length > 0 && (
+                                      <div className="text-[var(--op-red)]">
+                                        safety: {packet.safetyFlags.map(f => `${f.category} (${f.source})`).join(', ')}
+                                      </div>
+                                    )}
+                                    {packet.executions.length === 0 && packet.sessions.length === 0 && packet.messages.length === 0 && (
+                                      <div className="text-muted-foreground/50">no evidence recorded</div>
+                                    )}
+                                  </div>
+                                )
+                              })()}
 
                               {/* Event timeline (append-only audit trail) */}
                               {(stepEvents[step.id]?.length ?? 0) > 0 && (
