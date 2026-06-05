@@ -2643,13 +2643,15 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
               <Bullets>
                 <li><strong>Name, label, colour, icon</strong> — how the mode shows up in pickers and on steps.</li>
                 <li><strong>Instructions</strong> (markdown) — merged into every prompt that uses this mode.</li>
+                <li><strong>Max attempts</strong> — the default retry budget for steps created in this mode. A step’s own <em>maxRetries</em> still wins; blank falls back to the global default of 2.</li>
+                <li><strong>Output format</strong> — markdown / JSON / diff / plain. Appended to the prompt as a one-line hint (“Respond in json format.”). A nudge, not a guarantee — validate downstream if a machine consumes the output.</li>
+                <li><strong>Tool allowlist</strong> — one namespaced pattern per line: <code>github__create_issue</code> for an exact tool, <code>filesystem__*</code> for everything on a connection. Blank means no restriction. This narrows <em>on top of</em> the built-in mode heuristics (read-only modes like <Term>analyze</Term> already lose write-ish tools) and the per-connection tool toggles — a tool must survive all three filters to reach the agent.</li>
               </Bullets>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S4)">
-                <p>
-                  Per-mode tool allowlist editor (the dispatch-side filtering hook already exists), per-mode max
-                  attempts, and an output-format hint.
-                </p>
-              </Callout>
+              <TipBox>
+                Use the allowlist to make a mode <em>provably</em> narrow: a <Term>review</Term> mode allowed only
+                <code> github__get_pull_request</code> and <code>github__create_review_comment</code> cannot merge,
+                push, or delete anything no matter what the prompt says.
+              </TipBox>
             </Section>
 
             <Section id="help-settings-runtimes" title="Settings · Runtimes">

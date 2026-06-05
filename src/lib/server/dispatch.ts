@@ -136,7 +136,12 @@ export async function dispatchStep(stepId: string) {
     ? safeJsonParse<Record<string, string>>(agent.modeInstructions, {})[step.mode] ?? null
     : null
 
-  const modeInstructions = agentModeInstructions || projectMode?.instructions || ''
+  let modeInstructions = agentModeInstructions || projectMode?.instructions || ''
+
+  // Mode policy (Epic S4): output-format hint rides the mode-instruction layer
+  if (projectMode?.outputFormat) {
+    modeInstructions = `${modeInstructions}\nRespond in ${projectMode.outputFormat} format.`.trim()
+  }
 
   const capabilities = agent.capabilities
     ? safeJsonParse<string[]>(agent.capabilities, []).join(', ')
@@ -184,7 +189,10 @@ export async function dispatchStep(stepId: string) {
     ? safeJsonParse<string[]>(agent.mcpConnectionIds, [])
     : []
 
-  const tools = await resolveMcpTools(mcpConnectionIds, step.mode)
+  // Mode policy (Epic S4): the mode's explicit allowlist narrows the
+  // built-in heuristics further (layers compose).
+  const modeToolAllowlist = safeJsonParse<string[] | null>(projectMode?.toolAllowlist ?? null, null)
+  const tools = await resolveMcpTools(mcpConnectionIds, step.mode, modeToolAllowlist)
 
   const runtimeConfig: Record<string, unknown> = {
     ...safeJsonParse<Record<string, unknown>>(runtime.config, {}),

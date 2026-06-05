@@ -35,8 +35,13 @@ export const POST = withErrorHandling(
       throw badRequest(parsed.error.issues[0]?.message || 'Invalid mode payload')
     }
 
+    const { toolAllowlist, ...rest } = parsed.data
     const mode = await db.projectMode.create({
-      data: { ...parsed.data, projectId: id },
+      data: {
+        ...rest,
+        toolAllowlist: toolAllowlist ? JSON.stringify(toolAllowlist) : null,
+        projectId: id,
+      },
     })
 
     return NextResponse.json(mode)

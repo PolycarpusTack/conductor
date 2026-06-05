@@ -20,9 +20,16 @@ export const PUT = withErrorHandling(
       throw badRequest(parsed.error.issues[0]?.message || 'Invalid mode payload')
     }
 
+    const { toolAllowlist, ...rest } = parsed.data
     const mode = await db.projectMode.update({
       where: { id: modeId },
-      data: parsed.data,
+      data: {
+        ...rest,
+        // undefined = untouched; null clears; array persists as JSON
+        ...(toolAllowlist !== undefined
+          ? { toolAllowlist: toolAllowlist === null ? null : JSON.stringify(toolAllowlist) }
+          : {}),
+      },
     })
 
     return NextResponse.json(mode)

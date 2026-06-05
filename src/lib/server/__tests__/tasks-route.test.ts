@@ -20,6 +20,8 @@ const mockTxTaskStepFindMany = mock(() => Promise.resolve([])) as any
 const mockTxTaskStepUpdate = mock(() => Promise.resolve({})) as any
 const mockTxTaskFindUniqueOrThrow = mock(() => Promise.resolve({})) as any
 
+const mockTxModeFindMany = mock(() => Promise.resolve([])) as any
+
 const txShape = {
   task: {
     findFirst: mockTxTaskFindFirst,
@@ -31,6 +33,7 @@ const txShape = {
     findMany: mockTxTaskStepFindMany,
     update: mockTxTaskStepUpdate,
   },
+  projectMode: { findMany: mockTxModeFindMany },
 }
 
 const mockTransaction = mock((cb: (tx: typeof txShape) => unknown) => cb(txShape)) as any
@@ -133,6 +136,8 @@ beforeEach(() => {
   mockActivityLogCreate.mockResolvedValue({})
   mockProjectFindUnique.mockReset()
   mockProjectFindUnique.mockResolvedValue(null)
+  mockTxModeFindMany.mockReset()
+  mockTxModeFindMany.mockResolvedValue([])
 })
 
 // ---------------------------------------------------------------------------
@@ -371,5 +376,31 @@ describe('POST /api/tasks — default step for agent-assigned tasks', () => {
     expect(mockTxTaskStepCreateMany).not.toHaveBeenCalled()
     expect(mockTxTaskCreate.mock.calls[0][0].data.status).toBe('BACKLOG')
     expect(mockStartChain).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/tasks — per-mode maxAttempts default (Epic S4)', () => {
+  test('steps inherit the mode maxAttempts when not explicitly set', async () => {
+    mockTxModeFindMany.mockResolvedValue([{ name: 'develop', maxAttempts: 5 }])
+    mockTxTaskStepFindMany.mockResolvedValue([{ id: 'db-step-0', order: 1 }])
+
+    const res = await POST(
+      makeRequest({ title: 'retry test', projectId: 'proj-1', steps: [{ mode: 'develop' }] }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTxTaskStepCreateMany.mock.calls[0][0].data[0].maxRetries).toBe(5)
+  })
+
+  test('explicit step maxRetries wins over the mode default', async () => {
+    mockTxModeFindMany.mockResolvedValue([{ name: 'develop', maxAttempts: 5 }])
+    mockTxTaskStepFindMany.mockResolvedValue([{ id: 'db-step-0', order: 1 }])
+
+    const res = await POST(
+      makeRequest({ title: 'retry test', projectId: 'proj-1', steps: [{ mode: 'develop', maxRetries: 1 }] }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTxTaskStepCreateMany.mock.calls[0][0].data[0].maxRetries).toBe(1)
   })
 })

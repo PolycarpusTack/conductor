@@ -21,6 +21,9 @@ export function SettingsModes({ projectId, modes, onModesChange }: SettingsModes
   const [color, setColor] = useState('#60A5FA')
   const [icon, setIcon] = useState('')
   const [instructions, setInstructions] = useState('')
+  const [maxAttempts, setMaxAttempts] = useState('')
+  const [outputFormat, setOutputFormat] = useState('')
+  const [toolAllowlist, setToolAllowlist] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const colors = ['#60A5FA', '#F59E0B', '#4ADE80', '#2DD4BF', '#A78BFA', '#F87171', '#9BAAC4']
@@ -31,7 +34,20 @@ export function SettingsModes({ projectId, modes, onModesChange }: SettingsModes
     setColor('#60A5FA')
     setIcon('')
     setInstructions('')
+    setMaxAttempts('')
+    setOutputFormat('')
+    setToolAllowlist('')
     setError(null)
+  }
+
+  const parseAllowlist = (raw: string | null | undefined): string => {
+    if (!raw) return ''
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed.join('\n') : ''
+    } catch {
+      return ''
+    }
   }
 
   const startEdit = (mode: ProjectMode) => {
@@ -41,7 +57,22 @@ export function SettingsModes({ projectId, modes, onModesChange }: SettingsModes
     setColor(mode.color)
     setIcon(mode.icon || '')
     setInstructions(mode.instructions || '')
+    setMaxAttempts(mode.maxAttempts != null ? String(mode.maxAttempts) : '')
+    setOutputFormat(mode.outputFormat || '')
+    setToolAllowlist(parseAllowlist(mode.toolAllowlist))
     setCreating(false)
+  }
+
+  // Mode policy (Epic S4): blank fields mean "no override" — sent as null so
+  // the PUT route clears any previously-set value.
+  const buildPolicyPayload = () => {
+    const patterns = toolAllowlist.split('\n').map(l => l.trim()).filter(Boolean)
+    const attempts = parseInt(maxAttempts, 10)
+    return {
+      maxAttempts: Number.isFinite(attempts) && attempts >= 1 ? attempts : null,
+      outputFormat: outputFormat || null,
+      toolAllowlist: patterns.length > 0 ? patterns : null,
+    }
   }
 
   const handleSave = async () => {
@@ -51,7 +82,7 @@ export function SettingsModes({ projectId, modes, onModesChange }: SettingsModes
         const res = await fetch(`/api/projects/${projectId}/modes/${editing}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, label, color, icon: icon || undefined, instructions: instructions || undefined }),
+          body: JSON.stringify({ name, label, color, icon: icon || undefined, instructions: instructions || undefined, ...buildPolicyPayload() }),
         })
         if (!res.ok) throw new Error((await res.json()).error || 'Failed to update mode')
         const updated = await res.json()
@@ -60,7 +91,7 @@ export function SettingsModes({ projectId, modes, onModesChange }: SettingsModes
         const res = await fetch(`/api/projects/${projectId}/modes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, label, color, icon: icon || undefined, instructions: instructions || undefined }),
+          body: JSON.stringify({ name, label, color, icon: icon || undefined, instructions: instructions || undefined, ...buildPolicyPayload() }),
         })
         if (!res.ok) throw new Error((await res.json()).error || 'Failed to create mode')
         const created = await res.json()
@@ -100,6 +131,15 @@ export function SettingsModes({ projectId, modes, onModesChange }: SettingsModes
             <div>
               <div className="text-sm font-medium">{mode.label}</div>
               <div className="text-xs text-muted-foreground font-mono">{mode.name}</div>
+              {(mode.maxAttempts != null || mode.outputFormat || mode.toolAllowlist) && (
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  {[
+                    mode.maxAttempts != null ? `${mode.maxAttempts} attempts` : null,
+                    mode.outputFormat ? `→ ${mode.outputFormat}` : null,
+                    mode.toolAllowlist ? 'tool allowlist' : null,
+                  ].filter(Boolean).join(' · ')}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -145,6 +185,36 @@ export function SettingsModes({ projectId, modes, onModesChange }: SettingsModes
             <label className="text-xs font-medium text-muted-foreground">Default Instructions</label>
             <Textarea value={instructions} onChange={e => setInstructions(e.target.value)}
               placeholder="Instructions injected when this mode is used..." rows={2} className="mt-1" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Max attempts</label>
+              <Input type="number" min={1} max={20} value={maxAttempts}
+                onChange={e => setMaxAttempts(e.target.value)}
+                placeholder="2 (default)" className="mt-1" />
+              <p className="text-[10px] text-muted-foreground mt-1">Default retries for steps in this mode. Blank = global default (2).</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Output format</label>
+              <select value={outputFormat} onChange={e => setOutputFormat(e.target.value)}
+                className="mt-1 w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                <option value="">No preference</option>
+                <option value="markdown">Markdown</option>
+                <option value="json">JSON</option>
+                <option value="diff">Diff</option>
+                <option value="plain">Plain text</option>
+              </select>
+              <p className="text-[10px] text-muted-foreground mt-1">Appended to the prompt as a format hint.</p>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Tool allowlist</label>
+            <Textarea value={toolAllowlist} onChange={e => setToolAllowlist(e.target.value)}
+              placeholder={'One pattern per line, e.g.\ngithub__create_issue\nfilesystem__*'}
+              rows={3} className="mt-1 font-mono text-xs" />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Namespaced MCP tool patterns (<code>connection__tool</code> or <code>connection__*</code>). Blank = all tools allowed (mode heuristics still apply).
+            </p>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => { setEditing(null); setCreating(false); resetForm() }}>Cancel</Button>

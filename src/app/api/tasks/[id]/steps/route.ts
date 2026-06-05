@@ -133,6 +133,14 @@ export const POST = withErrorHandling(
       }
     }
 
+    // Mode policy (Epic S4): per-mode maxAttempts feeds the retry default
+    const modeRow = parsed.data.maxRetries === undefined
+      ? await db.projectMode.findFirst({
+          where: { project: { tasks: { some: { id } } }, name: parsed.data.mode },
+          select: { maxAttempts: true },
+        })
+      : null
+
     const step = await db.taskStep.create({
       data: {
         taskId: id,
@@ -142,7 +150,7 @@ export const POST = withErrorHandling(
         mode: parsed.data.mode,
         instructions: parsed.data.instructions || null,
         autoContinue: parsed.data.autoContinue ?? (parsed.data.mode !== 'human'),
-        maxRetries: parsed.data.maxRetries ?? 2,
+        maxRetries: parsed.data.maxRetries ?? modeRow?.maxAttempts ?? 2,
         retryDelayMs: parsed.data.retryDelayMs ?? 5000,
         timeoutMs: parsed.data.timeoutMs ?? 300000,
         nextSteps: nextSteps.length > 0 ? JSON.stringify(nextSteps) : null,

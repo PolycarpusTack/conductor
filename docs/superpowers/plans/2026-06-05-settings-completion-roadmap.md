@@ -57,10 +57,11 @@ Task soft-delete (`deletedAt`) with a 30-day resurrect window surfaced in the Ac
 plus a date-range filter in the activity UI (API already supports it). The help originally
 *claimed* soft-delete existed; users will expect it.
 
-### Epic S4 — Mode policy depth
-Per-mode max attempts (feeding step defaults), per-mode tool allowlist editor (the
-enforcement hook in `resolveMcpTools` already filters by mode), output-format hint as
-prompt suffix. Makes modes the policy object the help always described.
+### Epic S4 — Mode policy depth ✅ SHIPPED 2026-06-05
+Per-mode max attempts (feeding step defaults in both task-create and step-add routes),
+per-mode tool allowlist editor (exact + `conn__*` prefix patterns, layered after the
+`resolveMcpTools` mode heuristics), output-format hint appended to mode instructions.
+Makes modes the policy object the help always described.
 
 ### Epic S5 — Runtime & MCP operations ✅ SHIPPED 2026-06-05 (per-tool usage stats deferred)
 Per-runtime test call (the `/api/admin/runtimes/[id]/health` ping from v0.0.6 — just needs

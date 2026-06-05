@@ -181,6 +181,10 @@ export const createProjectModeSchema = z.object({
   color: colorSchema.optional(),
   icon: z.string().max(16).optional(),
   instructions: z.string().max(5000).optional(),
+  // Mode policy (Epic S4)
+  maxAttempts: z.number().int().min(1).max(20).nullable().optional(),
+  toolAllowlist: z.array(z.string().trim().min(1).max(120)).max(50).nullable().optional(),
+  outputFormat: z.enum(['markdown', 'json', 'diff', 'plain']).nullable().optional(),
 })
 
 export const updateProjectModeSchema = createProjectModeSchema.partial().refine(

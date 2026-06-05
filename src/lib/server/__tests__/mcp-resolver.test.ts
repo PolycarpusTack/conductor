@@ -289,3 +289,47 @@ describe('resolveMcpTools — per-tool scopes allowlist (Epic S5)', () => {
     expect(tools).toEqual([])
   })
 })
+
+describe('resolveMcpTools — per-mode tool allowlist (Epic S4)', () => {
+  const FS_TOOLS = {
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        result: {
+          tools: [
+            { name: 'read_file' },
+            { name: 'list_dir' },
+            { name: 'search' },
+          ],
+        },
+      }),
+  } as Response
+
+  beforeEach(() => {
+    ;(db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockResolvedValue([
+      { id: 'conn1', name: 'fs', endpoint: 'http://localhost:3001', scopes: null },
+    ])
+    setMockFetch(() => Promise.resolve(FS_TOOLS))
+  })
+
+  test('null allowlist leaves the heuristic result untouched', async () => {
+    const tools = await resolveMcpTools(['conn1'], 'develop', null)
+    expect(tools).toHaveLength(3)
+  })
+
+  test('exact pattern narrows to listed tools', async () => {
+    const tools = await resolveMcpTools(['conn1'], 'develop', ['fs__read_file'])
+    expect(tools.map(t => t.name)).toEqual(['fs__read_file'])
+  })
+
+  test('prefix glob matches a connection namespace', async () => {
+    const tools = await resolveMcpTools(['conn1'], 'develop', ['fs__*'])
+    expect(tools).toHaveLength(3)
+  })
+
+  test('composes with the read-only mode heuristic', async () => {
+    // analyze strips nothing here (no write-ish names), but allowlist still narrows
+    const tools = await resolveMcpTools(['conn1'], 'analyze', ['fs__search'])
+    expect(tools.map(t => t.name)).toEqual(['fs__search'])
+  })
+})

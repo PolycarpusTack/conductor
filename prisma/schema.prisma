@@ -140,6 +140,10 @@ model ProjectMode {
   color        String   @default("#60A5FA")
   icon         String?
   instructions String?
+  // Mode policy (Epic S4)
+  maxAttempts   Int? // default maxRetries for steps created in this mode
+  toolAllowlist String? // JSON string[]: namespaced tool patterns ("conn__tool", "conn__*"); null = no restriction
+  outputFormat  String? // markdown | json | diff | plain — appended as a prompt hint
   createdAt    DateTime @default(now())
 
   @@unique([projectId, name])

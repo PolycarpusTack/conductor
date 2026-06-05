@@ -46,9 +46,18 @@ const MODE_TOOL_FILTERS: Record<string, (toolName: string) => boolean> = {
   human: () => false, // No tools for human steps
 }
 
+/** Matches a namespaced tool name against an allowlist pattern (exact or `prefix*`). */
+export function matchesToolPattern(toolName: string, pattern: string): boolean {
+  if (pattern.endsWith('*')) {
+    return toolName.startsWith(pattern.slice(0, -1))
+  }
+  return toolName === pattern
+}
+
 export async function resolveMcpTools(
   mcpConnectionIds: string[],
   mode: string,
+  toolAllowlist?: string[] | null,
 ): Promise<McpTool[]> {
   if (mcpConnectionIds.length === 0) return []
 
@@ -56,7 +65,7 @@ export async function resolveMcpTools(
     where: { id: { in: mcpConnectionIds } },
   })
 
-  const allTools: McpTool[] = []
+  let allTools: McpTool[] = []
 
   for (const connection of connections) {
     try {
@@ -68,10 +77,18 @@ export async function resolveMcpTools(
     }
   }
 
-  // Filter tools based on mode permissions
+  // Layer 1: built-in mode heuristics (read-only modes lose write-ish tools)
   const modeFilter = MODE_TOOL_FILTERS[mode]
   if (modeFilter) {
-    return allTools.filter(tool => modeFilter(tool.name.toLowerCase()))
+    allTools = allTools.filter(tool => modeFilter(tool.name.toLowerCase()))
+  }
+
+  // Layer 2 (Epic S4): the mode's explicit allowlist narrows further.
+  // Patterns are namespaced names, exact or prefix glob ("conn__*").
+  if (toolAllowlist && toolAllowlist.length > 0) {
+    allTools = allTools.filter(tool =>
+      toolAllowlist.some(pattern => matchesToolPattern(tool.name, pattern)),
+    )
   }
 
   return allTools

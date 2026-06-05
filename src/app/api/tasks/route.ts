@@ -166,6 +166,13 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
         // links back to the HTTP request that created it.
         const traceContext = captureTraceContext()
 
+        // Mode policy (Epic S4): per-mode maxAttempts feeds the retry default
+        const modeRows = await tx.projectMode.findMany({
+          where: { projectId, name: { in: [...new Set(steps.map(s => s.mode))] } },
+          select: { name: true, maxAttempts: true },
+        })
+        const modeMaxAttempts = new Map(modeRows.map(m => [m.name, m.maxAttempts]))
+
         // Create steps without edge data first
         await tx.taskStep.createMany({
           data: steps.map((step, index) => ({
@@ -177,7 +184,7 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
             mode: step.mode,
             instructions: step.instructions || null,
             autoContinue: step.autoContinue ?? (step.mode !== 'human'),
-            maxRetries: step.maxRetries ?? 2,
+            maxRetries: step.maxRetries ?? modeMaxAttempts.get(step.mode) ?? 2,
             retryDelayMs: step.retryDelayMs ?? 5000,
             timeoutMs: step.timeoutMs ?? 300000,
             isParallelRoot: step.isParallelRoot ?? false,

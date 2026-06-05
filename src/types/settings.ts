@@ -9,6 +9,9 @@ export interface ProjectMode {
   color: string
   icon?: string | null
   instructions?: string | null
+  maxAttempts?: number | null
+  toolAllowlist?: string | null // JSON string[] of namespaced tool patterns
+  outputFormat?: string | null
 }
 
 export interface RuntimeModel {
