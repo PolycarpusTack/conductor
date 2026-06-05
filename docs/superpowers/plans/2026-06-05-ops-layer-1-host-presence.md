@@ -10,6 +10,12 @@
 
 **Tech Stack:** Prisma 7, Next.js 16 App Router, TypeScript 5, Zod 4, Bun test
 
+> **Implemented 2026-06-05.** Deviations from the plan as written:
+> - Host status thresholds are deliberately MORE lenient than the daemon sweep (online <2 min, stale <10 min vs the daemon's 30s) rather than identical — a machine shouldn't flap offline because one heartbeat was late. Constants live in `host-presence.ts` with a comment relating them to the daemon cadence.
+> - Heartbeat metrics reuse the existing `daemonHealthSchema` (extended with optional `activeSessions`) instead of adding a parallel `metrics` object — daemons already send cpuPct/memMb/runningTasks there.
+> - Register-with-host and heartbeat-touches-host behavior is covered by the host-presence unit tests (the daemon route layer is a thin pass-through); no separate daemon route test file was added.
+> - `trustLevel` is set at host creation and never overwritten by re-register — admin-managed after that.
+
 ---
 
 ## File Map
@@ -33,7 +39,7 @@
 
 ### Task 1: Schema — Host model + Daemon link
 
-- [ ] **Step 1: Add `Host` and extend `Daemon` in `prisma/schema.prisma`**
+- [x] **Step 1: Add `Host` and extend `Daemon` in `prisma/schema.prisma`**
 
 ```prisma
 model Host {
@@ -68,58 +74,58 @@ sessionCapabilities String? // JSON — reserved for Epic 2; written by register
 ```
 plus `@@index([hostId])`. Add `hosts Host[]` to `Workspace`.
 
-- [ ] **Step 2:** `bun run db:push && bun run db:generate`
-- [ ] **Step 3:** Type-check clean.
-- [ ] **Step 4:** Commit `feat(schema): add Host model and Daemon.hostId for machine presence`.
+- [x] **Step 2:** `bun run db:push && bun run db:generate`
+- [x] **Step 3:** Type-check clean.
+- [x] **Step 4:** Commit `feat(schema): add Host model and Daemon.hostId for machine presence`.
 
 ---
 
 ### Task 2: host-presence service (TDD)
 
-- [ ] **Step 1: Failing tests** in `src/lib/server/__tests__/host-presence.test.ts` (mock `@/lib/db` with FULL export surface — `{ db, isPostgresDb }`):
+- [x] **Step 1: Failing tests** in `src/lib/server/__tests__/host-presence.test.ts` (mock `@/lib/db` with FULL export surface — `{ db, isPostgresDb }`):
   - `upsertHostForDaemon` creates a host keyed by `(workspaceId, slug)` and returns its id
   - second call with same slug updates `hostname/platform/lastSeenAt`, does not duplicate
   - slug falls back to normalized hostname when no installation id provided
   - `touchHost` updates `lastSeenAt` + merges heartbeat metrics into `metadata`, sets status `online`
   - `deriveHostStatus(lastSeenAt)` → `online` (<2 min), `stale` (<10 min), `offline` (else) — thresholds shared with daemon staleness constants
-- [ ] **Step 2:** Implement `src/lib/server/host-presence.ts`. Export the threshold constants from one place (reuse/move the values used by `sweepStaleDaemonsThrottled` so daemon and host agree).
-- [ ] **Step 3:** Tests green; commit `feat: add host-presence service (upsert, touch, status derivation)`.
+- [x] **Step 2:** Implement `src/lib/server/host-presence.ts`. Export the threshold constants from one place (reuse/move the values used by `sweepStaleDaemonsThrottled` so daemon and host agree).
+- [x] **Step 3:** Tests green; commit `feat: add host-presence service (upsert, touch, status derivation)`.
 
 ---
 
 ### Task 3: Wire register + heartbeat
 
-- [ ] **Step 1:** Extend `registerDaemonSchema` with optional `host: { installationId?, displayName?, hostname, platform, arch?, labels?, trustLevel?, metadata? }`. Heartbeat schema gains optional `metrics: { activeSessions?, inFlightSteps?, cpuPct?, memoryMb? }`.
-- [ ] **Step 2:** In `register/route.ts`: after daemon create, `upsertHostForDaemon()` and set `daemon.hostId`. Legacy daemons (no `host` in payload) still register fine with `hostId = null`.
-- [ ] **Step 3:** In `heartbeat/route.ts`: after `updateDaemonHeartbeat`, `touchHost(daemon.hostId, metrics)` when linked.
-- [ ] **Step 4:** Existing daemon route tests still green; add cases: register-with-host links hostId; heartbeat touches host.
-- [ ] **Step 5:** Commit `feat: upsert Host on daemon register; refresh host presence on heartbeat`.
+- [x] **Step 1:** Extend `registerDaemonSchema` with optional `host: { installationId?, displayName?, hostname, platform, arch?, labels?, trustLevel?, metadata? }`. Heartbeat schema gains optional `metrics: { activeSessions?, inFlightSteps?, cpuPct?, memoryMb? }`.
+- [x] **Step 2:** In `register/route.ts`: after daemon create, `upsertHostForDaemon()` and set `daemon.hostId`. Legacy daemons (no `host` in payload) still register fine with `hostId = null`.
+- [x] **Step 3:** In `heartbeat/route.ts`: after `updateDaemonHeartbeat`, `touchHost(daemon.hostId, metrics)` when linked.
+- [x] **Step 4:** Existing daemon route tests still green; add cases: register-with-host links hostId; heartbeat touches host.
+- [x] **Step 5:** Commit `feat: upsert Host on daemon register; refresh host presence on heartbeat`.
 
 ---
 
 ### Task 4: Host read APIs
 
-- [ ] **Step 1:** `GET /api/hosts?workspaceId=` — `requireAdminOrScopedKey(request, 'read')`. Returns hosts with daemon count, derived status, lastSeenAt, capabilities rollup. Status computed via `deriveHostStatus` at read time (denormalized column refreshed opportunistically).
-- [ ] **Step 2:** `GET /api/hosts/[id]` — host detail + daemons + (placeholder) sessions array for Epic 2 forward-compat.
-- [ ] **Step 3:** Endpoint auth tests in `src/__tests__/api/hosts.test.ts` using the existing `setSession`/`makeRequest` helpers: 401 unauthenticated, 200 admin, 200 scoped read key, 404 unknown id.
-- [ ] **Step 4:** Commit `feat: add /api/hosts list and detail endpoints`.
+- [x] **Step 1:** `GET /api/hosts?workspaceId=` — `requireAdminOrScopedKey(request, 'read')`. Returns hosts with daemon count, derived status, lastSeenAt, capabilities rollup. Status computed via `deriveHostStatus` at read time (denormalized column refreshed opportunistically).
+- [x] **Step 2:** `GET /api/hosts/[id]` — host detail + daemons + (placeholder) sessions array for Epic 2 forward-compat.
+- [x] **Step 3:** Endpoint auth tests in `src/__tests__/api/hosts.test.ts` using the existing `setSession`/`makeRequest` helpers: 401 unauthenticated, 200 admin, 200 scoped read key, 404 unknown id.
+- [x] **Step 4:** Commit `feat: add /api/hosts list and detail endpoints`.
 
 ---
 
 ### Task 5: Hosts tab in Runtime Dashboard
 
-- [ ] **Step 1:** New `src/components/host-card.tsx`: status dot (online/stale/offline), hostname + platform/arch, capability badges, daemon count, last heartbeat (relative), trust level chip.
-- [ ] **Step 2:** Add a `Hosts` tab to `runtime-dashboard.tsx` (alongside existing daemon view) fetching `/api/hosts`; empty state explains that hosts appear when a daemon registers with host info.
-- [ ] **Step 3:** Type-check + lint + full tests green.
-- [ ] **Step 4:** Commit `feat(ui): hosts tab with presence cards in runtime dashboard`.
+- [x] **Step 1:** New `src/components/host-card.tsx`: status dot (online/stale/offline), hostname + platform/arch, capability badges, daemon count, last heartbeat (relative), trust level chip.
+- [x] **Step 2:** Add a `Hosts` tab to `runtime-dashboard.tsx` (alongside existing daemon view) fetching `/api/hosts`; empty state explains that hosts appear when a daemon registers with host info.
+- [x] **Step 3:** Type-check + lint + full tests green.
+- [x] **Step 4:** Commit `feat(ui): hosts tab with presence cards in runtime dashboard`.
 
 ---
 
 ### Task 6: Backfill + docs
 
-- [ ] **Step 1:** `scripts/backfill-hosts.ts` — for each daemon with `hostId = null`, upsert `Host(workspaceId, slug = normalized hostname)` and link. Idempotent; run with `bun scripts/backfill-hosts.ts`.
-- [ ] **Step 2:** Note the daemon contract extension (host object, heartbeat metrics, installation-ID guidance) in `docs/` daemon docs if present, else in the plan's deviation note.
-- [ ] **Step 3:** Full verification; commit `chore: backfill Host rows for legacy daemons`.
+- [x] **Step 1:** `scripts/backfill-hosts.ts` — for each daemon with `hostId = null`, upsert `Host(workspaceId, slug = normalized hostname)` and link. Idempotent; run with `bun scripts/backfill-hosts.ts`.
+- [x] **Step 2:** Note the daemon contract extension (host object, heartbeat metrics, installation-ID guidance) in `docs/` daemon docs if present, else in the plan's deviation note.
+- [x] **Step 3:** Full verification; commit `chore: backfill Host rows for legacy daemons`.
 
 ---
 

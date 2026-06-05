@@ -1,7 +1,21 @@
 import { describe, test, expect, mock } from 'bun:test'
+import { createHash } from 'crypto'
 import { setSession, ADMIN_SESSION, makeRequest } from '../helpers/auth'
 
 const NOW = new Date()
+
+// Scoped API key fixture for the keyed-read path
+const RAW_KEY = 'a'.repeat(64)
+const KEY_RECORD = {
+  id: 'key-1',
+  prefix: RAW_KEY.slice(0, 8),
+  keyHash: createHash('sha256').update(RAW_KEY).digest('hex'),
+  label: 'monitoring',
+  scopes: '["read"]',
+  createdAt: NOW,
+  lastUsedAt: null,
+  revokedAt: null,
+}
 
 const mockHost = {
   id: 'host-1',
@@ -42,6 +56,11 @@ mock.module('@/lib/db', () => ({
       findUnique: ({ where }: { where: { id: string } }) =>
         Promise.resolve(where.id === 'host-1' ? mockHost : null),
     },
+    apiKey: {
+      findUnique: ({ where }: { where: { prefix: string } }) =>
+        Promise.resolve(where.prefix === KEY_RECORD.prefix ? KEY_RECORD : null),
+      update: () => Promise.resolve(KEY_RECORD),
+    },
   },
   isPostgresDb: false,
 }))
@@ -65,6 +84,16 @@ describe('GET /api/hosts — auth', () => {
     expect(body.hosts[0].daemonCount).toBe(1)
     expect(body.hosts[0].capabilities).toEqual(['claude-code'])
     expect(body.hosts[0].labels).toEqual(['gpu'])
+  })
+
+  test('returns 200 for a scoped read key without a session', async () => {
+    setSession(null)
+    const { GET } = await import('@/app/api/hosts/route')
+    const res = await GET(
+      makeRequest('http://localhost/api/hosts', { headers: { authorization: `Bearer ${RAW_KEY}` } }),
+      { params: Promise.resolve({}) },
+    )
+    expect(res.status).toBe(200)
   })
 })
 
