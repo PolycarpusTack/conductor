@@ -5,6 +5,7 @@ import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { activityQuerySchema } from '@/lib/server/contracts'
 import { purgeProjectLogs } from '@/lib/server/activity-logger'
+import { purgeProjectArtifacts } from '@/lib/server/retention'
 
 export const GET = withErrorHandling('api/activity', async (request: Request) => {
   // Admin session OR a scoped API key with "read" — integration-friendly
@@ -50,8 +51,10 @@ export const GET = withErrorHandling('api/activity', async (request: Request) =>
   })
 
   // Lazy purge: fire-and-forget after response data is ready. Does not delay
-  // the response. Only runs if the project has a retention policy configured.
+  // the response. Each only runs if the project has the matching retention
+  // policy configured.
   void purgeProjectLogs(projectId)
+  void purgeProjectArtifacts(projectId)
 
   return NextResponse.json(activities)
 })

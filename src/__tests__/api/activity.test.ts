@@ -27,6 +27,9 @@ mock.module('@/lib/db', () => ({
         Promise.resolve(where.prefix === KEY_RECORD.prefix ? KEY_RECORD : null),
       update: () => Promise.resolve(KEY_RECORD),
     },
+    // For the route's fire-and-forget artifact purge (retention.ts)
+    project: { findUnique: () => Promise.resolve({ artifactRetentionDays: null }) },
+    stepArtifact: { deleteMany: () => Promise.resolve({ count: 0 }) },
   },
   isPostgresDb: false,
 }))
