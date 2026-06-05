@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
-import { requireAdminSession } from '@/lib/server/admin-session'
+import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { activityQuerySchema } from '@/lib/server/contracts'
 import { purgeProjectLogs } from '@/lib/server/activity-logger'
 
 export const GET = withErrorHandling('api/activity', async (request: Request) => {
-  const unauthorized = await requireAdminSession()
+  // Admin session OR a scoped API key with "read" — integration-friendly
+  const unauthorized = await requireAdminOrScopedKey(request, 'read')
   if (unauthorized) return unauthorized
 
   const { searchParams } = new URL(request.url)

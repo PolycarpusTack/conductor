@@ -1,9 +1,10 @@
 import { db } from '@/lib/db'
-import { requireAdminSession } from '@/lib/server/admin-session'
+import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 
 export const GET = withErrorHandling('api/activity/export', async (request: Request) => {
-    const unauthorized = await requireAdminSession()
+    // Admin session OR a scoped API key with "read" — integration-friendly
+    const unauthorized = await requireAdminOrScopedKey(request, 'read')
     if (unauthorized) return unauthorized
 
     const { searchParams } = new URL(request.url)

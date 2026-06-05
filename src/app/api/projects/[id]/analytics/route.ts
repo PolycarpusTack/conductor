@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireAdminSession } from '@/lib/server/admin-session'
+import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import {
   getProjectStats,
@@ -15,7 +15,8 @@ export const GET = withErrorHandling(
     request: Request,
     { params }: { params: Promise<{ id: string }> },
   ) => {
-    const unauthorized = await requireAdminSession()
+    // Admin session OR a scoped API key with "read" — integration-friendly
+    const unauthorized = await requireAdminOrScopedKey(request, 'read')
     if (unauthorized) return unauthorized
 
     const { id: projectId } = await params

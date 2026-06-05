@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
+import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createTaskSchema } from '@/lib/server/contracts'
 import { normalizeDagEdges, startChain } from '@/lib/server/dispatch'
@@ -38,7 +39,9 @@ export const GET = withErrorHandling('api/tasks', async (request: Request) => {
 })
 
 export const POST = withErrorHandling('api/tasks', async (request: Request) => {
-  const unauthorized = await requireAdminSession()
+  // Admin session (with CSRF check) OR a scoped API key with "write" —
+  // lets webhooks and scripts create tasks without a browser session.
+  const unauthorized = await requireAdminOrScopedKey(request, 'write')
   if (unauthorized) return unauthorized
 
   const parsed = createTaskSchema.safeParse(await request.json())

@@ -72,7 +72,7 @@ export function createProjectApiKey(projectId: string) {
   return generateStructuredKey('project', projectId)
 }
 
-function extractBearerToken(request: Request) {
+export function extractBearerToken(request: Request) {
   const authHeader = request.headers.get('authorization')
 
   if (!authHeader) {

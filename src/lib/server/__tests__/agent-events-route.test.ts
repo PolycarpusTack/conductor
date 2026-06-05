@@ -26,9 +26,20 @@ mock.module('@/lib/db', () => ({
 const mockResolveAgentByApiKey = mock(() => Promise.resolve(null)) as any
 const mockExtractAgentApiKey = mock(() => 'fake-agent-key') as any
 
+// NOTE: bun's mock.module registry is shared across test files in a run, so
+// this factory must expose the full export surface of the real module.
 mock.module('@/lib/server/api-keys', () => ({
   extractAgentApiKey: mockExtractAgentApiKey,
   resolveAgentByApiKey: mockResolveAgentByApiKey,
+  extractBearerToken: (request: Request) => {
+    const match = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)
+    return match?.[1]?.trim() || null
+  },
+  buildApiKeyPreview: (rawKey: string) => `${rawKey.slice(0, 12)}...${rawKey.slice(-6)}`,
+  createAgentApiKey: () => ({ rawKey: 'mock', hash: 'mock', preview: 'mock' }),
+  createProjectApiKey: () => ({ rawKey: 'mock', hash: 'mock', preview: 'mock' }),
+  getLegacyApiKeyStatus: () => Promise.resolve({ projectsWithPlaintext: 0, agentsWithPlaintext: 0, totalWithPlaintext: 0 }),
+  migrateLegacyApiKeys: () => Promise.resolve({ projects: 0, agents: 0 }),
 }))
 
 const mockBroadcastProjectEvent = mock(() => undefined) as any
