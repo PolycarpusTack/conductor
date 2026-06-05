@@ -208,6 +208,7 @@ model TaskStep {
   isParallelRoot   Boolean         @default(false)
   isMergePoint     Boolean         @default(false)
   fallbackAgentId  String?
+  traceContext     String? // JSON: W3C trace propagation carrier captured at creation
   createdAt        DateTime        @default(now())
   executions       StepExecution[]
   reviews          StepReview[]

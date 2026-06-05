@@ -41,6 +41,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         maxRetries: true,
         attempts: true,
         agentId: true,
+        traceContext: true,
         agent: {
           select: {
             id: true,
@@ -80,6 +81,9 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         retryDelayMs: step.retryDelayMs,
         maxRetries: step.maxRetries,
         attempt: step.attempts + 1,
+        // W3C carrier from the request that created the step — lets the
+        // daemon continue the trace across the process boundary.
+        traceContext: step.traceContext,
         runtime,
         agent: step.agent
           ? {

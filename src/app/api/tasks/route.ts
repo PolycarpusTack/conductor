@@ -8,6 +8,7 @@ import { normalizeDagEdges, startChain } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
 import { fireProjectEvent as broadcastProjectEvent } from '@/lib/server/project-event'
 import { taskBoardInclude } from '@/lib/server/selects'
+import { captureTraceContext } from '@/lib/server/telemetry'
 
 const log = getLogger('api/tasks')
 
@@ -110,10 +111,15 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
       })
 
       if (steps && steps.length > 0) {
+        // Capture the request's trace context once — every step of this task
+        // links back to the HTTP request that created it.
+        const traceContext = captureTraceContext()
+
         // Create steps without edge data first
         await tx.taskStep.createMany({
           data: steps.map((step, index) => ({
             taskId: created.id,
+            traceContext,
             order: index + 1,
             agentId: step.agentId || null,
             humanLabel: step.humanLabel || null,

@@ -10,6 +10,7 @@ import { findPreviousAgentStep, normalizeDagEdges, hasDagEdges } from '@/lib/ser
 import { getLogger } from '@/lib/server/logger'
 import { appendStepEvent, computeBackoffMs, moveToDeadLetter } from '@/lib/server/step-events'
 import { LEASE_TIMEOUT_MS } from '@/lib/server/step-queue'
+import { dispatchWithTelemetry } from '@/lib/server/telemetry'
 import { safeJsonParse } from '@/lib/server/utils'
 import { randomBytes } from 'crypto'
 
@@ -242,7 +243,7 @@ export async function dispatchStep(stepId: string) {
 
   try {
     const result = await Promise.race([
-      adapter.dispatch({
+      dispatchWithTelemetry(adapter, {
         systemPrompt,
         taskContext: fullTaskContext,
         previousOutput: previousStep?.output || undefined,
@@ -252,7 +253,7 @@ export async function dispatchStep(stepId: string) {
         tools: tools.length > 0 ? tools : undefined,
         mcpConnectionIds: mcpConnectionIds.length > 0 ? mcpConnectionIds : undefined,
         executionId: execution.id,
-      }),
+      }, step.traceContext),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('STEP_TIMEOUT')), timeoutMs)
       ),

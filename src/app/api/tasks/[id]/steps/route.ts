@@ -4,6 +4,7 @@ import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { normalizeDagEdges } from '@/lib/server/dispatch'
 import { taskStepSchema } from '@/lib/server/contracts'
+import { captureTraceContext } from '@/lib/server/telemetry'
 
 export const GET = withErrorHandling(
   'api/tasks/[id]/steps',
@@ -150,6 +151,7 @@ export const POST = withErrorHandling(
         isMergePoint: parsed.data.isMergePoint ?? false,
         fallbackAgentId: parsed.data.fallbackAgentId || null,
         requiredSignOffs: parsed.data.requiredSignOffs ?? 1,
+        traceContext: captureTraceContext(),
       },
       include: {
         agent: { select: { id: true, name: true, emoji: true } },
