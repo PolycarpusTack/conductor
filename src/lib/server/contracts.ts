@@ -33,6 +33,9 @@ export const createProjectSchema = z.object({
 export const updateProjectSchema = createProjectSchema
   .extend({
     logRetentionDays: z.number().int().min(1).max(3650).nullable().optional(),
+    defaultStepMode: z.string().trim().min(1).max(60).nullable().optional(),
+    defaultChainTemplateId: z.string().trim().min(1).nullable().optional(),
+    artifactRetentionDays: z.number().int().min(1).max(3650).nullable().optional(),
   })
   .partial()
   .refine(

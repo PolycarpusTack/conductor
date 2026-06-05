@@ -20,6 +20,9 @@ export const GET = withErrorHandling(
         name: true,
         description: true,
         color: true,
+        defaultStepMode: true,
+        defaultChainTemplateId: true,
+        artifactRetentionDays: true,
         agents: {
           select: agentSummarySelect,
         },
@@ -65,16 +68,25 @@ export const PUT = withErrorHandling(
     if (!parsed.success) {
       throw badRequest(parsed.error.issues[0]?.message || 'Invalid project payload')
     }
-    const { name, description, color, logRetentionDays } = parsed.data
+    const {
+      name, description, color, logRetentionDays,
+      defaultStepMode, defaultChainTemplateId, artifactRetentionDays,
+    } = parsed.data
 
     const project = await db.project.update({
       where: { id },
-      data: { name, description, color, logRetentionDays },
+      data: {
+        name, description, color, logRetentionDays,
+        defaultStepMode, defaultChainTemplateId, artifactRetentionDays,
+      },
       select: {
         id: true,
         name: true,
         description: true,
         color: true,
+        defaultStepMode: true,
+        defaultChainTemplateId: true,
+        artifactRetentionDays: true,
       },
     })
 

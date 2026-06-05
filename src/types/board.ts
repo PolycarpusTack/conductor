@@ -58,6 +58,9 @@ export interface Project {
   name: string
   description?: string | null
   color: string
+  defaultStepMode?: string | null
+  defaultChainTemplateId?: string | null
+  artifactRetentionDays?: number | null
   agents: Agent[]
   tasks: Task[]
 }

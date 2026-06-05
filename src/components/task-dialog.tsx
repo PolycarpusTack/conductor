@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -64,6 +65,23 @@ export function TaskDialog({
   handleSaveTask, resetTaskForm,
   currentProject, projectModes, chainTemplates, statusColumns,
 }: TaskDialogProps) {
+  // Project default (Epic S1): fresh task dialogs start with the default
+  // chain template's steps prefilled — visible and fully editable, so it's
+  // a suggestion rather than a surprise.
+  const defaultTemplateId = currentProject?.defaultChainTemplateId
+  useEffect(() => {
+    if (!taskDialogOpen || editingTask || taskSteps.length > 0 || !defaultTemplateId) return
+    const template = chainTemplates.find((t) => t.id === defaultTemplateId)
+    if (!template) return
+    try {
+      const parsed = JSON.parse(template.steps)
+      if (Array.isArray(parsed) && parsed.length > 0) setTaskSteps(parsed)
+    } catch {
+      // malformed template steps — leave the builder empty
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefill once per open
+  }, [taskDialogOpen, editingTask, defaultTemplateId])
+
   return (
     <Dialog open={taskDialogOpen} onOpenChange={(open) => { setTaskDialogOpen(open); if (!open) resetTaskForm() }}>
       <DialogContent className="sm:max-w-[425px]">

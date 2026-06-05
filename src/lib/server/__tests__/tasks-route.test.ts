@@ -37,6 +37,7 @@ const mockTransaction = mock((cb: (tx: typeof txShape) => unknown) => cb(txShape
 const mockAgentFindUnique = mock(() => Promise.resolve(null)) as any
 const mockAgentFindMany = mock(() => Promise.resolve([])) as any
 const mockActivityLogCreate = mock(() => Promise.resolve({})) as any
+const mockProjectFindUnique = mock(() => Promise.resolve(null)) as any
 
 // A known scoped API key fixture (write scope) for the key-auth path
 import { createHash } from 'crypto'
@@ -63,6 +64,7 @@ mock.module('@/lib/db', () => ({
       findMany: mock(() => Promise.resolve([])) as any,
       count: mock(() => Promise.resolve(0)) as any,
     },
+    project: { findUnique: mockProjectFindUnique },
     apiKey: {
       findUnique: ({ where }: { where: { prefix: string } }) =>
         Promise.resolve(where.prefix === WRITE_KEY_RECORD.prefix ? WRITE_KEY_RECORD : null),
@@ -129,6 +131,8 @@ beforeEach(() => {
   mockStartChain.mockResolvedValue(undefined)
   mockActivityLogCreate.mockReset()
   mockActivityLogCreate.mockResolvedValue({})
+  mockProjectFindUnique.mockReset()
+  mockProjectFindUnique.mockResolvedValue(null)
 })
 
 // ---------------------------------------------------------------------------
@@ -312,5 +316,60 @@ describe('POST /api/tasks — content safety', () => {
     const createCall = mockTxTaskCreate.mock.calls[0][0]
     expect(createCall.data.description).toBe(INJECTION)
     expect(mockActivityLogCreate).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// POST /api/tasks — project default step (Epic S1)
+// ===========================================================================
+
+describe('POST /api/tasks — default step for agent-assigned tasks', () => {
+  test('agent + no steps + no status → auto-creates a default-mode step and dispatches', async () => {
+    mockProjectFindUnique.mockResolvedValue({ defaultStepMode: 'analyze' })
+    mockAgentFindUnique.mockResolvedValue({ projectId: 'proj-1' })
+    mockAgentFindMany.mockResolvedValue([{ id: 'agent-1', projectId: 'proj-1' }])
+    mockTxTaskStepFindMany.mockResolvedValue([{ id: 'db-step-0', order: 1 }])
+
+    const res = await POST(
+      makeRequest({ title: 'auto', projectId: 'proj-1', agentId: 'agent-1' }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+
+    const createMany = mockTxTaskStepCreateMany.mock.calls[0][0]
+    expect(createMany.data).toHaveLength(1)
+    expect(createMany.data[0].mode).toBe('analyze')
+    expect(createMany.data[0].agentId).toBe('agent-1')
+
+    const taskCreate = mockTxTaskCreate.mock.calls[0][0]
+    expect(taskCreate.data.status).toBe('IN_PROGRESS')
+    expect(mockStartChain).toHaveBeenCalledTimes(1)
+  })
+
+  test('falls back to develop when the project has no default mode', async () => {
+    mockProjectFindUnique.mockResolvedValue({ defaultStepMode: null })
+    mockAgentFindUnique.mockResolvedValue({ projectId: 'proj-1' })
+    mockAgentFindMany.mockResolvedValue([{ id: 'agent-1', projectId: 'proj-1' }])
+    mockTxTaskStepFindMany.mockResolvedValue([{ id: 'db-step-0', order: 1 }])
+
+    const res = await POST(
+      makeRequest({ title: 'auto', projectId: 'proj-1', agentId: 'agent-1' }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTxTaskStepCreateMany.mock.calls[0][0].data[0].mode).toBe('develop')
+  })
+
+  test('an explicit BACKLOG status opts out of the auto-step', async () => {
+    mockAgentFindUnique.mockResolvedValue({ projectId: 'proj-1' })
+
+    const res = await POST(
+      makeRequest({ title: 'parked', projectId: 'proj-1', agentId: 'agent-1', status: 'BACKLOG' }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTxTaskStepCreateMany).not.toHaveBeenCalled()
+    expect(mockTxTaskCreate.mock.calls[0][0].data.status).toBe('BACKLOG')
+    expect(mockStartChain).not.toHaveBeenCalled()
   })
 })

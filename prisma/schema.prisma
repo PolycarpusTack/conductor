@@ -35,6 +35,11 @@ model Project {
   automationPollMs   Int                    @default(10000) // poll interval in ms
   // Activity log retention (null = keep forever)
   logRetentionDays   Int?
+  // Project defaults (Epic S1): consumed at task creation
+  defaultStepMode        String? // mode for the auto-created step on agent-assigned stepless tasks
+  defaultChainTemplateId String? // prefills the task dialog's step builder
+  // Artifact retention for DONE tasks (null = keep forever)
+  artifactRetentionDays  Int?
   // Workspace container (nullable; backfilled)
   workspaceId        String?
   workspace          Workspace?             @relation(fields: [workspaceId], references: [id], onDelete: SetNull)

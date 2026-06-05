@@ -94,7 +94,23 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
     }
   }
 
-  const steps = parsed.data.steps
+  let steps = parsed.data.steps
+
+  // Project default (Epic S1): a task created WITH an agent but WITHOUT steps
+  // and WITHOUT an explicit status gets a single auto-step in the project's
+  // default mode — so "assign an agent" actually dispatches, as the guide
+  // describes. An explicit status (e.g. BACKLOG) opts out.
+  if (agentId && (!steps || steps.length === 0) && !status) {
+    const projectDefaults = await db.project.findUnique({
+      where: { id: projectId },
+      select: { defaultStepMode: true },
+    })
+    steps = [{
+      mode: projectDefaults?.defaultStepMode || 'develop',
+      agentId,
+      autoContinue: true,
+    }]
+  }
 
   // Validate step agents (including fallback agents) before transaction
   if (steps && steps.length > 0) {
