@@ -212,10 +212,45 @@ model TaskStep {
   executions       StepExecution[]
   reviews          StepReview[]
   artifacts        StepArtifact[]
+  stepEvents       StepEvent[]
 
   @@unique([taskId, order])
   @@index([taskId, status])
   @@index([agentId, status])
+}
+
+// Append-only event log per step: leased | started | succeeded | failed |
+// retry_scheduled | dead_lettered. Never updated or deleted while the step
+// lives — the audit trail for debugging dispatch behaviour.
+model StepEvent {
+  id        String   @id @default(cuid())
+  stepId    String
+  step      TaskStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  event     String
+  data      String? // JSON — error message, worker id, delayMs, retryAt, etc.
+  createdAt DateTime @default(now())
+
+  @@index([stepId])
+  @@index([stepId, event])
+}
+
+// Snapshot of a step whose retries (and fallback agent, if any) are exhausted.
+// Rows survive even if the original step or task is deleted — that is the point
+// of a dead-letter table, so no relation/cascade on purpose.
+model DeadLetterStep {
+  id             String    @id @default(cuid())
+  originalStepId String
+  taskId         String
+  agentId        String?
+  mode           String
+  instructions   String?
+  attempts       Int
+  lastError      String?
+  lastErrorAt    DateTime?
+  payload        String? // JSON snapshot of the step at time of failure
+  movedAt        DateTime  @default(now())
+
+  @@index([taskId])
 }
 
 model StepExecution {
