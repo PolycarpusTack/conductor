@@ -6,6 +6,9 @@ const TRIGGERABLE = new Set([
   'step-failed',
   'task-created',
   'step-reviewed',
+  // Synthetic events from the automation sweep (Epic S7 Phase 2)
+  'task-stale',
+  'review-gate-stale',
 ])
 
 export async function fireProjectEvent(

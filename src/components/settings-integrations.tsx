@@ -52,6 +52,8 @@ const EVENT_TYPES = [
   { value: 'step-failed', label: 'Step failed' },
   { value: 'task-created', label: 'Task created' },
   { value: 'step-reviewed', label: 'Step reviewed' },
+  { value: 'task-stale', label: 'Task stale (sweep)' },
+  { value: 'review-gate-stale', label: 'Review gate stale (sweep)' },
 ]
 
 const REACTION_TYPES = [

@@ -36,6 +36,8 @@ export const updateProjectSchema = createProjectSchema
     defaultStepMode: z.string().trim().min(1).max(60).nullable().optional(),
     defaultChainTemplateId: z.string().trim().min(1).nullable().optional(),
     artifactRetentionDays: z.number().int().min(1).max(3650).nullable().optional(),
+    autoArchiveDays: z.number().int().min(1).max(3650).nullable().optional(),
+    reviewEscalationHours: z.number().int().min(1).max(720).nullable().optional(),
   })
   .partial()
   .refine(
@@ -346,6 +348,9 @@ export const eventTypeSchema = z.enum([
   'step-failed',
   'task-created',
   'step-reviewed',
+  // Synthetic events from the automation sweep (Epic S7 Phase 2)
+  'task-stale',
+  'review-gate-stale',
 ])
 
 export const reactionTypeSchema = z.enum([

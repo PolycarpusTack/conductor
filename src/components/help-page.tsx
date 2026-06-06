@@ -2736,8 +2736,24 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 lands in the activity log as <code>automation_rule_fired</code>. Rehearse a rule with the
                 <strong> dry run</strong> toggle first: it logs what would happen and touches nothing.
               </WatchIt>
-              <Callout tone="purple" title="🛣 Still on the roadmap (S7 phases 2-3)">
-                <p>Time-based rules (auto-archive DONE after N days, stale review-gate escalation) via a scheduler sweep, an Archived view in the UI, and per-action config forms instead of raw JSON.</p>
+              <H3 id="help-automation-time-rules">Time-based rules (the sweep)</H3>
+              <p>
+                Two automation knobs live right on this tab: <strong>Flag DONE tasks idle for N days</strong>{' '}
+                and <strong>Flag human gates waiting over N hours</strong>. An hourly sweep turns matches into
+                synthetic events — <code>task-stale</code> and <code>review-gate-stale</code> — which flow
+                through the same trigger/filter/reaction pipeline as everything else. The sweep itself never
+                touches a task; what happens is up to your triggers.
+              </p>
+              <TipBox>
+                The classic pairing: set <em>auto-archive</em> to 30 days, then add a trigger on{' '}
+                <Term>task-stale</Term> with the internal action <code>task:archive</code>. Done tasks tidy
+                themselves away after a month — and archived &ne; deleted, so they&apos;re all still in{' '}
+                <em>Settings &rarr; Activity &rarr; Archived Tasks</em>, one Unarchive click from coming back.
+                For stale review gates, pair <Term>review-gate-stale</Term> with <code>step:escalate</code>{' '}
+                and/or a Slack post.
+              </TipBox>
+              <Callout tone="purple" title="🛣 Still on the roadmap (S7 phase 3)">
+                <p>Per-action config forms instead of raw JSON, and a read-only &ldquo;recent automation activity&rdquo; list on this tab.</p>
               </Callout>
             </Section>
 

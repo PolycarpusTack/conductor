@@ -39,6 +39,10 @@ model Project {
   // Project defaults (Epic S1): consumed at task creation
   defaultStepMode        String? // mode for the auto-created step on agent-assigned stepless tasks
   defaultChainTemplateId String? // prefills the task dialog's step builder
+  // Time-based automation (Epic S7 Phase 2): null = sweep disabled
+  autoArchiveDays        Int? // DONE tasks idle this long emit task-stale events
+  reviewEscalationHours  Int? // active human gates older than this emit review-gate-stale
+  lastAutomationSweepAt  DateTime? // sweep claim timestamp (max once/hour)
   // Artifact retention for DONE tasks (null = keep forever)
   artifactRetentionDays  Int?
   // Workspace container (nullable; backfilled)

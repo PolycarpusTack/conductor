@@ -59,6 +59,48 @@ export function SettingsAutomation({ projectId }: SettingsAutomationProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // Time-based rules (Epic S7 Phase 2): blank = sweep off
+  const [autoArchiveDays, setAutoArchiveDays] = useState('')
+  const [reviewEscalationHours, setReviewEscalationHours] = useState('')
+  const [savingSweep, setSavingSweep] = useState(false)
+  const [sweepSaved, setSweepSaved] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}`, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return
+        setAutoArchiveDays(data.autoArchiveDays != null ? String(data.autoArchiveDays) : '')
+        setReviewEscalationHours(data.reviewEscalationHours != null ? String(data.reviewEscalationHours) : '')
+      })
+      .catch(() => {})
+  }, [projectId])
+
+  const saveSweepSettings = async () => {
+    setSavingSweep(true)
+    setSweepSaved(false)
+    try {
+      const days = parseInt(autoArchiveDays, 10)
+      const hours = parseInt(reviewEscalationHours, 10)
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          autoArchiveDays: Number.isFinite(days) && days >= 1 ? days : null,
+          reviewEscalationHours: Number.isFinite(hours) && hours >= 1 ? hours : null,
+        }),
+      })
+      if (res.ok) {
+        setSweepSaved(true)
+        setTimeout(() => setSweepSaved(false), 2000)
+      }
+    } catch (err) {
+      console.error('Failed to save sweep settings:', err)
+    } finally {
+      setSavingSweep(false)
+    }
+  }
+
   // Editable state
   const [mode, setMode] = useState('manual')
   const [pollMs, setPollMs] = useState('10000')
@@ -289,6 +331,41 @@ export function SettingsAutomation({ projectId }: SettingsAutomationProps) {
       >
         {saving ? 'Saving...' : 'Save Automation Settings'}
       </Button>
+
+      {/* Time-based rules (Epic S7 Phase 2) */}
+      <div className="space-y-3 p-3 rounded-lg border border-border/30 bg-muted/10">
+        <label className="text-sm font-medium">Time-Based Rules</label>
+        <p className="text-[11px] text-muted-foreground">
+          An hourly sweep emits <code>task-stale</code> and <code>review-gate-stale</code> events for
+          old work. Pair them with a trigger in the Integrations tab (e.g. <code>task-stale</code> →
+          internal action <code>task:archive</code>) to act on them. Blank = off.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Flag DONE tasks idle for (days)</label>
+            <Input
+              type="number" min={1} max={3650}
+              value={autoArchiveDays}
+              onChange={e => setAutoArchiveDays(e.target.value)}
+              placeholder="Off"
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Flag human gates waiting over (hours)</label>
+            <Input
+              type="number" min={1} max={720}
+              value={reviewEscalationHours}
+              onChange={e => setReviewEscalationHours(e.target.value)}
+              placeholder="Off"
+              className="h-8 text-xs"
+            />
+          </div>
+        </div>
+        <Button size="sm" variant="outline" onClick={saveSweepSettings} disabled={savingSweep} className="w-full">
+          {savingSweep ? 'Saving...' : sweepSaved ? 'Saved ✓' : 'Save Time-Based Rules'}
+        </Button>
+      </div>
     </div>
   )
 }

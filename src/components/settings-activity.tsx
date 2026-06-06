@@ -116,6 +116,32 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
     }
   }
 
+  // Archived tasks (Epic S7) — kept forever, hidden from the board
+  const [archivedTasks, setArchivedTasks] = useState<Array<{ id: string; title: string; archivedAt: string }>>([])
+  const [unarchivingId, setUnarchivingId] = useState<string | null>(null)
+
+  const fetchArchivedTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/archived-tasks`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        setArchivedTasks(data.tasks)
+      }
+    } catch {}
+  }, [projectId])
+
+  useEffect(() => { void fetchArchivedTasks() }, [fetchArchivedTasks])
+
+  const unarchiveTask = async (taskId: string) => {
+    setUnarchivingId(taskId)
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/unarchive`, { method: 'POST' })
+      if (res.ok) setArchivedTasks(prev => prev.filter(t => t.id !== taskId))
+    } finally {
+      setUnarchivingId(null)
+    }
+  }
+
   const fetchLogs = useCallback(async () => {
     setLoading(true)
     try {
@@ -208,6 +234,37 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
                   onClick={() => restoreTask(task.id)}
                 >
                   {restoringId === task.id ? 'Restoring…' : 'Restore'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Archived tasks (Epic S7) — kept forever, hidden from the board */}
+      {archivedTasks.length > 0 && (
+        <div className="rounded-lg border border-border p-4 space-y-2">
+          <div>
+            <p className="text-sm font-medium">Archived Tasks</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Hidden from the board but kept forever — unarchive to bring one back.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {archivedTasks.map((task) => (
+              <div key={task.id} className="flex items-center gap-2 p-2 rounded bg-muted/20">
+                <span className="text-xs flex-1 truncate">{task.title}</span>
+                <span className="text-[10px] text-muted-foreground/60 shrink-0">
+                  archived {new Date(task.archivedAt).toLocaleDateString()}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-xs"
+                  disabled={unarchivingId === task.id}
+                  onClick={() => unarchiveTask(task.id)}
+                >
+                  {unarchivingId === task.id ? 'Unarchiving…' : 'Unarchive'}
                 </Button>
               </div>
             ))}

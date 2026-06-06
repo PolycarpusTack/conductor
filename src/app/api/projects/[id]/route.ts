@@ -72,6 +72,7 @@ export const PUT = withErrorHandling(
     const {
       name, description, color, logRetentionDays,
       defaultStepMode, defaultChainTemplateId, artifactRetentionDays,
+      autoArchiveDays, reviewEscalationHours,
     } = parsed.data
 
     const project = await db.project.update({
@@ -79,6 +80,7 @@ export const PUT = withErrorHandling(
       data: {
         name, description, color, logRetentionDays,
         defaultStepMode, defaultChainTemplateId, artifactRetentionDays,
+        autoArchiveDays, reviewEscalationHours,
       },
       select: {
         id: true,
@@ -88,6 +90,8 @@ export const PUT = withErrorHandling(
         defaultStepMode: true,
         defaultChainTemplateId: true,
         artifactRetentionDays: true,
+        autoArchiveDays: true,
+        reviewEscalationHours: true,
       },
     })
 
