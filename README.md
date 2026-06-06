@@ -53,6 +53,10 @@ Navigate to `http://localhost:3000`
 
 ### 6. Create Your First Project
 
+> 📖 **Full walkthrough:** [docs/walkthroughs/first-project-calendar-app.md](docs/walkthroughs/first-project-calendar-app.md)
+> takes you from a fresh install to agents building a small calendar app —
+> runtime, agents, chains, automation, and where the results land.
+
 Open the board, sign in with the admin password, and create a project from the header. You can choose whether to provision starter agents during project creation.
 
 Optional for local evaluation: use the "Load Demo Data" button from the empty state instead of creating a project manually.
