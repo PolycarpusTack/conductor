@@ -14,32 +14,37 @@
 
 ## Task 1 — Attribution plumbing (Phase 2)
 
-- [ ] `ActivityLog.userId String?` + `user User?` (SetNull) + User back-relation.
-- [ ] `request-context.ts`: ALS store `{ user?: SessionUser | null }`,
+- [x] `ActivityLog.userId String?` + `user User?` (SetNull) + User back-relation.
+- [x] `request-context.ts`: ALS store `{ user?: SessionUser | null }`,
   `runWithRequestContext`, `getRequestUser`, `setRequestUser`.
-- [ ] `withErrorHandling` wraps handlers in `runWithRequestContext`.
-- [ ] `getSessionUser` caches into / reads from the store (synthetic legacy
+- [x] `withErrorHandling` wraps handlers in `runWithRequestContext`.
+- [x] `getSessionUser` caches into / reads from the store (synthetic legacy
   owner is NOT stamped — `legacy-admin` isn't a DB row).
-- [ ] db.ts: `$extends` query extension injecting `userId` into
+- [x] db.ts: `$extends` query extension injecting `userId` into
   `activityLog.create` data when absent and a real request user exists.
-- [ ] Activity GET includes `user: { name, email }`; ActivityEntry renders
+- [x] Activity GET includes `user: { name, email }`; ActivityEntry renders
   "· by NAME" in the Activity tab.
-- [ ] Admin messages: sender shows the session user's email instead of the
+- [x] Admin messages: sender shows the session user's email instead of the
   fixed `admin@conductor` (fallback preserved for legacy sessions).
-- [ ] Tests: extension stamping logic (pure helper), context round-trip.
+- [x] Tests: extension stamping logic (pure helper), context round-trip.
 
 ## Task 2 — Account polish (Phase 3)
 
-- [ ] `api/admin/me` route: `PUT` personal password change (verify current,
+- [x] `api/admin/me` route: `PUT` personal password change (verify current,
   scrypt new, revoke OTHER sessions — keep the current one); `DELETE` = sign
   out everywhere (revoke all sessions + clear cookie). Works for every role.
-- [ ] Login route: per-email rate bucket alongside the IP bucket.
-- [ ] Security tab "Your account" block (renders for members too): change
+- [x] Login route: per-email rate bucket alongside the IP bucket.
+- [x] Security tab "Your account" block (renders for members too): change
   password, sign out everywhere.
-- [ ] Tests: me route (wrong current 401, revocation), email rate bucket.
+- [x] Tests: me route (wrong current 401, revocation), email rate bucket.
 
 ## Task 3 — Release v0.4.0
 
-- [ ] package.json 0.3.0 → 0.4.0; help "What's new in 0.4.0" (accounts +
+- [x] package.json 0.3.0 → 0.4.0; help "What's new in 0.4.0" (accounts +
   attribution, recurring tasks, tool usage stats); full verification incl.
   build; release commit + tag.
+
+> **Implemented 2026-06-06.** Deviations: extension-stamping is verified through
+> the request-context unit tests plus type-checked extension code (the extension
+> itself only runs against a real client, which the route tests mock out);
+> admin message signing uses the user's email local-part + @conductor.

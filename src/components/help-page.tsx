@@ -23,6 +23,7 @@ const TOC: TocGroup[] = [
   {
     label: 'Release notes',
     items: [
+      { id: 'help-release-0-4-0', title: "What's new in 0.4.0" },
       { id: 'help-release-0-3-0', title: "What's new in 0.3.0" },
       { id: 'help-release-0-2-0', title: "What's new in 0.2.0" },
       { id: 'help-release-0-1-0', title: "What's new in 0.1.0" },
@@ -506,6 +507,41 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             {/* ════════════════════════════════════════════════════════════════
                 RELEASE NOTES
                ════════════════════════════════════════════════════════════════ */}
+
+            <Section
+              id="help-release-0-4-0"
+              title="What's new in 0.4.0"
+              subtitle="Named user accounts, recurring tasks, and per-tool usage stats."
+            >
+              <Callout tone="neon" title="The headline">
+                <p>
+                  0.4.0 retires the shared admin password. Everyone gets a <strong>named account</strong>{' '}
+                  (owner / admin / member), sessions revoke instantly, the activity log finally says{' '}
+                  <em>who</em> did what — and your first login with the old password migrates you
+                  automatically. Plus: tasks that create themselves on a schedule, and usage counters on
+                  every MCP tool.
+                </p>
+              </Callout>
+
+              <H3 id="help-release-0-4-0-accounts">User accounts</H3>
+              <Bullets>
+                <li><strong>No flag-day</strong> — the first legacy login creates <code>owner@conductor.local</code> with the same password; <code>RECOVERY_MODE=1</code> is the documented break-glass.</li>
+                <li><strong>Roles</strong> — members work the board; admins manage everything but owners; owners manage everything. The Security tab, user management, and project deletion are role-gated.</li>
+                <li><strong>DB-backed sessions</strong> — deactivating a user or resetting a password signs them out <em>immediately</em>; &ldquo;Sign Out Everywhere&rdquo; lives under <em>Settings &rarr; Security &rarr; Your account</em>.</li>
+                <li><strong>Attribution</strong> — activity entries show the acting user, and admin messages in the task drawer are signed with your address instead of a shared one.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-4-0-recurring">Recurring tasks</H3>
+              <Bullets>
+                <li>Instantiate a <Ref href="#help-settings-templates">task template</Ref> daily/weekly/monthly at a set time — attached chains start automatically with agent roles resolved.</li>
+                <li>Creation fires the normal <Term>task-created</Term> event, so automation rules compose with recurrences for free.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-4-0-tools">Per-tool usage stats</H3>
+              <Bullets>
+                <li>Every MCP tool invocation bumps a counter — the tools expander shows how often (and when) each tool was last used, so allowlists can be tightened with evidence.</li>
+              </Bullets>
+            </Section>
 
             <Section
               id="help-release-0-3-0"
