@@ -16,6 +16,7 @@ import { AgentBadge } from '@/components/agent-badge'
 import { WorkflowEditor, type DagStep, type StepEdge } from '@/components/workflow-editor'
 import type { StepDraft, ChainTemplate, ProjectMode } from '@/types/settings'
 import type { Agent } from '@/types/board'
+import { resolveStepAgents } from '@/lib/resolve-step-agents'
 
 interface ChainBuilderProps {
   projectId: string
@@ -86,7 +87,7 @@ export function ChainBuilder({
 
   const handleSelectTemplate = (template: ChainTemplate) => {
     setSelectedTemplate(template.id)
-    const parsed = parseSteps(template.steps)
+    const parsed = resolveStepAgents(parseSteps(template.steps), agents)
     onStepsChange(parsed)
   }
 

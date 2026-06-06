@@ -404,3 +404,38 @@ describe('POST /api/tasks — per-mode maxAttempts default (Epic S4)', () => {
     expect(mockTxTaskStepCreateMany.mock.calls[0][0].data[0].maxRetries).toBe(1)
   })
 })
+
+describe('POST /api/tasks — library chain agentRole resolution', () => {
+  test('role-only steps resolve to the project agent with that role', async () => {
+    // resolution lookup, then validation lookup sees the resolved id
+    mockAgentFindMany
+      .mockResolvedValueOnce([{ id: 'agent-ddd', role: 'domain-discovery-coach' }])
+      .mockResolvedValueOnce([{ id: 'agent-ddd', projectId: 'proj-1' }])
+    mockTxTaskStepFindMany.mockResolvedValue([{ id: 'db-step-0', order: 1 }])
+
+    const res = await POST(
+      makeRequest({
+        title: 'chain task', projectId: 'proj-1',
+        steps: [{ mode: 'analyze', agentRole: 'domain-discovery-coach' }],
+      }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTxTaskStepCreateMany.mock.calls[0][0].data[0].agentId).toBe('agent-ddd')
+  })
+
+  test('unresolvable roles leave the step agentless (it waits for assignment)', async () => {
+    mockAgentFindMany.mockResolvedValue([])
+    mockTxTaskStepFindMany.mockResolvedValue([{ id: 'db-step-0', order: 1 }])
+
+    const res = await POST(
+      makeRequest({
+        title: 'chain task', projectId: 'proj-1',
+        steps: [{ mode: 'analyze', agentRole: 'ghost-role' }],
+      }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTxTaskStepCreateMany.mock.calls[0][0].data[0].agentId).toBeNull()
+  })
+})

@@ -133,6 +133,17 @@ export const POST = withErrorHandling(
       }
     }
 
+    // Library chains reference agents by role — resolve when no agentId given
+    let resolvedAgentId = parsed.data.agentId || null
+    if (!resolvedAgentId && parsed.data.agentRole) {
+      const roleAgent = await db.agent.findFirst({
+        where: { project: { tasks: { some: { id } } }, role: parsed.data.agentRole },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      })
+      resolvedAgentId = roleAgent?.id ?? null
+    }
+
     // Mode policy (Epic S4): per-mode maxAttempts feeds the retry default
     const modeRow = parsed.data.maxRetries === undefined
       ? await db.projectMode.findFirst({
@@ -145,7 +156,7 @@ export const POST = withErrorHandling(
       data: {
         taskId: id,
         order: (maxOrder?.order || 0) + 1,
-        agentId: parsed.data.agentId || null,
+        agentId: resolvedAgentId,
         humanLabel: parsed.data.humanLabel || null,
         mode: parsed.data.mode,
         instructions: parsed.data.instructions || null,

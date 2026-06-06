@@ -69,6 +69,7 @@ export interface ChainTemplate {
 
 export interface StepDraft {
   agentId?: string | null
+  agentRole?: string // library chains reference agents by role; resolved to agentId at selection/creation
   humanLabel?: string
   mode: string
   instructions?: string

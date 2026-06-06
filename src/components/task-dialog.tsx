@@ -26,6 +26,7 @@ import { ChainBuilder } from '@/components/chain-builder'
 import { AgentBadge } from '@/components/agent-badge'
 import type { Task, TaskStatus, TaskPriority, Project } from '@/types/board'
 import type { ProjectMode, ChainTemplate, TaskTemplate, StepDraft } from '@/types/settings'
+import { resolveStepAgents } from '@/lib/resolve-step-agents'
 
 interface TaskDialogProps {
   taskDialogOpen: boolean
@@ -102,7 +103,7 @@ export function TaskDialog({
       if (chain) {
         try {
           const parsed = JSON.parse(chain.steps)
-          if (Array.isArray(parsed)) setTaskSteps(parsed)
+          if (Array.isArray(parsed)) setTaskSteps(resolveStepAgents(parsed, currentProject?.agents ?? []))
         } catch {
           // malformed chain steps — leave the builder as-is
         }
@@ -119,7 +120,9 @@ export function TaskDialog({
     if (!template) return
     try {
       const parsed = JSON.parse(template.steps)
-      if (Array.isArray(parsed) && parsed.length > 0) setTaskSteps(parsed)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setTaskSteps(resolveStepAgents(parsed, currentProject?.agents ?? []))
+      }
     } catch {
       // malformed template steps — leave the builder empty
     }

@@ -112,6 +112,27 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
     }]
   }
 
+  // Library chains reference agents by role (Agent.role = library slug) —
+  // resolve role-only steps to the project's first matching agent so chain
+  // tasks dispatch instead of stalling agentless. Mirrors the recurring runner.
+  if (steps?.some((s) => !s.agentId && s.agentRole)) {
+    const roles = [...new Set(steps.filter((s) => !s.agentId && s.agentRole).map((s) => s.agentRole!))]
+    const roleAgents = await db.agent.findMany({
+      where: { projectId, role: { in: roles } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, role: true },
+    })
+    const byRole = new Map<string, string>()
+    for (const agent of roleAgents) {
+      if (agent.role && !byRole.has(agent.role)) byRole.set(agent.role, agent.id)
+    }
+    steps = steps.map((s) =>
+      !s.agentId && s.agentRole && byRole.has(s.agentRole)
+        ? { ...s, agentId: byRole.get(s.agentRole)! }
+        : s,
+    )
+  }
+
   // Validate step agents (including fallback agents) before transaction
   if (steps && steps.length > 0) {
     const stepAgentIds = [

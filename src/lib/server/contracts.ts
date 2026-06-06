@@ -102,6 +102,9 @@ export const stepEdgeSchema = z.object({
 
 export const taskStepSchema = z.object({
   agentId: z.string().trim().min(1).optional().nullable(),
+  // Library chains reference agents by role; the server resolves it to an
+  // agentId when none is given (mirrors the recurring-task runner).
+  agentRole: z.string().trim().max(120).optional(),
   humanLabel: z.string().trim().max(120).optional(),
   mode: z.string().trim().min(1).max(60),
   instructions: z.string().max(5000).optional(),
