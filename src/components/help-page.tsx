@@ -2790,9 +2790,19 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 For stale review gates, pair <Term>review-gate-stale</Term> with <code>step:escalate</code>{' '}
                 and/or a Slack post.
               </TipBox>
-              <Callout tone="purple" title="🛣 Still on the roadmap (S7 phase 3)">
-                <p>Per-action config forms instead of raw JSON, and a read-only &ldquo;recent automation activity&rdquo; list on this tab.</p>
-              </Callout>
+              <H3 id="help-automation-recurring">Recurring tasks</H3>
+              <p>
+                The Automation tab can also <strong>create</strong> work, not just dispatch it: pick a{' '}
+                <Ref href="#help-settings-templates">task template</Ref>, a cadence (daily / weekly /
+                monthly) and a time, and Conductor instantiates the task on schedule. If the template has
+                a chain attached, the chain starts immediately — agent roles in the template resolve to
+                your project&apos;s agents automatically.
+              </p>
+              <TipBox>
+                Recurring creation fires the normal <Term>task-created</Term> event, so your automation
+                rules compose: a recurring &ldquo;weekly dependency audit&rdquo; task can be auto-assigned
+                by the same <code>task:assign</code> rule that handles everything else.
+              </TipBox>
             </Section>
 
             <Section id="help-settings-integrations" title="Settings · Integrations">

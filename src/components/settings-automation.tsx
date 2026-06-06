@@ -76,6 +76,89 @@ export function SettingsAutomation({ projectId }: SettingsAutomationProps) {
       .catch(() => {})
   }, [projectId])
 
+  // Recurring tasks: instantiate a task template on a cadence
+  interface Recurrence {
+    id: string
+    name: string
+    cadence: string
+    dayOfWeek: number | null
+    dayOfMonth: number | null
+    timeOfDay: string
+    enabled: boolean
+    nextRunAt: string
+    taskTemplate: { id: string; name: string; icon: string | null }
+  }
+  const [recurrences, setRecurrences] = useState<Recurrence[]>([])
+  const [taskTemplates, setTaskTemplates] = useState<Array<{ id: string; name: string; icon: string | null }>>([])
+  const [addingRecurrence, setAddingRecurrence] = useState(false)
+  const [recName, setRecName] = useState('')
+  const [recTemplateId, setRecTemplateId] = useState('')
+  const [recCadence, setRecCadence] = useState('daily')
+  const [recDayOfWeek, setRecDayOfWeek] = useState('1')
+  const [recDayOfMonth, setRecDayOfMonth] = useState('1')
+  const [recTime, setRecTime] = useState('09:00')
+  const [recError, setRecError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/recurring-tasks`, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : [])
+      .then((data) => { if (Array.isArray(data)) setRecurrences(data) })
+      .catch(() => {})
+    fetch(`/api/projects/${projectId}/task-templates`, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : [])
+      .then((data) => { if (Array.isArray(data)) setTaskTemplates(data) })
+      .catch(() => {})
+  }, [projectId])
+
+  const addRecurrence = async () => {
+    setRecError(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/recurring-tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: recName,
+          taskTemplateId: recTemplateId,
+          cadence: recCadence,
+          dayOfWeek: recCadence === 'weekly' ? Number(recDayOfWeek) : undefined,
+          dayOfMonth: recCadence === 'monthly' ? Number(recDayOfMonth) : undefined,
+          timeOfDay: recTime,
+        }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to create recurrence')
+      const created = await res.json()
+      setRecurrences(prev => [...prev, created])
+      setAddingRecurrence(false)
+      setRecName('')
+      setRecTemplateId('')
+    } catch (err) {
+      setRecError(err instanceof Error ? err.message : 'Failed to create')
+    }
+  }
+
+  const toggleRecurrence = async (rec: Recurrence) => {
+    const res = await fetch(`/api/projects/${projectId}/recurring-tasks/${rec.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !rec.enabled }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setRecurrences(prev => prev.map(r => r.id === rec.id ? updated : r))
+    }
+  }
+
+  const deleteRecurrence = async (recId: string) => {
+    const res = await fetch(`/api/projects/${projectId}/recurring-tasks/${recId}`, { method: 'DELETE' })
+    if (res.ok) setRecurrences(prev => prev.filter(r => r.id !== recId))
+  }
+
+  const cadenceSummary = (rec: Recurrence) => {
+    if (rec.cadence === 'weekly') return `${DAYS[rec.dayOfWeek ?? 1]?.label}s at ${rec.timeOfDay}`
+    if (rec.cadence === 'monthly') return `day ${rec.dayOfMonth} monthly at ${rec.timeOfDay}`
+    return `daily at ${rec.timeOfDay}`
+  }
+
   // Recent automation activity (Epic S7 Phase 3) — what the rules actually did
   const [ruleActivity, setRuleActivity] = useState<Array<{
     id: string; action: string; details: string | null; createdAt: string
@@ -389,6 +472,97 @@ export function SettingsAutomation({ projectId }: SettingsAutomationProps) {
         <Button size="sm" variant="outline" onClick={saveSweepSettings} disabled={savingSweep} className="w-full">
           {savingSweep ? 'Saving...' : sweepSaved ? 'Saved ✓' : 'Save Time-Based Rules'}
         </Button>
+      </div>
+
+      {/* Recurring tasks */}
+      <div className="space-y-3 p-3 rounded-lg border border-border/30 bg-muted/10">
+        <label className="text-sm font-medium">Recurring Tasks</label>
+        <p className="text-[11px] text-muted-foreground">
+          Create a task from a <strong>task template</strong> on a schedule. Chains attached to the
+          template start automatically with agents resolved by role.
+        </p>
+
+        {recurrences.map((rec) => (
+          <div key={rec.id} className="flex items-center gap-2 text-xs p-2 rounded bg-background/50">
+            <span className="shrink-0">{rec.taskTemplate?.icon || '📋'}</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium truncate">{rec.name}</div>
+              <div className="text-muted-foreground text-[10px]">
+                {cadenceSummary(rec)} · next {new Date(rec.nextRunAt).toLocaleString()}
+              </div>
+            </div>
+            <button
+              onClick={() => toggleRecurrence(rec)}
+              className={`text-[10px] font-mono px-2 py-1 rounded border shrink-0 ${
+                rec.enabled
+                  ? 'bg-[var(--op-green-bg,rgba(74,222,128,0.1))] text-[var(--op-green,#4ADE80)] border-[var(--op-green-dim,rgba(74,222,128,0.2))]'
+                  : 'text-muted-foreground border-border/30'
+              }`}
+            >
+              {rec.enabled ? 'on' : 'off'}
+            </button>
+            <Button variant="ghost" size="sm" className="h-6 text-xs shrink-0" onClick={() => deleteRecurrence(rec.id)}>
+              Delete
+            </Button>
+          </div>
+        ))}
+
+        {addingRecurrence ? (
+          <div className="space-y-2 p-2 rounded border border-border/20">
+            {recError && <p className="text-xs text-destructive">{recError}</p>}
+            <Input value={recName} onChange={e => setRecName(e.target.value)} placeholder="Recurrence name" className="h-8 text-xs" />
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={recTemplateId || 'none'} onValueChange={v => setRecTemplateId(v === 'none' ? '' : v)}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Task template" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" className="text-xs">Pick a template…</SelectItem>
+                  {taskTemplates.map(t => (
+                    <SelectItem key={t.id} value={t.id} className="text-xs">{t.icon || '📋'} {t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={recCadence} onValueChange={setRecCadence}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily" className="text-xs">Daily</SelectItem>
+                  <SelectItem value="weekly" className="text-xs">Weekly</SelectItem>
+                  <SelectItem value="monthly" className="text-xs">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {recCadence === 'weekly' && (
+                <Select value={recDayOfWeek} onValueChange={setRecDayOfWeek}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DAYS.map(d => <SelectItem key={d.value} value={d.value} className="text-xs">{d.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {recCadence === 'monthly' && (
+                <Input type="number" min={1} max={28} value={recDayOfMonth}
+                  onChange={e => setRecDayOfMonth(e.target.value)} placeholder="Day of month" className="h-8 text-xs" />
+              )}
+              <Input type="time" value={recTime} onChange={e => setRecTime(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="h-7 text-xs" onClick={addRecurrence} disabled={!recName.trim() || !recTemplateId}>
+                Add
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAddingRecurrence(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : taskTemplates.length > 0 ? (
+          <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => setAddingRecurrence(true)}>
+            + Add Recurring Task
+          </Button>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">
+            No task templates yet — create one in <strong>Settings → Templates</strong> first.
+          </p>
+        )}
       </div>
 
       {/* Recent automation activity (Epic S7 Phase 3) */}
