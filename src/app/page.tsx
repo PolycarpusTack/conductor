@@ -51,6 +51,8 @@ export default function Home() {
     isAdminAuthenticated,
     adminConfigured,
     adminPassword, setAdminPassword,
+    adminEmail, setAdminEmail,
+    usersExist,
     authError,
     authChecking,
     checkAdminSession,
@@ -176,9 +178,16 @@ export default function Home() {
   }, [])
 
   const handleAdminLogin = useCallback(async () => {
-    const ok = await login(adminPassword)
-    if (ok) await initializeBoard()
-  }, [adminPassword, initializeBoard, login])
+    const result = await login(adminPassword, adminEmail)
+    if (!result.ok) return
+    if (result.bootstrapped) {
+      toast({
+        title: 'Owner account created',
+        description: `Sign in from now on as ${result.bootstrapped} with the same password. Manage users in Settings → Security.`,
+      })
+    }
+    await initializeBoard()
+  }, [adminPassword, adminEmail, initializeBoard, login, toast])
 
   const handleAdminLogout = useCallback(async () => {
     await logout()
@@ -201,6 +210,9 @@ export default function Home() {
         authChecking={authChecking}
         adminPassword={adminPassword}
         setAdminPassword={setAdminPassword}
+        adminEmail={adminEmail}
+        setAdminEmail={setAdminEmail}
+        usersExist={usersExist}
         adminConfigured={adminConfigured}
         authError={authError}
         loading={loading}

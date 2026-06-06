@@ -3076,30 +3076,44 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
 
             <Section
               id="help-security"
-              title="Admin login & session"
+              title="Accounts, login & sessions"
               subtitle="How authentication works in the browser."
             >
               <p>
-                Conductor is admin-password protected, with <strong>layered credentials</strong>: the
-                <code> AGENTBOARD_ADMIN_PASSWORD</code> env var bootstraps a fresh install, and a password set in
-                <em> Settings &rarr; Security</em> overrides it from then on (stored as a slow scrypt hash). The
-                env var stays your <strong>break-glass</strong> credential — clear the AdminConfig database row
-                and it works again. After signing in, your browser carries a session cookie — HttpOnly,
-                SameSite=Lax, HMAC-signed.
+                Conductor uses <strong>named user accounts</strong> (email + password). Three roles:{' '}
+                <Term>owner</Term> (everything, including managing other owners), <Term>admin</Term>{' '}
+                (everything except owners), and <Term>member</Term> (day-to-day work, but no Security tab,
+                user management, or project deletion). Manage them in <em>Settings &rarr; Security &rarr; Users</em>{' '}
+                — new users get a temporary password shown exactly once.
               </p>
 
-              <H3>Session lifetime</H3>
+              <PlainEnglish>
+                <p>
+                  Upgrading from the shared-password days? Nothing breaks: your <strong>first login with the
+                  old password</strong> quietly creates the owner account <code>owner@conductor.local</code>{' '}
+                  with that same password. From then on, sign in with that email — and create personal
+                  accounts for the team so the activity log can eventually say <em>who</em> did what.
+                </p>
+              </PlainEnglish>
+
+              <H3>Session lifetime &amp; revocation</H3>
               <Bullets>
-                <li>Configurable in <em>Settings &rarr; Security</em> (1 hour to 30 days; default 12 hours). Applies to new sign-ins.</li>
-                <li>Changing the password invalidates every active session instantly — session tokens are derived from the credential itself.</li>
+                <li>Sessions are database-backed (only a hash of the token is stored). TTL is configurable in <em>Settings &rarr; Security</em> (1 hour to 30 days; default 12 hours).</li>
+                <li>Deactivating a user or resetting their password revokes their sessions <strong>immediately</strong> — no waiting for a cookie to expire.</li>
                 <li>Mutating requests additionally pass a same-origin CSRF check, so a malicious site can&apos;t ride your cookie.</li>
               </Bullets>
 
+              <H3>Break-glass recovery</H3>
+              <p>
+                Locked out (last owner deactivated their own brain)? Set <code>RECOVERY_MODE=1</code> in the
+                server environment and the legacy <code>AGENTBOARD_ADMIN_PASSWORD</code> path works again —
+                password-only login as a synthetic owner. Fix your accounts, unset the variable.
+              </p>
+
               <WatchIt>
                 <p>
-                  Still one shared admin password (per-user accounts are a future epic). Share it narrowly and
-                  rotate from <em>Settings &rarr; Security</em> whenever someone with access leaves — everyone
-                  gets signed out, which is exactly what you want.
+                  The last active owner can&apos;t be deactivated or demoted, and nobody can deactivate
+                  themselves — lockouts have to be deliberate, by someone else, with an owner left standing.
                 </p>
               </WatchIt>
             </Section>
@@ -3255,7 +3269,7 @@ curl -X POST -H "Authorization: Bearer $AGENT_KEY" \\
                   ['Is Conductor a chat UI?', <>No. Conductor dispatches work to agents and tracks the outcomes. Want to chat with a model? Use the provider&apos;s own client — it&apos;s better at chatting than we&apos;ll ever try to be.</>],
                   ['Do I need Docker or Postgres?', <>Nope. SQLite is the zero-config default and runs everything. Postgres + pgvector buys you semantic skill search and better concurrency when you outgrow a single file — and not a day before.</>],
                   ['Can I run it on my laptop?', <><code>bun install &amp;&amp; bun run db:push &amp;&amp; bun run dev</code> — that&apos;s the whole install. You need one API key for one runtime (Anthropic, OpenAI, OpenRouter, or a local Ollama). Run <code>bun run doctor</code> afterwards and it will tell you what, if anything, is missing.</>],
-                  ['Can several people use it at once?', <>Yes — the WebSocket pushes changes to every open browser, and the activity log records who did what. One caveat: there&apos;s a single shared admin password today; per-user accounts are on the roadmap.</>],
+                  ['Can several people use it at once?', <>Yes — the WebSocket pushes changes to every open browser, and everyone gets their own account (<em>Settings &rarr; Security &rarr; Users</em>): owners, admins, and members with appropriately scoped powers.</>],
                   ['Does Conductor train models?', <>No. It&apos;s a dispatcher. Prompts go to whatever model your runtime points at; the providers run the models. Your data goes where your runtimes send it — choose them accordingly.</>],
                   ['Can agents talk to each other?', <>Yes — through Conductor&apos;s message inboxes, never directly. Agents send task-aware messages via their API keys; every message is durable, scanned for prompt injection, and visible to admins in the task drawer. For passing <em>work output</em> downstream, a chain is still the right tool — messages are for questions and handoffs, not the pipeline itself.</>],
                   ['What does it cost to run?', <>Infrastructure: peanuts — one server, one database. The AI provider bills are the real line item. Set <em>Max cost per step</em>, watch the Observability cost tile, and remember that a runaway retry loop is the most expensive bug you can have. (The dead-letter queue and backoff exist precisely for this.)</>],

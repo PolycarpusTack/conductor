@@ -8,6 +8,9 @@ interface AuthViewProps {
   authChecking: boolean
   adminPassword: string
   setAdminPassword: (v: string) => void
+  adminEmail: string
+  setAdminEmail: (v: string) => void
+  usersExist: boolean
   adminConfigured: boolean
   authError: string | null
   loading: boolean
@@ -19,6 +22,9 @@ export function AuthView({
   authChecking,
   adminPassword,
   setAdminPassword,
+  adminEmail,
+  setAdminEmail,
+  usersExist,
   adminConfigured,
   authError,
   loading,
@@ -53,13 +59,32 @@ export function AuthView({
           </div>
 
           <div className="space-y-4">
+            {usersExist && (
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="username"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAdminLogin()
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Upgraded from the shared password? Your account is <code>owner@conductor.local</code> with the same password.
+                </p>
+              </div>
+            )}
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Admin password</label>
+              <label className="text-sm font-medium">{usersExist ? 'Password' : 'Admin password'}</label>
               <Input
                 type="password"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Enter admin password"
+                placeholder={usersExist ? 'Enter your password' : 'Enter admin password'}
+                autoComplete="current-password"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAdminLogin()
                 }}

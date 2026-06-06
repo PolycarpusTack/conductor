@@ -25,6 +25,7 @@ import { SettingsIntegrations } from '@/components/settings-integrations'
 import { SettingsActivity } from '@/components/settings-activity'
 import { SettingsScopedKeys } from '@/components/settings-scoped-keys'
 import { SettingsSecurity } from '@/components/settings-security'
+import { SettingsUsers } from '@/components/settings-users'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import {
   Activity,
@@ -569,7 +570,10 @@ export function SettingsDialog({
             </TabsContent>
 
             <TabsContent value="security" className="mt-0">
-              <SettingsSecurity />
+              <div className="space-y-6">
+                <SettingsUsers />
+                <SettingsSecurity />
+              </div>
             </TabsContent>
 
             <TabsContent value="activity" className="mt-0">

@@ -27,7 +27,8 @@ cp .env.example .env
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | No | Defaults to SQLite at `file:./prisma/dev.db`. Use `postgresql://…` for Postgres. |
-| `AGENTBOARD_ADMIN_PASSWORD` | Production | Bootstrap dashboard password, min 8 chars. A password set later in Settings → Security overrides it; this env var remains the break-glass credential (clear the AdminConfig DB row to fall back). |
+| `AGENTBOARD_ADMIN_PASSWORD` | Production | Bootstrap dashboard password, min 8 chars. The first login with it creates the `owner@conductor.local` account (same password); after that, sign in with account email + password. |
+| `RECOVERY_MODE` | Recovery only | Set to `1` to re-enable the legacy password-only login when locked out of all accounts (signs in as a synthetic owner). Unset it after fixing your users. |
 | `AGENTBOARD_ADMIN_SESSION_SECRET` | No | Separate cookie-signing secret (min 16 chars); falls back to the admin password. Generate: `openssl rand -hex 16` |
 | `AGENTBOARD_WS_SECRET` / `AGENTBOARD_WS_INTERNAL_SECRET` | No | Shared secrets for the `board-ws` realtime mini-service (min 16 chars each). |
 | `PROMPT_LIBRARY_PATH` | No | Absolute path to a folder of `.md` prompt templates for the archive browser / agent wizard. |
