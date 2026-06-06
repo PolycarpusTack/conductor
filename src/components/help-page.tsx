@@ -2713,8 +2713,31 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 and — for scheduled mode — a weekly time window. Play/Stop controls the poller directly. Full
                 detail in <Ref href="#help-automation-dispatch">Configuring automation</Ref>.
               </p>
-              <Callout tone="purple" title="🛣 On the roadmap (Epic S7)">
-                <p>A rules engine on top of the scheduler: auto-assign by tag/priority, auto-archive DONE tasks, review-gate escalation, retry-policy defaults.</p>
+              <H3 id="help-automation-rules">Automation rules (internal actions)</H3>
+              <p>
+                Rules live in <Ref href="#help-settings-integrations">Settings &middot; Integrations</Ref>, because a
+                rule <em>is</em> a trigger + a reaction — just one that points <strong>inward</strong>. Alongside
+                &ldquo;post to Slack&rdquo; you&apos;ll find internal actions that change Conductor state:
+              </p>
+              <Bullets>
+                <li><code>task:assign</code> — give the task an agent, by id or by role (skips if already assigned; <code>force: true</code> overrides).</li>
+                <li><code>task:set-priority</code> / <code>task:set-retry</code> — set priority, or give all <em>pending</em> steps a new retry policy.</li>
+                <li><code>task:archive</code> — tuck a DONE task away. Archived &ne; deleted: it&apos;s kept forever, just off the board (<code>POST /api/tasks/:id/unarchive</code> brings it back).</li>
+                <li><code>step:escalate</code> — bump the task one rung up the priority ladder and/or swap the step to its fallback agent.</li>
+              </Bullets>
+              <TipBox>
+                Recipe: trigger on <Term>task-created</Term> with filter <code>tag equals backend</code> →
+                reaction <code>task:assign</code> with <code>{'{"agentRole": "developer"}'}</code>. Every backend
+                task self-assigns the moment it lands.
+              </TipBox>
+              <WatchIt>
+                Internal actions never fire project events, so a rule can&apos;t set off another rule — no
+                accidental loops. They&apos;re also idempotent (re-firing is harmless) and every real mutation
+                lands in the activity log as <code>automation_rule_fired</code>. Rehearse a rule with the
+                <strong> dry run</strong> toggle first: it logs what would happen and touches nothing.
+              </WatchIt>
+              <Callout tone="purple" title="🛣 Still on the roadmap (S7 phases 2-3)">
+                <p>Time-based rules (auto-archive DONE after N days, stale review-gate escalation) via a scheduler sweep, an Archived view in the UI, and per-action config forms instead of raw JSON.</p>
               </Callout>
             </Section>
 

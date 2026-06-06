@@ -75,7 +75,7 @@ The form-side counterpart to chain templates: saved task defaults (title pattern
 Templates tab and a "Start from template" picker in the task-create dialog.
 Versioning/share-to-workspace/archive remain stretch goals (not shipped).
 
-### Epic S7 — Automation rules engine — 📐 DESIGN COMPLETE 2026-06-05
+### Epic S7 — Automation rules engine — 🚢 PHASE 1 SHIPPED 2026-06-06 (design 2026-06-05)
 Beyond the scheduler: auto-assign by tag/priority/title, auto-archive DONE after N days,
 review-gate escalation notifications (compose with Triggers/Reactions rather than
 duplicating them), retry-policy defaults. Design doc:

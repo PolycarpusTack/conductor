@@ -25,10 +25,11 @@ type TriggerFilter = {
 type Reaction = {
   id: string
   name: string
-  type: 'post:slack' | 'post:http' | 'create:jira' | 'send:email'
+  type: string // post:slack | post:http | create:jira | send:email | internal task:*/step:* actions
   config: Record<string, unknown>
   order: number
   enabled: boolean
+  dryRun?: boolean
   consecutiveFailures: number
   lastError: string | null
 }
@@ -58,7 +59,26 @@ const REACTION_TYPES = [
   { value: 'post:http', label: 'HTTP request' },
   { value: 'create:jira', label: 'Create Jira issue' },
   { value: 'send:email', label: 'Send email' },
+  // Internal actions (Epic S7): mutate Conductor state — no external service
+  { value: 'task:assign', label: '⚙ Internal: assign agent' },
+  { value: 'task:set-priority', label: '⚙ Internal: set priority' },
+  { value: 'task:set-retry', label: '⚙ Internal: set retry policy' },
+  { value: 'task:archive', label: '⚙ Internal: archive task' },
+  { value: 'step:escalate', label: '⚙ Internal: escalate step' },
 ]
+
+// Starter config per reaction type, shown when the type changes.
+const CONFIG_HINTS: Record<string, string> = {
+  'post:slack': '{"webhookEnvVar": "SLACK_WEBHOOK", "text": "Chain {{event.taskId}} completed"}',
+  'post:http': '{"url": "https://example.com/hook", "method": "POST"}',
+  'create:jira': '{"baseUrl": "https://org.atlassian.net", "projectKey": "OPS", "summary": "{{event.error}}"}',
+  'send:email': '{"to": "team@example.com", "subject": "Step failed"}',
+  'task:assign': '{"agentRole": "developer"}',
+  'task:set-priority': '{"priority": "HIGH"}',
+  'task:set-retry': '{"maxRetries": 5, "retryDelayMs": 10000}',
+  'task:archive': '{}',
+  'step:escalate': '{"bumpPriority": true, "reassignFallback": false}',
+}
 
 type Props = {
   projectId: string
@@ -130,18 +150,43 @@ function ReactionRow({
     onUpdate({ ...reaction, enabled: !reaction.enabled })
   }
 
+  const toggleDryRun = async () => {
+    const res = await fetch(
+      `/api/projects/${projectId}/triggers/${triggerId}/reactions/${reaction.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: !reaction.dryRun }),
+      },
+    )
+    if (!res.ok) return
+    onUpdate({ ...reaction, dryRun: !reaction.dryRun })
+  }
+
   return (
     <div className="border rounded p-3 space-y-2 text-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-medium">{reaction.name}</span>
           <Badge variant="outline">{reaction.type}</Badge>
+          {reaction.dryRun && <Badge variant="outline" className="text-amber-500 border-amber-500/40">dry run</Badge>}
           <span className="text-muted-foreground">order {reaction.order}</span>
           {reaction.consecutiveFailures > 0 && (
             <Badge variant="destructive">{reaction.consecutiveFailures} failures</Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleDryRun}
+            title="Dry run: log what would happen, execute nothing"
+            className={`text-[10px] font-mono px-2 py-1 rounded border ${
+              reaction.dryRun
+                ? 'text-amber-500 border-amber-500/40 bg-amber-500/10'
+                : 'text-muted-foreground border-border/30 hover:border-border'
+            }`}
+          >
+            dry
+          </button>
           <Switch checked={reaction.enabled} onCheckedChange={toggleEnabled} />
           <Button variant="ghost" size="sm" onClick={() => setEditing(e => !e)}>Edit</Button>
           <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
@@ -191,6 +236,7 @@ function TriggerCard({
   const [newRxnName, setNewRxnName] = useState('')
   const [newRxnType, setNewRxnType] = useState<string>('post:slack')
   const [newRxnConfig, setNewRxnConfig] = useState('{}')
+  const [newRxnDryRun, setNewRxnDryRun] = useState(false)
   const [newRxnOrder, setNewRxnOrder] = useState(trigger.reactions.length)
   const [testing, setTesting] = useState(false)
 
@@ -235,7 +281,7 @@ function TriggerCard({
     const res = await fetch(`/api/projects/${projectId}/triggers/${trigger.id}/reactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newRxnName, type: newRxnType, config: parsedConfig, order: newRxnOrder }),
+      body: JSON.stringify({ name: newRxnName, type: newRxnType, config: parsedConfig, order: newRxnOrder, dryRun: newRxnDryRun }),
     })
     if (!res.ok) { const e = await res.json() as { error?: string }; alert(e.error); return }
     const created = await res.json() as Reaction
@@ -244,6 +290,7 @@ function TriggerCard({
     setAddingReaction(false)
     setNewRxnName('')
     setNewRxnConfig('{}')
+    setNewRxnDryRun(false)
     setNewRxnOrder(trigger.reactions.length + 1)
   }
 
@@ -290,7 +337,7 @@ function TriggerCard({
             </div>
             <div>
               <Label>Type</Label>
-              <Select value={newRxnType} onValueChange={setNewRxnType}>
+              <Select value={newRxnType} onValueChange={(v) => { setNewRxnType(v); if (newRxnConfig === '{}' || Object.values(CONFIG_HINTS).includes(newRxnConfig)) setNewRxnConfig(CONFIG_HINTS[v] ?? '{}') }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {REACTION_TYPES.map(t => (
@@ -313,6 +360,10 @@ function TriggerCard({
                 placeholder='{"webhookEnvVar": "SLACK_WEBHOOK", "text": "Chain {{event.taskId}} completed"}'
               />
             </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={newRxnDryRun} onChange={e => setNewRxnDryRun(e.target.checked)} />
+              Dry run — log what would happen, execute nothing
+            </label>
             <div className="flex gap-2">
               <Button size="sm" onClick={addReaction}>Add reaction</Button>
               <Button size="sm" variant="ghost" onClick={() => setAddingReaction(false)}>Cancel</Button>

@@ -98,3 +98,44 @@ describe('GET /api/projects/[id]/deleted-tasks', () => {
     expect(where).toEqual({ projectId: 'p-1', deletedAt: { not: null } })
   })
 })
+
+describe('archived tasks (Epic S7)', () => {
+  test('POST /api/tasks/[id]/unarchive restores an archived task', async () => {
+    setSession(ADMIN_SESSION)
+    mockTaskFindUnique.mockResolvedValue({ id: 't-1', projectId: 'p-1', archivedAt: new Date() })
+    const { POST } = await import('@/app/api/tasks/[id]/unarchive/route')
+    const res = await POST(
+      makeRequest('http://localhost/api/tasks/t-1/unarchive', { method: 'POST', body: {} }),
+      restoreParams,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTaskUpdate.mock.calls[0][0].data).toEqual({ archivedAt: null })
+  })
+
+  test('POST unarchive 404s for a task that is not archived', async () => {
+    setSession(ADMIN_SESSION)
+    mockTaskFindUnique.mockResolvedValue({ id: 't-1', projectId: 'p-1', archivedAt: null })
+    const { POST } = await import('@/app/api/tasks/[id]/unarchive/route')
+    const res = await POST(
+      makeRequest('http://localhost/api/tasks/t-1/unarchive', { method: 'POST', body: {} }),
+      restoreParams,
+    )
+    expect(res.status).toBe(404)
+    expect(mockTaskUpdate).not.toHaveBeenCalled()
+  })
+
+  test('GET /api/projects/[id]/archived-tasks lists archived, never-deleted tasks', async () => {
+    setSession(ADMIN_SESSION)
+    mockTaskFindMany.mockResolvedValue([{ id: 't-1', title: 'Old', status: 'DONE', archivedAt: new Date() }])
+    const { GET } = await import('@/app/api/projects/[id]/archived-tasks/route')
+    const res = await GET(makeRequest('http://localhost/api/projects/p-1/archived-tasks'), {
+      params: Promise.resolve({ id: 'p-1' }),
+    })
+    expect(res.status).toBe(200)
+    expect(mockTaskFindMany.mock.calls[0][0].where).toEqual({
+      projectId: 'p-1',
+      archivedAt: { not: null },
+      deletedAt: null,
+    })
+  })
+})
