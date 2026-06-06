@@ -129,7 +129,7 @@ export const createTaskSchema = z.object({
   projectId: z.string().trim().min(1),
   agentId: z.string().trim().min(1).optional().nullable().transform((value) => value || undefined),
   notes: trimmedOptionalString,
-  steps: z.array(taskStepSchema).max(10).optional(),
+  steps: z.array(taskStepSchema).max(25).optional(),
   runtimeOverride: runtimeOverrideSchema.optional().nullable(),
 })
 
@@ -160,6 +160,12 @@ export const createUserSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   name: z.string().trim().min(1).max(120),
   role: userRoleSchema.default('member'),
+})
+
+// Agent library import (bundled suites + chain catalog)
+export const importLibrarySchema = z.object({
+  categories: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
+  includeChains: z.boolean().default(false),
 })
 
 export const changeMyPasswordSchema = z.object({
@@ -268,7 +274,7 @@ export const createChainTemplateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().max(500).optional(),
   icon: z.string().max(16).optional(),
-  steps: z.array(chainTemplateStepSchema).min(1).max(10),
+  steps: z.array(chainTemplateStepSchema).min(1).max(25),
 })
 
 export const stepReviewSchema = z.object({

@@ -72,6 +72,7 @@ model Agent {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   role             String?
+  category         String? // grouping for the agents UI (e.g. "Domain-Driven Design")
   capabilities     String?
   maxConcurrent    Int                 @default(1)
   supportedModes   String?
