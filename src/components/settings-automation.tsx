@@ -76,6 +76,30 @@ export function SettingsAutomation({ projectId }: SettingsAutomationProps) {
       .catch(() => {})
   }, [projectId])
 
+  // Recent automation activity (Epic S7 Phase 3) — what the rules actually did
+  const [ruleActivity, setRuleActivity] = useState<Array<{
+    id: string; action: string; details: string | null; createdAt: string
+  }>>([])
+
+  useEffect(() => {
+    fetch(`/api/activity?projectId=${projectId}&component=automation&limit=15`, { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : [])
+      .then((entries) => { if (Array.isArray(entries)) setRuleActivity(entries) })
+      .catch(() => {})
+  }, [projectId])
+
+  const describeRule = (entry: { details: string | null }) => {
+    try {
+      const d = JSON.parse(entry.details || '{}')
+      const action = d.ruleAction || 'rule'
+      const target = d.agentName || d.to || d.bumpedPriority || d.reassignedTo
+        || (d.maxRetries != null ? `maxRetries ${d.maxRetries}` : null)
+      return target ? `${action} → ${target}` : action
+    } catch {
+      return 'rule fired'
+    }
+  }
+
   const saveSweepSettings = async () => {
     setSavingSweep(true)
     setSweepSaved(false)
@@ -365,6 +389,28 @@ export function SettingsAutomation({ projectId }: SettingsAutomationProps) {
         <Button size="sm" variant="outline" onClick={saveSweepSettings} disabled={savingSweep} className="w-full">
           {savingSweep ? 'Saving...' : sweepSaved ? 'Saved ✓' : 'Save Time-Based Rules'}
         </Button>
+      </div>
+
+      {/* Recent automation activity (Epic S7 Phase 3) */}
+      <div className="space-y-2 p-3 rounded-lg border border-border/30 bg-muted/10">
+        <label className="text-sm font-medium">Recent Automation Activity</label>
+        {ruleActivity.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">
+            Nothing yet — when an automation rule fires (an internal action on a trigger), it logs here
+            as <code>automation_rule_fired</code>.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {ruleActivity.map((entry) => (
+              <div key={entry.id} className="flex items-center gap-2 text-xs p-1.5 rounded bg-background/50">
+                <span className="text-muted-foreground/60 shrink-0 font-mono text-[10px]">
+                  {new Date(entry.createdAt).toLocaleString()}
+                </span>
+                <span className="truncate">{describeRule(entry)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

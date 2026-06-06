@@ -95,6 +95,107 @@ function statusDot(trigger: IntegrationTrigger) {
   return <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
 }
 
+const INTERNAL_TYPES = new Set(['task:assign', 'task:set-priority', 'task:set-retry', 'task:archive', 'step:escalate'])
+const AGENT_ROLES = ['developer', 'researcher', 'writer', 'support', 'qa', 'analyst']
+
+// Structured config editor for internal actions (Epic S7 Phase 3). The JSON
+// config string stays the source of truth — this form parses and writes back,
+// so switching types or hand-editing elsewhere keeps working.
+function InternalActionConfig({ type, configJson, onChange }: {
+  type: string
+  configJson: string
+  onChange: (json: string) => void
+}) {
+  let config: Record<string, unknown> = {}
+  try { config = JSON.parse(configJson) } catch {}
+  const set = (patch: Record<string, unknown>) => {
+    const next = { ...config, ...patch }
+    for (const key of Object.keys(next)) {
+      if (next[key] === undefined || next[key] === '' || next[key] === false) delete next[key]
+    }
+    onChange(JSON.stringify(next))
+  }
+
+  if (type === 'task:archive') {
+    return <p className="text-xs text-muted-foreground">No configuration needed — archives the event&apos;s task when it&apos;s DONE.</p>
+  }
+
+  if (type === 'task:assign') {
+    return (
+      <div className="space-y-2">
+        <div>
+          <Label>Agent role</Label>
+          <Select value={(config.agentRole as string) || 'none'} onValueChange={v => set({ agentRole: v === 'none' ? undefined : v, agentId: undefined })}>
+            <SelectTrigger><SelectValue placeholder="Pick a role" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— by id instead —</SelectItem>
+              {AGENT_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        {!config.agentRole && (
+          <div>
+            <Label>Agent id</Label>
+            <Input value={(config.agentId as string) || ''} onChange={e => set({ agentId: e.target.value })} placeholder="agent id" />
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={config.force === true} onChange={e => set({ force: e.target.checked })} />
+          Force — reassign even if the task already has an agent
+        </label>
+      </div>
+    )
+  }
+
+  if (type === 'task:set-priority') {
+    return (
+      <div>
+        <Label>Priority</Label>
+        <Select value={(config.priority as string) || 'HIGH'} onValueChange={v => set({ priority: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map(pr => <SelectItem key={pr} value={pr}>{pr}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    )
+  }
+
+  if (type === 'task:set-retry') {
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label>Max retries</Label>
+          <Input type="number" min={0} max={20} value={String(config.maxRetries ?? 5)}
+            onChange={e => set({ maxRetries: parseInt(e.target.value, 10) || 0 })} />
+        </div>
+        <div>
+          <Label>Retry delay (ms)</Label>
+          <Input type="number" min={0} value={String(config.retryDelayMs ?? 10000)}
+            onChange={e => set({ retryDelayMs: parseInt(e.target.value, 10) || 0 })} />
+        </div>
+      </div>
+    )
+  }
+
+  if (type === 'step:escalate') {
+    return (
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={config.bumpPriority === true} onChange={e => set({ bumpPriority: e.target.checked })} />
+          Bump task priority one rung (LOW → MEDIUM → HIGH → URGENT)
+        </label>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={config.reassignFallback === true} onChange={e => set({ reassignFallback: e.target.checked })} />
+          Reassign the step to its fallback agent
+        </label>
+      </div>
+    )
+  }
+
+  return null
+}
+
 function ReactionRow({
   reaction,
   triggerId,
@@ -352,16 +453,25 @@ function TriggerCard({
               <Label>Order</Label>
               <Input type="number" value={newRxnOrder} onChange={e => setNewRxnOrder(Number(e.target.value))} />
             </div>
-            <div>
-              <Label>Config (JSON)</Label>
-              <Textarea
-                value={newRxnConfig}
-                onChange={e => setNewRxnConfig(e.target.value)}
-                rows={4}
-                className="font-mono text-xs"
-                placeholder='{"webhookEnvVar": "SLACK_WEBHOOK", "text": "Chain {{event.taskId}} completed"}'
-              />
-            </div>
+            {INTERNAL_TYPES.has(newRxnType) ? (
+              <div>
+                <Label>Action settings</Label>
+                <div className="mt-1">
+                  <InternalActionConfig type={newRxnType} configJson={newRxnConfig} onChange={setNewRxnConfig} />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label>Config (JSON)</Label>
+                <Textarea
+                  value={newRxnConfig}
+                  onChange={e => setNewRxnConfig(e.target.value)}
+                  rows={4}
+                  className="font-mono text-xs"
+                  placeholder='{"webhookEnvVar": "SLACK_WEBHOOK", "text": "Chain {{event.taskId}} completed"}'
+                />
+              </div>
+            )}
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={newRxnDryRun} onChange={e => setNewRxnDryRun(e.target.checked)} />
               Dry run — log what would happen, execute nothing

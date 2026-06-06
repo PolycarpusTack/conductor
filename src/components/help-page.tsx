@@ -23,6 +23,7 @@ const TOC: TocGroup[] = [
   {
     label: 'Release notes',
     items: [
+      { id: 'help-release-0-3-0', title: "What's new in 0.3.0" },
       { id: 'help-release-0-2-0', title: "What's new in 0.2.0" },
       { id: 'help-release-0-1-0', title: "What's new in 0.1.0" },
       { id: 'help-release-0-6', title: "What's new in 0.6" },
@@ -505,6 +506,43 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             {/* ════════════════════════════════════════════════════════════════
                 RELEASE NOTES
                ════════════════════════════════════════════════════════════════ */}
+
+            <Section
+              id="help-release-0-3-0"
+              title="What's new in 0.3.0"
+              subtitle="Modes become policy, tasks get templates, and automation grows a rules engine."
+            >
+              <Callout tone="neon" title="The headline">
+                <p>
+                  0.3.0 completes the settings roadmap (S1&ndash;S7). Modes now carry real policy — retry
+                  budgets, tool allowlists, output-format hints. Task templates prefill the create dialog.
+                  And the new <strong>automation rules engine</strong> lets triggers point inward: auto-assign
+                  agents, set priorities and retry policies, archive old work, and escalate stale review
+                  gates — with dry-run rehearsal and a hard no-cascade guarantee.
+                </p>
+              </Callout>
+
+              <H3 id="help-release-0-3-0-modes">Mode policy depth (S4)</H3>
+              <Bullets>
+                <li><strong>Per-mode max attempts</strong> — steps created in a mode inherit its retry budget; explicit step settings still win.</li>
+                <li><strong>Tool allowlists</strong> — exact names or <code>connection__*</code> globs narrow MCP tools after the built-in read-only heuristics; a tool must survive every layer to reach an agent.</li>
+                <li><strong>Output-format hints</strong> — markdown / JSON / diff / plain, appended to the mode instructions at dispatch.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-3-0-templates">Task templates (S6)</H3>
+              <Bullets>
+                <li><strong>Saved task forms</strong> — title pattern (with <code>{'{date}'}</code> expansion), description, priority, tag, notes, and an attached chain template.</li>
+                <li><strong>Start from template</strong> — a picker at the top of the create-task dialog prefills everything, step builder included. It&apos;s a prefill, not a lock.</li>
+              </Bullets>
+
+              <H3 id="help-release-0-3-0-automation">Automation rules engine (S7)</H3>
+              <Bullets>
+                <li><strong>Internal actions</strong> — <code>task:assign</code>, <code>task:set-priority</code>, <code>task:set-retry</code>, <code>task:archive</code>, <code>step:escalate</code> ride the same trigger/reaction pipeline as Slack and Jira, with structured config forms.</li>
+                <li><strong>Safety rails</strong> — automations can never trigger automations, every action is idempotent, every firing is audited, and a dry-run toggle rehearses rules without executing them.</li>
+                <li><strong>Time-based rules</strong> — an hourly sweep emits <Term>task-stale</Term> and <Term>review-gate-stale</Term> events; pair them with internal actions to auto-archive DONE work or escalate forgotten human gates.</li>
+                <li><strong>Archive &ne; delete</strong> — archived tasks leave the board but live forever in <em>Settings &rarr; Activity &rarr; Archived Tasks</em>.</li>
+              </Bullets>
+            </Section>
 
             <Section
               id="help-release-0-2-0"
