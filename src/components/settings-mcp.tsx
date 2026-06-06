@@ -12,6 +12,8 @@ interface DiscoveredTool {
   name: string
   description: string | null
   enabled: boolean
+  usageCount?: number
+  lastUsedAt?: string | null
 }
 
 interface SettingsMcpProps {
@@ -221,10 +223,18 @@ export function SettingsMcp({ projectId, connections, onConnectionsChange }: Set
                             )
                           }
                         />
-                        <span>
+                        <span className="flex-1">
                           <span className="font-mono">{tool.name}</span>
                           {tool.description && <span className="text-muted-foreground"> — {tool.description}</span>}
                         </span>
+                        {(tool.usageCount ?? 0) > 0 && (
+                          <span
+                            className="text-[10px] text-muted-foreground/70 font-mono shrink-0"
+                            title={tool.lastUsedAt ? `last used ${new Date(tool.lastUsedAt).toLocaleString()}` : undefined}
+                          >
+                            {tool.usageCount}×
+                          </span>
+                        )}
                       </label>
                     ))}
                   </div>

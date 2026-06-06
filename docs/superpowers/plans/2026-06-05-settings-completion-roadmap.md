@@ -63,7 +63,7 @@ per-mode tool allowlist editor (exact + `conn__*` prefix patterns, layered after
 `resolveMcpTools` mode heuristics), output-format hint appended to mode instructions.
 Makes modes the policy object the help always described.
 
-### Epic S5 — Runtime & MCP operations ✅ SHIPPED 2026-06-05 (per-tool usage stats deferred)
+### Epic S5 — Runtime & MCP operations ✅ SHIPPED 2026-06-05 (per-tool usage stats landed 2026-06-06)
 Per-runtime test call (the `/api/admin/runtimes/[id]/health` ping from v0.0.6 — just needs
 a button!), per-runtime usage rollups from execution logs, MCP tool discovery UI
 (`tools/list` against the endpoint), and per-tool enable/disable persisted to the unused

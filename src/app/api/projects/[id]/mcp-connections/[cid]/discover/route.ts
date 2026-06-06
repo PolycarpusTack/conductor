@@ -43,11 +43,20 @@ export const POST = withErrorHandling(
       const scopes = parseScopes(connection.scopes)
       const allowed = scopes === null ? null : new Set(scopes)
 
+      // Per-tool usage counters (Epic S5 leftover) — recorded by executeMcpTool
+      const usageRows = await db.mcpToolUsage.findMany({
+        where: { connectionId: cid },
+        select: { toolName: true, count: true, lastUsedAt: true },
+      })
+      const usage = new Map(usageRows.map((u) => [u.toolName, u]))
+
       return NextResponse.json({
         tools: rawTools.map((tool) => ({
           name: tool.name,
           description: tool.description ?? null,
           enabled: allowed === null ? true : allowed.has(tool.name),
+          usageCount: usage.get(tool.name)?.count ?? 0,
+          lastUsedAt: usage.get(tool.name)?.lastUsedAt ?? null,
         })),
       })
     } catch {

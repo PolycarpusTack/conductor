@@ -6,10 +6,13 @@ import { setSession, ADMIN_SESSION, makeRequest } from '../helpers/auth'
 const mockConnectionFindUnique = mock(() => Promise.resolve(null)) as any
 const mockExecutionFindMany = mock(() => Promise.resolve([])) as any
 
+const mockUsageFindMany = mock(() => Promise.resolve([])) as any
+
 mock.module('@/lib/db', () => ({
   db: {
     projectMcpConnection: { findUnique: mockConnectionFindUnique },
     stepExecution: { findMany: mockExecutionFindMany },
+    mcpToolUsage: { findMany: mockUsageFindMany },
   },
   isPostgresDb: false,
 }))
@@ -22,6 +25,8 @@ beforeEach(() => {
   mockConnectionFindUnique.mockResolvedValue(null)
   mockExecutionFindMany.mockReset()
   mockExecutionFindMany.mockResolvedValue([])
+  mockUsageFindMany.mockReset()
+  mockUsageFindMany.mockResolvedValue([])
 })
 
 const discoverParams = { params: Promise.resolve({ id: 'p-1', cid: 'conn-1' }) }
@@ -74,8 +79,8 @@ describe('POST /api/projects/[id]/mcp-connections/[cid]/discover', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.tools).toEqual([
-      { name: 'read_file', description: 'Read', enabled: true },
-      { name: 'write_file', description: null, enabled: false },
+      { name: 'read_file', description: 'Read', enabled: true, usageCount: 0, lastUsedAt: null },
+      { name: 'write_file', description: null, enabled: false, usageCount: 0, lastUsedAt: null },
     ])
   })
 

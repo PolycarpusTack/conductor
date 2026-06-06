@@ -2718,9 +2718,11 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 dispatch. All-checked means &ldquo;no restriction&rdquo;, so new server tools stay available
                 automatically.
               </p>
-              <Callout tone="purple" title="🛣 Still on the roadmap (Epic S5 leftovers)">
-                <p>Per-tool usage stats.</p>
-              </Callout>
+              <TipBox>
+                Each tool in the expander shows a <strong>usage counter</strong> (hover for the last-used
+                time) — an easy way to spot which tools your agents actually rely on before you tighten an
+                allowlist.
+              </TipBox>
             </Section>
 
             <Section id="help-settings-templates" title="Settings · Templates">

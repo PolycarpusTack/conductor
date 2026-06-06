@@ -175,16 +175,30 @@ model ProjectRuntime {
 }
 
 model ProjectMcpConnection {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name      String
   type      String
   icon      String?
   endpoint  String?
   config    String?
   scopes    String?
-  createdAt DateTime @default(now())
+  toolUsage McpToolUsage[]
+  createdAt DateTime       @default(now())
+}
+
+// Per-tool usage counters (Epic S5 leftover): incremented fire-and-forget on
+// every tool invocation, surfaced in the MCP tools expander.
+model McpToolUsage {
+  id           String               @id @default(cuid())
+  connectionId String
+  connection   ProjectMcpConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  toolName     String
+  count        Int                  @default(0)
+  lastUsedAt   DateTime             @default(now())
+
+  @@unique([connectionId, toolName])
 }
 
 model ChainTemplate {

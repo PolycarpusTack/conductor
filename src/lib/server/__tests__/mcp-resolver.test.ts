@@ -1,12 +1,16 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test'
 
 // Mock the db module before importing the module under test
+const mockUsageUpsert = mock(() => Promise.resolve({})) as any
+
 mock.module('@/lib/db', () => ({
   db: {
     projectMcpConnection: {
       findMany: mock(() => Promise.resolve([])),
     },
+    mcpToolUsage: { upsert: mockUsageUpsert },
   },
+  isPostgresDb: false,
 }))
 
 // Import AFTER mocking
@@ -22,6 +26,8 @@ function setMockFetch(impl: (...args: any[]) => Promise<Response>) {
 beforeEach(() => {
   globalThis.fetch = originalFetch;
   (db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockReset()
+  mockUsageUpsert.mockReset()
+  mockUsageUpsert.mockResolvedValue({})
 })
 
 describe('executeMcpTool', () => {
@@ -331,5 +337,43 @@ describe('resolveMcpTools — per-mode tool allowlist (Epic S4)', () => {
     // analyze strips nothing here (no write-ish names), but allowlist still narrows
     const tools = await resolveMcpTools(['conn1'], 'analyze', ['fs__search'])
     expect(tools.map(t => t.name)).toEqual(['fs__search'])
+  })
+})
+
+
+describe('executeMcpTool — per-tool usage stats (Epic S5)', () => {
+  test('increments the usage counter fire-and-forget', async () => {
+    ;(db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockResolvedValue([
+      { id: 'conn1', name: 'myserver', endpoint: 'http://localhost:3001' },
+    ])
+    setMockFetch(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ result: { content: [{ type: 'text', text: 'ok' }] } }),
+      } as Response),
+    )
+
+    await executeMcpTool('myserver__run_query', {}, ['conn1'])
+
+    expect(mockUsageUpsert).toHaveBeenCalledTimes(1)
+    const args = mockUsageUpsert.mock.calls[0][0]
+    expect(args.where.connectionId_toolName).toEqual({ connectionId: 'conn1', toolName: 'run_query' })
+    expect(args.update.count).toEqual({ increment: 1 })
+  })
+
+  test('a failing usage write never breaks the tool call', async () => {
+    ;(db.projectMcpConnection.findMany as ReturnType<typeof mock>).mockResolvedValue([
+      { id: 'conn1', name: 'myserver', endpoint: 'http://localhost:3001' },
+    ])
+    mockUsageUpsert.mockRejectedValue(new Error('db down'))
+    setMockFetch(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ result: { content: [{ type: 'text', text: 'still works' }] } }),
+      } as Response),
+    )
+
+    const result = await executeMcpTool('myserver__run_query', {}, ['conn1'])
+    expect(result.text).toBe('still works')
   })
 })

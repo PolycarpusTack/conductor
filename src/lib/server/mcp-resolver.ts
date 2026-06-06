@@ -181,6 +181,14 @@ export async function executeMcpTool(
     return { text: JSON.stringify({ error: `MCP connection "${connectionName}" not found or has no endpoint` }), artifacts: [] }
   }
 
+  // Per-tool usage counter (Epic S5) — fire-and-forget; stats must never
+  // slow down or fail a tool call.
+  db.mcpToolUsage.upsert({
+    where: { connectionId_toolName: { connectionId: connection.id, toolName: actualToolName } },
+    create: { connectionId: connection.id, toolName: actualToolName, count: 1 },
+    update: { count: { increment: 1 }, lastUsedAt: new Date() },
+  }).catch(() => {})
+
   const endpoint = connection.endpoint.replace(/\/$/, '')
 
   try {
