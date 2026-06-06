@@ -69,6 +69,35 @@ bun run build      # next build + standalone copy
 bun run start      # serves .next/standalone via bun
 ```
 
+## 4b. Custom ports & parallel instances
+
+`next dev`/`next start` bind `PORT` (default 3000); board-ws binds its own
+`PORT` (default 3003). `PORT` must be set in the **process** environment —
+Next binds before it reads `.env`.
+
+A fully isolated second instance needs its own port, database, and realtime
+wiring:
+
+```powershell
+# instance 2 — PowerShell
+$env:PORT=3100
+$env:DATABASE_URL="file:./prisma/dev2.db"
+$env:AGENTBOARD_WS_URL="http://127.0.0.1:3103"
+$env:NEXT_PUBLIC_AGENTBOARD_WS_URL="http://127.0.0.1:3103"
+bun run db:push; bun run dev
+```
+
+```powershell
+# its board-ws — PowerShell
+cd mini-services/board-ws
+$env:PORT=3103
+$env:AGENTBOARD_WS_ALLOWED_ORIGINS="http://localhost:3100,http://127.0.0.1:3100"
+bun run start
+```
+
+(bash: `PORT=3100 DATABASE_URL=file:./prisma/dev2.db bun run dev` etc.)
+Skip the board-ws pair entirely if the second instance doesn't need live sync.
+
 ## 5. Realtime updates (optional)
 
 Live board sync runs through the `mini-services/board-ws` Socket.IO service
