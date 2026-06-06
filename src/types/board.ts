@@ -10,6 +10,7 @@ export interface Agent {
   isActive: boolean
   lastSeen?: string | null
   role?: string | null
+  category?: string | null
   capabilities?: string | null
   maxConcurrent: number
   supportedModes?: string | null

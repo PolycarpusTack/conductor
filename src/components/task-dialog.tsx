@@ -16,7 +16,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -66,6 +68,19 @@ export function TaskDialog({
   handleSaveTask, resetTaskForm,
   currentProject, projectModes, chainTemplates, taskTemplates, statusColumns,
 }: TaskDialogProps) {
+  // Agent picker grouped by category (library-scale projects)
+  const agentGroups = (() => {
+    const map = new Map<string, Project['agents']>()
+    for (const agent of currentProject?.agents ?? []) {
+      const key = agent.category || 'General'
+      const list = map.get(key) ?? []
+      list.push(agent)
+      map.set(key, list)
+    }
+    return [...map.entries()].sort(([a], [b]) =>
+      a === 'General' ? -1 : b === 'General' ? 1 : a.localeCompare(b))
+  })()
+
   // Task templates (Epic S6): picking one prefills the form. It's a suggestion —
   // every field stays editable, and picking another template overwrites again.
   const [pickedTemplateId, setPickedTemplateId] = useState('')
@@ -202,11 +217,17 @@ export function TaskDialog({
               <label className="text-sm font-medium">Agent</label>
               <Select value={taskAgentId} onValueChange={setTaskAgentId}>
                 <SelectTrigger><SelectValue placeholder="Assign agent..." /></SelectTrigger>
-                <SelectContent>
-                  {currentProject?.agents.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      <AgentBadge agent={agent} size="card" />
-                    </SelectItem>
+                <SelectContent className="max-h-72">
+                  {/* Grouped by category so 100+ library agents stay navigable */}
+                  {agentGroups.map(([group, groupAgents]) => (
+                    <SelectGroup key={group}>
+                      {agentGroups.length > 1 && <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">{group}</SelectLabel>}
+                      {groupAgents.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          <AgentBadge agent={agent} size="card" />
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

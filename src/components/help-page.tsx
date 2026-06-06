@@ -2659,6 +2659,26 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
                 fresh API key (shown once) — the copy starts <em>inactive</em> so you can review it before it
                 claims work.
               </p>
+
+              <H3 id="help-agent-library">The agent library</H3>
+              <p>
+                <strong>Import from Library</strong> opens a catalog of ~100 specialist agents with full system
+                prompts — Domain-Driven Design coaches, refactoring and clean-code reviewers, security and SRE
+                advisors, testing strategists, planning facilitators — plus {`~27`} ready-made workflow chains
+                from the chain catalog (Solution Design, Code Review, Quality Gate, Refactoring Session, …).
+                Pick categories, optionally include the chains, import. It&apos;s additive and idempotent:
+                existing names are never overwritten, and re-importing just skips what you already have.
+              </p>
+              <Bullets>
+                <li><strong>Imported agents start inactive</strong> — assign a runtime and activate the ones you actually want claiming work.</li>
+                <li><strong>Chains resolve by role</strong> — each library agent&apos;s role is its slug, so the imported chain templates find their agents automatically (and so do <code>task:assign</code> rules and recurring tasks).</li>
+                <li><strong>Chains only import when complete</strong> — a chain whose steps need categories you didn&apos;t select is skipped rather than imported broken.</li>
+              </Bullets>
+              <TipBox>
+                With a library-sized cast, the tab switches to <strong>category groups</strong> with a search
+                box — and the task dialog&apos;s agent picker grows matching group headers. Collapse what you
+                don&apos;t use; search reaches across name, role, description, and category.
+              </TipBox>
             </Section>
 
             <Section id="help-settings-api" title="Settings · API keys">

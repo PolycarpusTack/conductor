@@ -26,6 +26,7 @@ import { SettingsActivity } from '@/components/settings-activity'
 import { SettingsScopedKeys } from '@/components/settings-scoped-keys'
 import { SettingsSecurity } from '@/components/settings-security'
 import { SettingsUsers } from '@/components/settings-users'
+import { SettingsAgents } from '@/components/settings-agents'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import {
   Activity,
@@ -85,6 +86,7 @@ interface SettingsDialogProps {
   setAgentDialogOpen: Dispatch<SetStateAction<boolean>>
   onProjectUpdated: (patch: Partial<Project>) => void
   onProjectDeleted: () => void
+  onLibraryImported: () => void
 }
 
 const ARTIFACT_RETENTION_OPTIONS = [
@@ -303,7 +305,7 @@ export function SettingsDialog({
   copyToClipboard, rotateProjectApiKey, rotateAgentApiKey, migrateLegacyKeys,
   expandedAgentStats, setExpandedAgentStats,
   openEditAgentDialog, handleDeleteAgent, resetAgentForm, setAgentDialogOpen,
-  onProjectUpdated, onProjectDeleted,
+  onProjectUpdated, onProjectDeleted, onLibraryImported,
 }: SettingsDialogProps) {
   const handleDuplicateAgent = async (agentId: string) => {
     try {
@@ -399,56 +401,18 @@ export function SettingsDialog({
                     </div>
                   </div>
                 )}
-                {currentProject?.agents.map((agent) => (
-                  <div key={agent.id} className="rounded-lg border border-border/30">
-                    <div className="flex items-center justify-between p-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">{agent.emoji}</span>
-                        <div>
-                          <div className="text-sm font-medium flex items-center gap-2">
-                            {agent.name}
-                            {agent.isActive && (
-                              <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                Active
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground">{agent.description}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setExpandedAgentStats(expandedAgentStats === agent.id ? null : agent.id)}>
-                          <Activity className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" title="Duplicate agent" onClick={() => handleDuplicateAgent(agent.id)}>
-                          <CopyPlus className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEditAgentDialog(agent)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteAgent(agent.id)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    {expandedAgentStats === agent.id && (
-                      <div className="px-3 pb-3">
-                        <AgentActivityDashboard agentId={agent.id} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => { resetAgentForm(); setAgentDialogOpen(true) }}
-                  disabled={projectRuntimes.length === 0}
-                  title={projectRuntimes.length === 0 ? 'Add a runtime first — agents need one to dispatch' : undefined}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Agent
-                </Button>
+                {currentProject && (
+                  <SettingsAgents
+                    projectId={currentProject.id}
+                    agents={currentProject.agents}
+                    hasRuntimes={projectRuntimes.length > 0}
+                    onAddAgent={() => { resetAgentForm(); setAgentDialogOpen(true) }}
+                    onEditAgent={openEditAgentDialog}
+                    onDeleteAgent={handleDeleteAgent}
+                    onDuplicateAgent={handleDuplicateAgent}
+                    onImported={onLibraryImported}
+                  />
+                )}
               </div>
             </TabsContent>
 

@@ -475,6 +475,7 @@ export function BoardView({
         onProjectUpdated={(patch) =>
           setCurrentProject(prev => (prev ? { ...prev, ...patch } : prev))
         }
+        onLibraryImported={() => { if (currentProject) void switchProject(currentProject.id) }}
         onProjectDeleted={() => {
           setSettingsTab(null)
           const survivor = projects.find(p => p.id !== currentProject?.id)

@@ -14,6 +14,8 @@ export const agentSummarySelect = {
   isActive: true,
   lastSeen: true,
   invocationMode: true,
+  role: true,
+  category: true, // agents UI groups by this
   // supportedModes is a JSON string of allowed step modes; ChainBuilder needs
   // it to constrain which steps a given agent can be assigned to.
   supportedModes: true,
