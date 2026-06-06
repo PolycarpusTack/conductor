@@ -495,6 +495,34 @@ model AdminConfig {
   updatedAt       DateTime @updatedAt
 }
 
+// Per-user accounts (Phase 1): named users replace the shared admin password.
+// The owner bootstraps from the legacy credential on first login.
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  passwordHash String // scrypt "salt:hash" hex (admin-config helpers)
+  role         String        @default("member") // owner | admin | member
+  isActive     Boolean       @default(true)
+  lastLoginAt  DateTime?
+  sessions     UserSession[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+// DB-backed sessions: only the token hash is stored, enabling per-user
+// revocation ("deactivate now", "sign out everywhere").
+model UserSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique // SHA-256 of the cookie value
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 // ─── Agent messaging ───────────────────────────────────────────────────────
 
 // A stable, human-readable address for an agent within a project

@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import { assertSameOrigin } from '@/lib/csrf'
 import { setAdminPassword } from '@/lib/server/admin-config'
-import { requireAdminSession, verifyAdminPassword } from '@/lib/server/admin-session'
+import { requireRole, verifyAdminPassword } from '@/lib/server/admin-session'
 import { badRequest, unauthorized as unauthorizedError, withErrorHandling } from '@/lib/server/api-errors'
 
 const changePasswordSchema = z.object({
@@ -18,7 +18,7 @@ const changePasswordSchema = z.object({
  * every session (including this one) is invalidated — the client re-logs in.
  */
 export const POST = withErrorHandling('api/admin/security/password', async (request: Request) => {
-  const unauthorized = await requireAdminSession()
+  const unauthorized = await requireRole('admin')
   if (unauthorized) return unauthorized
   assertSameOrigin(request)
 

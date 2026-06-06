@@ -4,6 +4,15 @@ import { NextResponse } from 'next/server'
 
 import { getAdminConfig, scryptVerify } from '@/lib/server/admin-config'
 import { getLogger } from '@/lib/server/logger'
+import {
+  resolveUserSession,
+  revokeSessionByToken,
+  createUserSession,
+  usersExist,
+  USER_TOKEN_PREFIX,
+  type SessionUser,
+  type UserRole,
+} from '@/lib/server/user-auth'
 
 const log = getLogger('admin-session')
 
@@ -38,10 +47,10 @@ function secureEquals(left: string, right: string) {
 }
 
 /**
- * The credential fingerprint anchors session tokens (Epic S2). DB password
- * hash when set (UI-managed), else a digest of the env password (bootstrap).
- * Changing either credential changes the fingerprint, which invalidates
- * every outstanding session with zero extra bookkeeping.
+ * The credential fingerprint anchors LEGACY session tokens (Epic S2). DB
+ * password hash when set (UI-managed), else a digest of the env password.
+ * Once user accounts exist, sessions move to DB-backed tokens (user-auth.ts)
+ * and the legacy path only stays open for RECOVERY_MODE.
  */
 async function getCredentialFingerprint(): Promise<string | null> {
   const config = await getAdminConfig()
@@ -62,11 +71,20 @@ async function buildSessionToken(nonce: string): Promise<string | null> {
   return digest(`${fingerprint}:${secret}:${nonce}`)
 }
 
+/** Break-glass: keeps the legacy password path open even when users exist. */
+function isRecoveryMode(): boolean {
+  return process.env.RECOVERY_MODE === '1' || process.env.RECOVERY_MODE === 'true'
+}
+
 export async function isAdminAuthConfigured(): Promise<boolean> {
+  if (await usersExist()) return true
   return (await getCredentialFingerprint()) !== null && Boolean(getSessionSecret())
 }
 
-export async function hasAdminSession() {
+/** Legacy HMAC pair is only honored before the first user exists (or in recovery). */
+async function hasLegacySession(): Promise<boolean> {
+  if ((await usersExist()) && !isRecoveryMode()) return false
+
   const cookieStore = await cookies()
   const nonce = cookieStore.get(ADMIN_SESSION_NONCE_COOKIE)?.value
   const sessionToken = cookieStore.get(ADMIN_COOKIE_NAME)?.value
@@ -81,6 +99,29 @@ export async function hasAdminSession() {
   }
 
   return secureEquals(sessionToken, expectedToken)
+}
+
+/**
+ * The session user, or null. A valid legacy session acts as a synthetic
+ * owner so pre-account deployments (and recovery mode) lose nothing.
+ */
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value
+  if (!token) return null
+
+  if (token.startsWith(USER_TOKEN_PREFIX)) {
+    return resolveUserSession(token)
+  }
+
+  if (await hasLegacySession()) {
+    return { id: 'legacy-admin', email: 'admin@legacy', name: 'Admin (legacy)', role: 'owner' }
+  }
+  return null
+}
+
+export async function hasAdminSession() {
+  return (await getSessionUser()) !== null
 }
 
 export async function requireAdminSession() {
@@ -98,9 +139,26 @@ export async function requireAdminSession() {
   return null
 }
 
+const ROLE_RANK: Record<UserRole, number> = { member: 0, admin: 1, owner: 2 }
+
 /**
- * Layered verification: a UI-set DB password takes precedence; the env var
- * remains the bootstrap / break-glass credential when no DB password exists.
+ * Role gate for the privileged surface (security config, user management,
+ * project delete). 401 without a session, 403 below the required role.
+ */
+export async function requireRole(role: 'admin' | 'owner') {
+  const unauthorized = await requireAdminSession()
+  if (unauthorized) return unauthorized
+
+  const user = await getSessionUser()
+  if (!user || ROLE_RANK[user.role] < ROLE_RANK[role]) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+  return null
+}
+
+/**
+ * Layered verification of the LEGACY credential: a UI-set DB password takes
+ * precedence; the env var remains the bootstrap / break-glass credential.
  */
 export async function verifyAdminPassword(password: string) {
   const config = await getAdminConfig()
@@ -116,14 +174,11 @@ export async function verifyAdminPassword(password: string) {
   return secureEquals(password, envPassword)
 }
 
-export async function createAdminSession() {
-  const nonce = randomBytes(16).toString('hex')
-  const token = await buildSessionToken(nonce)
-
-  if (!token) {
-    throw new Error('Admin authentication is not configured on the server')
-  }
-
+/**
+ * Starts a session. With a userId: DB-backed token (per-user revocation).
+ * Without: the legacy HMAC pair — only used before the first user exists.
+ */
+export async function createAdminSession(userId?: string) {
   const { sessionTtlHours } = await getAdminConfig()
 
   const cookieStore = await cookies()
@@ -135,12 +190,30 @@ export async function createAdminSession() {
     maxAge: sessionTtlHours * 60 * 60,
   }
 
+  if (userId) {
+    const token = await createUserSession(userId, sessionTtlHours)
+    cookieStore.set(ADMIN_COOKIE_NAME, token, cookieOptions)
+    cookieStore.delete(ADMIN_SESSION_NONCE_COOKIE)
+    return
+  }
+
+  const nonce = randomBytes(16).toString('hex')
+  const token = await buildSessionToken(nonce)
+
+  if (!token) {
+    throw new Error('Admin authentication is not configured on the server')
+  }
+
   cookieStore.set(ADMIN_COOKIE_NAME, token, cookieOptions)
   cookieStore.set(ADMIN_SESSION_NONCE_COOKIE, nonce, cookieOptions)
 }
 
 export async function clearAdminSession() {
   const cookieStore = await cookies()
+  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value
+  if (token?.startsWith(USER_TOKEN_PREFIX)) {
+    await revokeSessionByToken(token).catch(() => {})
+  }
   cookieStore.delete(ADMIN_COOKIE_NAME)
   cookieStore.delete(ADMIN_SESSION_NONCE_COOKIE)
 }

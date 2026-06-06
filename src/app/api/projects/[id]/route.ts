@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { assertSameOrigin } from '@/lib/csrf'
-import { requireAdminSession } from '@/lib/server/admin-session'
+import { requireAdminSession, requireRole } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateProjectSchema } from '@/lib/server/contracts'
 import { agentSummarySelect } from '@/lib/server/selects'
@@ -102,7 +102,8 @@ export const PUT = withErrorHandling(
 export const DELETE = withErrorHandling(
   'api/projects/[id]',
   async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
-    const unauthorized = await requireAdminSession()
+    // Destroying a project (and everything in it) is admin-only territory.
+    const unauthorized = await requireRole('admin')
     if (unauthorized) return unauthorized
     assertSameOrigin(request)
 

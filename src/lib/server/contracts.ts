@@ -148,8 +148,29 @@ export const updateTaskSchema = z
   .refine((value) => Object.keys(value).length > 0, 'Provide at least one task field to update')
 
 export const adminLoginSchema = z.object({
+  // Email is optional until the first user account exists (legacy window)
+  email: z.string().trim().toLowerCase().email().optional(),
   password: z.string().min(1),
 })
+
+// User management (per-user accounts Phase 1)
+export const userRoleSchema = z.enum(['owner', 'admin', 'member'])
+
+export const createUserSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  name: z.string().trim().min(1).max(120),
+  role: userRoleSchema.default('member'),
+})
+
+export const updateUserSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    role: userRoleSchema,
+    isActive: z.boolean(),
+    resetPassword: z.literal(true),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
 
 export const logLevelSchema = z.enum(['debug', 'info', 'warn', 'error'])
 export const logComponentSchema = z.enum(['task', 'agent', 'daemon', 'wizard', 'runtime', 'system'])

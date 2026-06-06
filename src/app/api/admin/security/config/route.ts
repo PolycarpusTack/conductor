@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import { assertSameOrigin } from '@/lib/csrf'
 import { getAdminConfig, setSessionTtlHours } from '@/lib/server/admin-config'
-import { requireAdminSession } from '@/lib/server/admin-session'
+import { requireRole } from '@/lib/server/admin-session'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 
 const configSchema = z.object({
@@ -12,7 +12,7 @@ const configSchema = z.object({
 
 /** GET /api/admin/security/config — current instance security settings. */
 export const GET = withErrorHandling('api/admin/security/config', async () => {
-  const unauthorized = await requireAdminSession()
+  const unauthorized = await requireRole('admin')
   if (unauthorized) return unauthorized
 
   const config = await getAdminConfig()
@@ -24,7 +24,7 @@ export const GET = withErrorHandling('api/admin/security/config', async () => {
 
 /** PUT /api/admin/security/config — update session TTL (applies to new sessions). */
 export const PUT = withErrorHandling('api/admin/security/config', async (request: Request) => {
-  const unauthorized = await requireAdminSession()
+  const unauthorized = await requireRole('admin')
   if (unauthorized) return unauthorized
   assertSameOrigin(request)
 

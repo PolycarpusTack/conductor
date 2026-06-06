@@ -3,10 +3,16 @@ import { NextResponse } from 'next/server'
 import {
   clearAdminSession,
   createAdminSession,
-  hasAdminSession,
+  getSessionUser,
   isAdminAuthConfigured,
   verifyAdminPassword,
 } from '@/lib/server/admin-session'
+import {
+  bootstrapOwnerFromLegacy,
+  usersExist,
+  verifyUserCredentials,
+} from '@/lib/server/user-auth'
+import { db } from '@/lib/db'
 import { ApiError, badRequest, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { adminLoginSchema } from '@/lib/server/contracts'
 
@@ -36,11 +42,16 @@ function isRateLimited(ip: string): boolean {
 }
 
 // Public endpoint — frontend needs to know whether to show login screen.
-// Returns whether auth is configured and whether the current session is valid.
+// Returns whether auth is configured, whether the current session is valid,
+// whether user accounts exist (login form needs an email field then), and
+// who is signed in.
 export async function GET() {
+  const user = await getSessionUser()
   return NextResponse.json({
     configured: await isAdminAuthConfigured(),
-    authenticated: await hasAdminSession(),
+    authenticated: user !== null,
+    usersExist: await usersExist(),
+    user: user ? { name: user.name, email: user.email, role: user.role } : null,
   })
 }
 
@@ -63,10 +74,43 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
   const parsed = adminLoginSchema.safeParse(await request.json())
   if (!parsed.success) throw badRequest('Password is required')
 
+  const accountsExist = await usersExist()
+  const recoveryMode = process.env.RECOVERY_MODE === '1' || process.env.RECOVERY_MODE === 'true'
+
+  // Account login — the only path once users exist (outside recovery mode).
+  if (parsed.data.email) {
+    const user = await verifyUserCredentials(parsed.data.email, parsed.data.password)
+    if (!user) throw unauthorized('Invalid email or password')
+
+    loginAttempts.delete(ip)
+    await createAdminSession(user.id)
+    db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {})
+    return NextResponse.json({ success: true, user: { name: user.name, email: user.email, role: user.role } })
+  }
+
+  // Legacy password-only login: allowed before the first account exists, or
+  // as break-glass when RECOVERY_MODE is set.
+  if (accountsExist && !recoveryMode) {
+    throw unauthorized('Sign in with your account email and password')
+  }
+
   const validPassword = await verifyAdminPassword(parsed.data.password)
   if (!validPassword) throw unauthorized('Invalid password')
 
   loginAttempts.delete(ip)
+
+  // First successful legacy login bootstraps the owner account — same
+  // password, now with an identity. Recovery mode never bootstraps.
+  if (!accountsExist && !recoveryMode) {
+    const owner = await bootstrapOwnerFromLegacy(parsed.data.password)
+    await createAdminSession(owner.id)
+    return NextResponse.json({
+      success: true,
+      bootstrapped: owner.email,
+      user: { name: owner.name, email: owner.email, role: owner.role },
+    })
+  }
+
   await createAdminSession()
   return NextResponse.json({ success: true })
 })
