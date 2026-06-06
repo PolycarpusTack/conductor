@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { runAutomationSweeps } from '@/lib/server/automation-sweep'
+import { runRecurringTasks } from '@/lib/server/recurring-tasks'
 import { getLogger } from '@/lib/server/logger'
 import { pollAndDispatch } from '@/lib/server/step-queue'
 
@@ -183,6 +184,10 @@ async function checkScheduledProjects() {
     // Time-based automation rules (Epic S7 Phase 2) ride the same global
     // tick — the sweep self-limits to once per hour per project.
     await runAutomationSweeps().catch((error) => log.error('automation sweep failed', error))
+
+    // Recurring tasks: due rows are claimed atomically, so the 60s tick is
+    // just the heartbeat — cadence lives on each row's nextRunAt.
+    await runRecurringTasks().catch((error) => log.error('recurring tasks failed', error))
   } finally {
     checkInProgress = false
   }

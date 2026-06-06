@@ -283,6 +283,35 @@ export const updateTaskTemplateSchema = createTaskTemplateSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
 
+// Recurring tasks: instantiate a task template on a cadence.
+export const recurringCadenceSchema = z.enum(['daily', 'weekly', 'monthly'])
+
+export const createRecurringTaskSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    taskTemplateId: z.string().trim().min(1),
+    cadence: recurringCadenceSchema,
+    dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
+    dayOfMonth: z.number().int().min(1).max(28).nullable().optional(),
+    timeOfDay: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'timeOfDay must be HH:MM'),
+    enabled: z.boolean().default(true),
+  })
+  .refine((v) => v.cadence !== 'weekly' || v.dayOfWeek != null, 'Weekly cadence needs a dayOfWeek')
+  .refine((v) => v.cadence !== 'monthly' || v.dayOfMonth != null, 'Monthly cadence needs a dayOfMonth')
+
+export const updateRecurringTaskSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    taskTemplateId: z.string().trim().min(1),
+    cadence: recurringCadenceSchema,
+    dayOfWeek: z.number().int().min(0).max(6).nullable(),
+    dayOfMonth: z.number().int().min(1).max(28).nullable(),
+    timeOfDay: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'timeOfDay must be HH:MM'),
+    enabled: z.boolean(),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Provide at least one field')
+
 // ── Skills ──────────────────────────────────────────────────────────────────
 
 export const createSkillSchema = z.object({
