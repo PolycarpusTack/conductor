@@ -5,6 +5,7 @@ import { getLogger } from '@/lib/server/logger'
 import { safeJsonParse } from '@/lib/server/utils'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { renderConfigMustache } from './mustache'
+import { dispatchInternalReaction, type InternalReactionContext } from './internal'
 import { executeSlackReaction } from './types/slack'
 import { executeHttpReaction } from './types/http'
 import { executeJiraReaction } from './types/jira'
@@ -18,7 +19,16 @@ function sanitizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 }
 
-async function dispatchReaction(type: string, config: Record<string, unknown>): Promise<ReactionOutput> {
+async function dispatchReaction(
+  type: string,
+  config: Record<string, unknown>,
+  ctx: InternalReactionContext,
+): Promise<ReactionOutput> {
+  // Internal actions (Epic S7) mutate Conductor state and need the context;
+  // outbound types only see their rendered config.
+  const internal = await dispatchInternalReaction(type, config, ctx)
+  if (internal !== null) return internal
+
   switch (type) {
     case 'post:slack':   return executeSlackReaction(config)
     case 'post:http':    return executeHttpReaction(config)
@@ -53,12 +63,26 @@ export async function executeReactions(
     },
   }
 
+  const payloadRecord = (eventPayload ?? {}) as Record<string, unknown>
+  const ctx: InternalReactionContext = {
+    projectId: trigger.projectId,
+    taskId,
+    stepId: typeof payloadRecord.stepId === 'string' ? payloadRecord.stepId : undefined,
+  }
+
   for (const reaction of trigger.reactions) {
     const rawConfig = safeJsonParse<Record<string, unknown>>(reaction.config, {})
     const renderedConfig = renderConfigMustache(rawConfig, context)
 
     try {
-      const output = await dispatchReaction(reaction.type, renderedConfig)
+      // dryRun (Epic S7): log what would happen, execute nothing — applies to
+      // every type so rules can be rehearsed before they're trusted.
+      const output = reaction.dryRun
+        ? { dryRun: true, wouldExecute: reaction.type, config: renderedConfig }
+        : await dispatchReaction(reaction.type, renderedConfig, ctx)
+      if (reaction.dryRun) {
+        log.info(`dry-run: ${reaction.type} "${reaction.name}"`, { triggerId: trigger.id, config: renderedConfig })
+      }
       ;(context.reactions as Record<string, unknown>)[`${reaction.order}_${sanitizeName(reaction.name)}`] = output
 
       await db.reaction.update({

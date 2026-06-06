@@ -58,6 +58,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
       where: {
         projectId: agent.projectId,
         deletedAt: null,
+        archivedAt: null,
         agentId: agent.id,
         status: 'IN_PROGRESS',
       },
@@ -81,6 +82,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
       where: {
         projectId: agent.projectId,
         deletedAt: null,
+        archivedAt: null,
         agentId: agent.id,
         status: 'BACKLOG',
       },
@@ -105,6 +107,7 @@ export const GET = withErrorHandling('api/agent/next', async (request: Request) 
       where: {
         projectId: agent.projectId,
         deletedAt: null,
+        archivedAt: null,
         agentId: null,
         status: 'BACKLOG',
       },

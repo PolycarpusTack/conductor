@@ -429,6 +429,8 @@ export async function dispatchStep(stepId: string) {
           stepId,
           error: message,
           attempt: attemptNumber,
+          maxRetries,
+          mode: step.mode,
           exhaustedRetries: true,
         })
 
@@ -454,6 +456,7 @@ async function failStep(stepId: string, projectId: string, error: string) {
     taskId: step.taskId,
     stepId,
     error,
+    mode: step.mode,
   })
 }
 

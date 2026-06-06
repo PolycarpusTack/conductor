@@ -36,6 +36,7 @@ export async function GET(request: Request) {
       where: {
         projectId: agent.projectId,
         deletedAt: null,
+        archivedAt: null,
         agentId: agent.id,
         status: 'IN_PROGRESS',
       },
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
         where: {
           projectId: agent.projectId,
           deletedAt: null,
+          archivedAt: null,
           agentId: agent.id,
           status: 'BACKLOG',
         },
@@ -60,6 +62,7 @@ export async function GET(request: Request) {
         where: {
           projectId: agent.projectId,
           deletedAt: null,
+          archivedAt: null,
           agentId: null,
           status: 'BACKLOG',
         },

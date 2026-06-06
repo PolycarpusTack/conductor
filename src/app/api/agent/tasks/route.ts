@@ -31,10 +31,11 @@ export const GET = withErrorHandling('api/agent/tasks', async (request: Request)
       isActive: true,
     })
 
-    const where: { agentId: string; status?: 'BACKLOG' | 'IN_PROGRESS' | 'WAITING' | 'REVIEW' | 'DONE'; projectId: string; deletedAt: null } = {
+    const where: { agentId: string; status?: 'BACKLOG' | 'IN_PROGRESS' | 'WAITING' | 'REVIEW' | 'DONE'; projectId: string; deletedAt: null; archivedAt: null } = {
       projectId: agent.projectId,
       agentId: agent.id,
       deletedAt: null,
+      archivedAt: null,
     }
 
     if (parsedStatus.data) {

@@ -23,7 +23,7 @@ export const GET = withErrorHandling('api/tasks', async (request: Request) => {
   const take = Math.min(Math.max(parseInt(searchParams.get('limit') || '200', 10) || 200, 1), 500)
   const skip = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0)
 
-  const where = { deletedAt: null, ...(projectId ? { projectId } : {}) }
+  const where = { deletedAt: null, archivedAt: null, ...(projectId ? { projectId } : {}) }
 
   const [tasks, total] = await Promise.all([
     db.task.findMany({

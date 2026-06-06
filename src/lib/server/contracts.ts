@@ -353,6 +353,12 @@ export const reactionTypeSchema = z.enum([
   'post:http',
   'create:jira',
   'send:email',
+  // Internal actions (Epic S7): mutate Conductor state instead of posting out
+  'task:assign',
+  'task:set-priority',
+  'task:set-retry',
+  'task:archive',
+  'step:escalate',
 ])
 
 export const createTriggerSchema = z.object({
@@ -376,6 +382,7 @@ export const createReactionSchema = z.object({
   config: z.record(z.string(), z.unknown()),
   order: z.number().int().min(0),
   enabled: z.boolean().default(true),
+  dryRun: z.boolean().default(false),
 })
 
 export const updateReactionSchema = createReactionSchema.partial().refine(

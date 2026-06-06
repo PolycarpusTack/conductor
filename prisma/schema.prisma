@@ -102,6 +102,7 @@ model Task {
   startedAt   DateTime? // When agent started working
   completedAt DateTime? // When task was completed
   deletedAt   DateTime? // Soft delete (Epic S3); hard-purged after 30 days
+  archivedAt  DateTime? // Archive (Epic S7): kept forever, hidden from the board
   order            Int           @default(0)
   runtimeOverride  String?       // Per-task runtime override (claude-code | codex | copilot)
   activities       ActivityLog[]
@@ -109,6 +110,7 @@ model Task {
 
   @@index([projectId, status])
   @@index([projectId, deletedAt])
+  @@index([projectId, archivedAt])
 }
 
 model ActivityLog {
@@ -596,6 +598,7 @@ model Reaction {
   config              String    @default("{}")
   order               Int       @default(0)
   enabled             Boolean   @default(true)
+  dryRun              Boolean   @default(false) // log what would happen, mutate nothing
   consecutiveFailures Int       @default(0)
   lastError           String?
   lastFiredAt         DateTime?
