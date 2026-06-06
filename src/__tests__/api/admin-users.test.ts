@@ -185,3 +185,54 @@ describe('role enforcement on the privileged surface', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('/api/admin/me (Phase 3)', () => {
+  test('PUT rejects a wrong current password', async () => {
+    mockUserFindUnique.mockResolvedValue({ passwordHash: 'deadbeef:cafebabe' })
+    const { PUT } = await import('@/app/api/admin/me/route')
+    const res = await PUT(
+      makeRequest('http://localhost/api/admin/me', {
+        method: 'PUT',
+        body: { currentPassword: 'wrong', newPassword: 'new-password-1' },
+      }),
+      {} as any,
+    )
+    expect(res.status).toBe(401)
+    expect(mockUserUpdate).not.toHaveBeenCalled()
+  })
+
+  test('PUT changes the password and revokes other sessions', async () => {
+    const { scryptHash } = await import('@/lib/server/admin-config')
+    mockUserFindUnique.mockResolvedValue({ passwordHash: scryptHash('old-password') })
+    const { PUT } = await import('@/app/api/admin/me/route')
+    const res = await PUT(
+      makeRequest('http://localhost/api/admin/me', {
+        method: 'PUT',
+        body: { currentPassword: 'old-password', newPassword: 'new-password-1' },
+      }),
+      {} as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockUserUpdate.mock.calls[0][0].data.passwordHash).toMatch(/^[0-9a-f]+:[0-9a-f]+$/)
+    expect(mockSessionDeleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
+  })
+
+  test('DELETE signs out everywhere', async () => {
+    const { DELETE } = await import('@/app/api/admin/me/route')
+    const res = await DELETE(
+      makeRequest('http://localhost/api/admin/me', { method: 'DELETE' }),
+      {} as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockSessionDeleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
+  })
+
+  test('member can manage their own account', async () => {
+    setSession(MEMBER_SESSION)
+    const { GET } = await import('@/app/api/admin/me/route')
+    const res = await GET(makeRequest('http://localhost/api/admin/me'), {} as any)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.user.role).toBe('member')
+  })
+})

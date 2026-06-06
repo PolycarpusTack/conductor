@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { runWithRequestContext } from '@/lib/server/request-context'
+
 import { getLogger } from '@/lib/server/logger'
 
 const log = getLogger('api')
@@ -59,7 +61,9 @@ export function withErrorHandling<Ctx extends RouteContext = RouteContext>(
 ): RouteHandler<Ctx> {
   return async (request, context) => {
     try {
-      return await handler(request, context)
+      // Per-request context (Phase 2): carries the resolved session user for
+      // attribution + caching. Opened here so every route gets it for free.
+      return await runWithRequestContext(() => handler(request, context))
     } catch (err) {
       if (err instanceof ApiError) {
         return NextResponse.json(

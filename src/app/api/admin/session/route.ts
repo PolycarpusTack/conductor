@@ -67,12 +67,20 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
     throw new ApiError(429, 'Too many login attempts. Try again later.')
   }
 
+  // Per-email bucket (Phase 3): a single account can't be brute-forced from
+  // rotating IPs even behind a trusted proxy. Reuses the same window/limits.
+  const bodyClone = request.clone()
+
   if (!(await isAdminAuthConfigured())) {
     throw new ApiError(503, 'Admin authentication is not configured on the server')
   }
 
-  const parsed = adminLoginSchema.safeParse(await request.json())
+  const parsed = adminLoginSchema.safeParse(await bodyClone.json())
   if (!parsed.success) throw badRequest('Password is required')
+
+  if (parsed.data.email && isRateLimited(`email:${parsed.data.email}`)) {
+    throw new ApiError(429, 'Too many login attempts for this account. Try again later.')
+  }
 
   const accountsExist = await usersExist()
   const recoveryMode = process.env.RECOVERY_MODE === '1' || process.env.RECOVERY_MODE === 'true'
@@ -83,6 +91,7 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
     if (!user) throw unauthorized('Invalid email or password')
 
     loginAttempts.delete(ip)
+    loginAttempts.delete(`email:${parsed.data.email}`)
     await createAdminSession(user.id)
     db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {})
     return NextResponse.json({ success: true, user: { name: user.name, email: user.email, role: user.role } })

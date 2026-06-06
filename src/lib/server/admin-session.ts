@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 
 import { getAdminConfig, scryptVerify } from '@/lib/server/admin-config'
 import { getLogger } from '@/lib/server/logger'
+import { getRequestUser, setRequestUser } from '@/lib/server/request-context'
 import {
   resolveUserSession,
   revokeSessionByToken,
@@ -106,6 +107,18 @@ async function hasLegacySession(): Promise<boolean> {
  * owner so pre-account deployments (and recovery mode) lose nothing.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
+  // Per-request cache (Phase 2): the first resolution in a request wins —
+  // requireRole no longer hits the session table twice, and the activityLog
+  // attribution extension reads the same store.
+  const cached = getRequestUser()
+  if (cached !== undefined) return cached as SessionUser | null
+
+  const user = await resolveSessionUserUncached()
+  setRequestUser(user)
+  return user
+}
+
+async function resolveSessionUserUncached(): Promise<SessionUser | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value
   if (!token) return null

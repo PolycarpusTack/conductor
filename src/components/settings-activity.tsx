@@ -28,6 +28,7 @@ interface ActivityEntry {
   details: string | null
   createdAt: string
   agent?: { name: string; emoji: string } | null
+  user?: { name: string; email: string } | null
 }
 
 interface SettingsActivityProps {
@@ -430,7 +431,7 @@ function LogRow({ entry }: { entry: ActivityEntry }) {
         )}
 
         <span className="truncate text-foreground/90 flex-1">
-          {entry.agent ? `${entry.agent.emoji} ${entry.agent.name} · ` : ''}{entry.action}
+          {entry.agent ? `${entry.agent.emoji} ${entry.agent.name} · ` : ''}{entry.user ? `👤 ${entry.user.name} · ` : ''}{entry.action}
         </span>
 
         {entry.traceId && (

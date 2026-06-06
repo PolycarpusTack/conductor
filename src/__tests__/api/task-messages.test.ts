@@ -101,7 +101,7 @@ describe('POST /api/tasks/[id]/messages — auth', () => {
     expect(res.status).toBe(403)
   })
 
-  test('201 sends from admin@conductor with admin trust', async () => {
+  test('201 sends signed with the session user and admin trust', async () => {
     setSession(ADMIN_SESSION)
     mockMessageCreate.mockClear()
     const { POST } = await import('@/app/api/tasks/[id]/messages/route')
@@ -114,7 +114,9 @@ describe('POST /api/tasks/[id]/messages — auth', () => {
     )
     expect(res.status).toBe(201)
     const create = mockMessageCreate.mock.calls[0][0]
-    expect(create.data.fromAddress).toBe('admin@conductor')
+    // Attribution (Phase 2): messages are signed with the session user's
+    // local-part; the fixture user is user-1@test.local.
+    expect(create.data.fromAddress).toBe('user-1@conductor')
     expect(create.data.taskId).toBe('t-1')
     expect(JSON.parse(create.data.bodySecurity).trust).toBe('admin')
   })

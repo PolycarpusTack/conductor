@@ -1,13 +1,14 @@
 import { PrismaClient } from '@/generated/prisma/client'
+import { getAttributionUserId } from '@/lib/server/request-context'
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
+  prisma: ReturnType<typeof createClient> | undefined
 }
 
 /** True when connected to PostgreSQL (enables pgvector features). */
 export const isPostgresDb = (process.env.DATABASE_URL || '').startsWith('postgresql')
 
-function createClient() {
+function createBaseClient() {
   // Adapter is resolved synchronously at startup.
   // Both adapter packages are installed; only one is loaded per environment.
   if (isPostgresDb) {
@@ -28,6 +29,25 @@ function createClient() {
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'production' ? ['error'] : ['query'],
+  })
+}
+
+function createClient() {
+  // Attribution (Phase 2): every activity row written while a signed-in user's
+  // request is in flight gets stamped with that user — no call-site changes.
+  // Agent/daemon/scheduler writes have no request user and stay unattributed.
+  return createBaseClient().$extends({
+    query: {
+      activityLog: {
+        create({ args, query }) {
+          if (args.data && !('userId' in args.data && args.data.userId)) {
+            const userId = getAttributionUserId()
+            if (userId) args.data.userId = userId
+          }
+          return query(args)
+        },
+      },
+    },
   })
 }
 

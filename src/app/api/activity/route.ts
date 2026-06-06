@@ -53,6 +53,7 @@ export const GET = withErrorHandling('api/activity', async (request: Request) =>
     where,
     include: {
       agent: { select: { name: true, emoji: true } },
+      user: { select: { name: true, email: true } },
     },
     orderBy: { createdAt: 'desc' },
     take: limit,

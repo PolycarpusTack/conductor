@@ -93,13 +93,72 @@ export function SettingsUsers() {
     }
   }
 
+  // "Your account" (Phase 3) — every role manages itself here
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [pwStatus, setPwStatus] = useState<string | null>(null)
+  const [pwError, setPwError] = useState<string | null>(null)
+
+  const changeMyPassword = async () => {
+    setPwError(null)
+    setPwStatus(null)
+    try {
+      const res = await fetch('/api/admin/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to change password')
+      setPwStatus('Password changed — other sessions for your account were signed out.')
+      setCurrentPw('')
+      setNewPw('')
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : 'Failed to change password')
+    }
+  }
+
+  const signOutEverywhere = async () => {
+    await fetch('/api/admin/me', { method: 'DELETE' })
+    window.location.reload()
+  }
+
+  const yourAccount = me && me.email !== 'admin@legacy' ? (
+    <div className="space-y-2 p-3 rounded-lg border border-border/30 bg-card/30">
+      <h3 className="text-sm font-semibold">Your account</h3>
+      <p className="text-xs text-muted-foreground">
+        Signed in as <strong>{me.email}</strong> ({me.role}).
+      </p>
+      {pwError && <p className="text-xs text-destructive">{pwError}</p>}
+      {pwStatus && <p className="text-xs text-[var(--op-green,#4ADE80)]">{pwStatus}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <Input type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)}
+          placeholder="Current password" autoComplete="current-password" className="h-8 text-xs" />
+        <Input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
+          placeholder="New password (min 8 chars)" autoComplete="new-password" className="h-8 text-xs" />
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" className="h-7 text-xs"
+          onClick={changeMyPassword} disabled={!currentPw || newPw.length < 8}>
+          Change Password
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={signOutEverywhere}>
+          Sign Out Everywhere
+        </Button>
+      </div>
+    </div>
+  ) : null
+
   if (forbidden) {
     return (
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Users</h3>
-        <p className="text-xs text-muted-foreground">
-          User management needs an admin or owner account — ask one of yours.
-        </p>
+      <div className="space-y-4">
+        {yourAccount}
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Users</h3>
+          <p className="text-xs text-muted-foreground">
+            User management needs an admin or owner account — ask one of yours.
+          </p>
+        </div>
       </div>
     )
   }
@@ -108,10 +167,10 @@ export function SettingsUsers() {
 
   return (
     <div className="space-y-3">
+      {yourAccount}
       <div>
         <h3 className="text-sm font-semibold">Users</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {me ? <>Signed in as <strong>{me.email}</strong> ({me.role}). </> : null}
           Named accounts replace the shared admin password.
         </p>
       </div>

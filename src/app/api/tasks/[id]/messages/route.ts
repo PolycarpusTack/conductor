@@ -8,7 +8,7 @@ import {
   sendMessage,
 } from '@/lib/server/agent-messaging'
 import { assertSameOrigin } from '@/lib/csrf'
-import { requireAdminSession } from '@/lib/server/admin-session'
+import { getSessionUser, requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { safeJsonParse } from '@/lib/server/utils'
 
@@ -71,10 +71,17 @@ export const POST = withErrorHandling(
     const recipient = await resolveRecipientByAddress(task.projectId, input.to)
     if (!recipient) throw notFound(`No active address "${input.to}" in this project`)
 
+    // Attribution (Phase 2): sign messages with the actual user when one is
+    // signed in; the fixed admin address remains the legacy-session fallback.
+    const sender = await getSessionUser()
+    const fromAddress = sender && sender.id !== 'legacy-admin'
+      ? `${sender.email.split('@')[0]}@conductor`
+      : ADMIN_ADDRESS
+
     const message = await sendMessage({
       projectId: task.projectId,
       fromAgentId: null,
-      fromAddress: ADMIN_ADDRESS,
+      fromAddress,
       toAgentId: recipient.agentId,
       toAddress: input.to.trim().toLowerCase(),
       body: input.body,
