@@ -73,6 +73,7 @@ export default function Home() {
     chainTemplates, setChainTemplates,
     taskTemplates, setTaskTemplates,
     triggers, setTriggers,
+    settingsSyncedProjectId,
     projectApiKey,
     projectApiPreview,
     agentApiKeys,
@@ -245,6 +246,7 @@ export default function Home() {
       setTaskTemplates={setTaskTemplates}
       triggers={triggers}
       setTriggers={setTriggers}
+      settingsSyncedProjectId={settingsSyncedProjectId}
       projectApiKey={projectApiKey}
       projectApiPreview={projectApiPreview}
       agentApiKeys={agentApiKeys}

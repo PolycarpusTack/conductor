@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback, useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -11,7 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { WorkspaceSwitcher } from '@/components/workspace-switcher'
+import { DeadLetterPanel } from '@/components/dead-letter-panel'
 import {
   Menu,
   Settings,
@@ -20,6 +23,7 @@ import {
   HelpCircle,
   FolderPlus,
   LogOut,
+  AlertTriangle,
 } from 'lucide-react'
 import type { Project, ProjectListItem } from '@/types/board'
 
@@ -27,6 +31,18 @@ type ViewType = 'landing' | 'board' | 'runtime' | 'skills' | 'help'
 
 function formatUsd(value: number): string {
   return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`
+}
+
+/** Lightweight count read of the existing dead-letters endpoint. null = fetch failed. */
+async function fetchDeadLetterCount(projectId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/dead-letters`, { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = await res.json()
+    return Array.isArray(data?.deadLetters) ? data.deadLetters.length : 0
+  } catch {
+    return null
+  }
 }
 type SettingsTabType = 'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
 
@@ -55,6 +71,37 @@ export function BoardHeader({
   setProjectDialogOpen, setSettingsTab, handleAdminLogout,
   currentWorkspaceId, setCurrentWorkspaceId,
 }: BoardHeaderProps) {
+  // C-5: dead-letter count chip. No polling — refreshed whenever the project
+  // payload is refetched (the WS step-failed/chain-* handlers replace
+  // currentProject, which re-runs this effect) and when the panel dialog closes.
+  // The count is keyed by project id so a stale count never shows mid-switch.
+  const [deadLetters, setDeadLetters] = useState<{ projectId: string; count: number } | null>(null)
+  const [deadLettersOpen, setDeadLettersOpen] = useState(false)
+
+  const refreshDeadLetterCount = useCallback(() => {
+    if (!currentProject) return
+    const projectId = currentProject.id
+    void fetchDeadLetterCount(projectId).then((count) => {
+      // null = failed refresh; the chip is informational, keep the previous count
+      if (count !== null) setDeadLetters({ projectId, count })
+    })
+  }, [currentProject])
+
+  useEffect(() => {
+    if (!currentProject) return
+    const projectId = currentProject.id
+    let cancelled = false
+    void fetchDeadLetterCount(projectId).then((count) => {
+      if (!cancelled && count !== null) setDeadLetters({ projectId, count })
+    })
+    return () => { cancelled = true }
+  }, [currentProject])
+
+  const deadLetterCount =
+    currentProject && deadLetters?.projectId === currentProject.id ? deadLetters.count : 0
+
+  const wsLabel = wsConnected ? 'Live' : realtimeConfigured ? 'Offline' : 'Realtime Off'
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--border)] bg-[var(--surface)]/80 backdrop-blur-sm">
@@ -80,7 +127,13 @@ export function BoardHeader({
 
             <div className={`hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-mono ${wsConnected ? 'bg-[var(--op-teal-bg)] text-[var(--op-teal)] border border-[var(--op-teal-dim)]' : 'bg-muted text-muted-foreground'}`}>
               <div className={`h-1.5 w-1.5 rounded-full ${wsConnected ? 'bg-[var(--op-teal)] animate-pulse' : 'bg-muted-foreground/50'}`} />
-              {wsConnected ? 'Live' : realtimeConfigured ? 'Offline' : 'Realtime Off'}
+              {wsLabel}
+            </div>
+
+            {/* C-5: compact dot-only realtime indicator below the sm breakpoint */}
+            <div className="flex sm:hidden items-center" title={wsLabel}>
+              <div className={`h-2 w-2 rounded-full ${wsConnected ? 'bg-[var(--op-teal)] animate-pulse' : 'bg-muted-foreground/50'}`} />
+              <span className="sr-only">{wsLabel}</span>
             </div>
 
             {/* B-7: month-to-date spend vs budget; destructive chip while dispatch is budget-paused */}
@@ -105,6 +158,20 @@ export function BoardHeader({
                 </span>
               )
             })()}
+
+            {/* C-5: dead-letter count chip — opens the requeue panel */}
+            {currentProject && deadLetterCount > 0 && (
+              <button
+                onClick={() => setDeadLettersOpen(true)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-mono bg-[var(--op-red-bg)] text-[var(--op-red)] border border-[var(--op-red-dim)] hover:bg-[var(--op-red)]/15 transition-colors cursor-pointer"
+                title="Dead-lettered steps — exhausted retries; click to review and requeue"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                {deadLetterCount}
+                <span className="hidden md:inline">dead-lettered</span>
+                <span className="sr-only">dead-lettered steps — open panel</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -234,6 +301,26 @@ export function BoardHeader({
           </div>
         </div>
       </header>
+
+      {/* C-5: the existing dead-letter panel (settings → activity) surfaced from the board */}
+      {currentProject && (
+        <Dialog
+          open={deadLettersOpen}
+          onOpenChange={(open) => {
+            setDeadLettersOpen(open)
+            if (!open) void refreshDeadLetterCount()
+          }}
+        >
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Dead-lettered steps</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <DeadLetterPanel projectId={currentProject.id} showWhenEmpty />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-background/95 backdrop-blur-sm md:hidden pt-14">

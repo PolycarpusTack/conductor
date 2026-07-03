@@ -20,10 +20,16 @@ interface DeadLetter {
 
 interface DeadLetterPanelProps {
   projectId: string
+  /**
+   * Render a friendly empty state instead of returning null when the list is
+   * empty. The settings-activity mount keeps the default (hidden when empty);
+   * the board-header dialog sets it so the dialog is never blank.
+   */
+  showWhenEmpty?: boolean
 }
 
 /** Exhausted steps parked in the dead-letter table, with one-click requeue. */
-export function DeadLetterPanel({ projectId }: DeadLetterPanelProps) {
+export function DeadLetterPanel({ projectId, showWhenEmpty = false }: DeadLetterPanelProps) {
   const { toast } = useToast()
   const [deadLetters, setDeadLetters] = useState<DeadLetter[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,7 +74,14 @@ export function DeadLetterPanel({ projectId }: DeadLetterPanelProps) {
     }
   }
 
-  if (!loading && deadLetters.length === 0) return null
+  if (!loading && deadLetters.length === 0) {
+    if (!showWhenEmpty) return null
+    return (
+      <div className="rounded-lg border border-border/30 bg-card/50 p-4 text-center text-xs text-muted-foreground">
+        No dead-lettered steps — every failed step has been requeued or resolved.
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-lg border border-[var(--op-red-dim,rgba(248,113,113,0.2))] bg-[var(--op-red-bg,rgba(248,113,113,0.05))] p-4 space-y-3">

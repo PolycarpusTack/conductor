@@ -23,6 +23,9 @@ export function useProjectData() {
   const [chainTemplates, setChainTemplates] = useState<ChainTemplate[]>([])
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([])
   const [triggers, setTriggers] = useState<IntegrationTrigger[]>([])
+  // Which project the settings above (runtimes, modes, …) belong to. Lets
+  // consumers avoid acting on another project's stale settings mid-switch.
+  const [settingsSyncedProjectId, setSettingsSyncedProjectId] = useState<string | null>(null)
 
   // API key state
   const [projectApiKey, setProjectApiKey] = useState<string | null>(null)
@@ -122,6 +125,7 @@ export function useProjectData() {
       if (taskTemplatesRes.ok) setTaskTemplates(await taskTemplatesRes.json())
       const triggersRes = await fetch(`/api/projects/${projectId}/triggers`)
       if (triggersRes.ok) setTriggers(await triggersRes.json())
+      setSettingsSyncedProjectId(projectId)
     } catch (error) {
       console.error('Error fetching project settings:', error)
       toast({ title: 'Failed to load project settings', variant: 'destructive' })
@@ -356,6 +360,7 @@ export function useProjectData() {
     setTaskTemplates,
     triggers,
     setTriggers,
+    settingsSyncedProjectId,
 
     // API keys
     projectApiKey,

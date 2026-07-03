@@ -18,6 +18,7 @@ import { StepOutputViewer } from '@/components/step-output-viewer'
 import { TaskDetailDrawer } from '@/components/task-detail-drawer'
 import { HelpPage } from '@/components/help-page'
 import { BoardHeader } from '@/components/board-header'
+import { NoRuntimeBanner } from '@/components/no-runtime-banner'
 import { BoardTaskCard } from '@/components/board-task-card'
 import { BoardSidebar } from '@/components/board-sidebar'
 import { TaskDialog } from '@/components/task-dialog'
@@ -55,6 +56,7 @@ interface BoardViewProps {
   setTaskTemplates: Dispatch<SetStateAction<TaskTemplate[]>>
   triggers: IntegrationTrigger[]
   setTriggers: Dispatch<SetStateAction<IntegrationTrigger[]>>
+  settingsSyncedProjectId: string | null
   projectApiKey: string | null
   projectApiPreview: string | null
   agentApiKeys: Record<string, string>
@@ -225,6 +227,7 @@ export function BoardView({
   projectMcpConnections, setProjectMcpConnections, chainTemplates, setChainTemplates,
   taskTemplates, setTaskTemplates,
   triggers, setTriggers,
+  settingsSyncedProjectId,
   projectApiKey, projectApiPreview, agentApiKeys, agentApiPreviews,
   loadingApiKeys, rotatingKeyId, legacyKeyStatus, migratingLegacyKeys, copiedKey,
   projectDialogOpen, setProjectDialogOpen, projectName, setProjectName,
@@ -288,6 +291,16 @@ export function BoardView({
             <div className="border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive">
               {authError}
             </div>
+          )}
+          {/* C-5: dispatch-readiness banner above the board (no runtimes / no agents) */}
+          {view === 'board' && !loading && currentProject && settingsSyncedProjectId === currentProject.id && (
+            <NoRuntimeBanner
+              key={currentProject.id}
+              projectId={currentProject.id}
+              hasAgents={currentProject.agents.length > 0}
+              hasRuntimes={projectRuntimes.length > 0}
+              onOpenSettings={setSettingsTab}
+            />
           )}
           {view === 'runtime' ? (
             <div className="p-6 max-w-6xl mx-auto">
