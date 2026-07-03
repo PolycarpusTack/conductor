@@ -118,6 +118,16 @@ model Task {
   // completion. Dispatcher-driven tasks NEVER set this — the reaper uses it
   // to distinguish reapable Model-B claims from chain-dispatch IN_PROGRESS.
   claimExpiresAt DateTime?
+  // Due date (D-2): optional deadline. Stored as an instant (the picker writes
+  // end-of-day so a date-only due date isn't "overdue" at 00:00 on the day).
+  // Null = no due date. Drives the card badge, the D-1 overdue filter, and the
+  // scheduler's overdue-reminder sweep.
+  dueDate          DateTime?
+  // Overdue-reminder dedupe (D-2-T2): stamped the first time the sweep emits a
+  // task_overdue notification for this task. A guarded compare-and-set on this
+  // column (NULL → now) makes the emit exactly-once and race-tolerant, mirroring
+  // the claim-reaper's guarded write.
+  dueReminderSentAt DateTime?
   order            Int           @default(0)
   runtimeOverride  String?       // Per-task runtime override (claude-code | codex | copilot)
   activities       ActivityLog[]
@@ -128,6 +138,11 @@ model Task {
   @@index([projectId, archivedAt])
   // Reaper sweep: IN_PROGRESS tasks with an expired claim lease
   @@index([status, claimExpiresAt])
+  // Overdue sweep: the hot predicate is a dueDate range scan (`dueDate not null
+  // and < now`). Indexing dueDate lets SQLite skip the majority of tasks (those
+  // with no due date) without a full scan; the status (notIn DONE) and
+  // dueReminderSentAt null-guard are cheap post-filters.
+  @@index([dueDate])
 }
 
 model ActivityLog {
@@ -717,7 +732,7 @@ model Reaction {
 model Notification {
   id        String    @id @default(cuid())
   projectId String?
-  type      String // review_gate_waiting | dead_letter | budget_exceeded
+  type      String // review_gate_waiting | dead_letter | budget_exceeded | task_overdue
   title     String
   body      String?
   taskId    String?

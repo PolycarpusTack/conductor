@@ -36,6 +36,7 @@ export function TaskDialog() {
     taskStatus, setTaskStatus, taskPriority, setTaskPriority,
     taskTag, setTaskTag, taskAgentId, setTaskAgentId,
     taskNotes, setTaskNotes, taskRuntimeOverride, setTaskRuntimeOverride,
+    taskDueDate, setTaskDueDate,
     taskSteps, setTaskSteps,
     handleSaveTask, resetTaskForm,
   } = useTaskActions()
@@ -205,6 +206,31 @@ export function TaskDialog() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Due date</label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={taskDueDate}
+                onChange={(e) => setTaskDueDate(e.target.value)}
+                aria-label="Task due date"
+                className="flex-1"
+              />
+              {taskDueDate && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTaskDueDate('')}
+                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Optional. The card flags tasks due soon or overdue.</p>
           </div>
 
           <div className="grid gap-2">

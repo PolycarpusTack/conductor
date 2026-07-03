@@ -128,6 +128,13 @@ export const taskStepSchema = z.object({
 
 export const runtimeOverrideSchema = z.enum(['claude-code', 'codex', 'copilot'])
 
+// D-2 due date: ISO datetime string → Date, or null to clear (undefined = leave
+// unchanged on update). z.coerce.date() runs `new Date(input)` and rejects
+// invalid dates (garbage strings), so bad payloads 400 instead of persisting an
+// Invalid Date. `.nullable()` short-circuits on null before coercion, so null
+// stays null rather than coercing to the epoch.
+const dueDateSchema = z.coerce.date().nullable().optional()
+
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1).max(240),
   description: trimmedOptionalString,
@@ -137,6 +144,7 @@ export const createTaskSchema = z.object({
   projectId: z.string().trim().min(1),
   agentId: z.string().trim().min(1).optional().nullable().transform((value) => value || undefined),
   notes: trimmedOptionalString,
+  dueDate: dueDateSchema,
   steps: z.array(taskStepSchema).max(25).optional(),
   runtimeOverride: runtimeOverrideSchema.optional().nullable(),
 })
@@ -150,6 +158,7 @@ export const updateTaskSchema = z
     tag: z.string().trim().max(60).optional().nullable().transform((value) => value || undefined),
     agentId: z.string().trim().min(1).optional().nullable(),
     notes: trimmedOptionalString,
+    dueDate: dueDateSchema,
     order: z.number().int().min(0).optional(),
     runtimeOverride: runtimeOverrideSchema.optional().nullable(),
   })

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { filterTasks, isBoardFilterActive, emptyBoardFilter, type BoardFilter } from '../use-filtered-tasks'
+import { filterTasks, isBoardFilterActive, isTaskOverdue, emptyBoardFilter, type BoardFilter } from '../use-filtered-tasks'
 import type { Task, TaskPriority, TaskStatus, Agent } from '@/types/board'
 
 // ---------------------------------------------------------------------------
@@ -22,6 +22,7 @@ function task(overrides: Partial<Task> = {}): Task {
     tag: overrides.tag,
     agent: overrides.agent ?? null,
     order: overrides.order ?? 0,
+    dueDate: overrides.dueDate,
   }
 }
 
@@ -58,6 +59,62 @@ describe('isBoardFilterActive', () => {
     expect(isBoardFilterActive(filter({ agentId: 'a1' }))).toBe(true)
     expect(isBoardFilterActive(filter({ priority: 'HIGH' }))).toBe(true)
     expect(isBoardFilterActive(filter({ tag: 'backend' }))).toBe(true)
+    expect(isBoardFilterActive(filter({ overdue: true }))).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isTaskOverdue + overdue filter (D-2)
+// ---------------------------------------------------------------------------
+
+const PAST_ISO = '2020-01-01T23:59:59.999Z'
+const FUTURE_ISO = '2999-01-01T23:59:59.999Z'
+
+describe('isTaskOverdue', () => {
+  test('past due date on an active task is overdue', () => {
+    expect(isTaskOverdue(task({ dueDate: PAST_ISO, status: 'IN_PROGRESS' }))).toBe(true)
+  })
+
+  test('future due date is not overdue', () => {
+    expect(isTaskOverdue(task({ dueDate: FUTURE_ISO }))).toBe(false)
+  })
+
+  test('no due date is never overdue', () => {
+    expect(isTaskOverdue(task({ dueDate: undefined }))).toBe(false)
+  })
+
+  test('a DONE task past its due date is not overdue', () => {
+    expect(isTaskOverdue(task({ dueDate: PAST_ISO, status: 'DONE' }))).toBe(false)
+  })
+
+  test('a due date exactly at now is not overdue (strict past)', () => {
+    const now = Date.UTC(2026, 5, 1, 12, 0, 0)
+    expect(isTaskOverdue(task({ dueDate: new Date(now).toISOString() }), now)).toBe(false)
+  })
+})
+
+describe('filterTasks — overdue dimension', () => {
+  const overdueTasks: Task[] = [
+    task({ id: 'o1', title: 'Past active', dueDate: PAST_ISO, status: 'IN_PROGRESS' }),
+    task({ id: 'o2', title: 'Past done', dueDate: PAST_ISO, status: 'DONE' }),
+    task({ id: 'o3', title: 'Future active', dueDate: FUTURE_ISO, status: 'BACKLOG' }),
+    task({ id: 'o4', title: 'No due date', dueDate: undefined, status: 'BACKLOG' }),
+    task({ id: 'o5', title: 'Past backlog', dueDate: PAST_ISO, status: 'BACKLOG' }),
+  ]
+
+  test('overdue-only keeps past-due active tasks, excludes DONE and no-due-date', () => {
+    expect(ids(filterTasks(overdueTasks, filter({ overdue: true })))).toEqual(['o1', 'o5'])
+  })
+
+  test('overdue combines with other dimensions (AND)', () => {
+    // Only o1 is IN_PROGRESS among the overdue set.
+    const result = filterTasks(overdueTasks, filter({ overdue: true, text: 'past active' }))
+    expect(ids(result)).toEqual(['o1'])
+  })
+
+  test('inactive overdue flag imposes no constraint (same reference)', () => {
+    const result = filterTasks(overdueTasks, filter({ overdue: false }))
+    expect(result).toBe(overdueTasks)
   })
 })
 

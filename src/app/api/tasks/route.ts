@@ -50,7 +50,7 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
     throw badRequest(parsed.error.issues[0]?.message || 'Invalid task payload')
   }
 
-  const { title, status, priority, tag, projectId, agentId, notes, runtimeOverride } = parsed.data
+  const { title, status, priority, tag, projectId, agentId, notes, runtimeOverride, dueDate } = parsed.data
   let { description } = parsed.data
 
   // Project-scoped keys (B-4): a key bound to project P must not create tasks
@@ -181,6 +181,7 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
           projectId,
           agentId,
           notes,
+          dueDate: dueDate ?? null,
           runtimeOverride,
           order,
         },

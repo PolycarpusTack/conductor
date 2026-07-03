@@ -3,13 +3,50 @@
 import { memo } from 'react'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
-import { Eye, GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { CalendarClock, Eye, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentBadge } from '@/components/agent-badge'
 import { ActivityTail } from '@/components/activity-tail'
 import { useLiveAgentLogs } from '@/app/_views/board-context'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
-import type { Task, TaskPriority, TaskStepSummary } from '@/types/board'
+import type { Task, TaskPriority, TaskStatus, TaskStepSummary } from '@/types/board'
+
+const DAY_MS = 86_400_000
+
+type DueTone = 'overdue' | 'soon' | 'muted'
+
+/** Card tone classes per due-date urgency (E-8 op-* tokens, no raw hex). */
+const DUE_TONE_CLASSES: Record<DueTone, string> = {
+  overdue: 'border-[var(--op-red-dim)] bg-[var(--op-red-bg)] text-[var(--op-red)]',
+  soon: 'border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)] text-[var(--op-amber)]',
+  muted: 'border-border/40 bg-surface text-muted-foreground',
+}
+
+/**
+ * D-2: describe a task's due date for the card badge without date-fns (removed
+ * in E-8). Due dates are stored end-of-day UTC, so the calendar label is
+ * formatted in UTC to echo the picked day. DONE tasks never flag urgent — they
+ * show the date muted. Non-DONE: op-red when past due, op-amber within 24h,
+ * muted otherwise. `now` is injectable for deterministic tests.
+ */
+export function describeDueDate(
+  dueDateIso: string,
+  status: TaskStatus,
+  now: number = Date.now(),
+): { label: string; tone: DueTone } | null {
+  const due = new Date(dueDateIso).getTime()
+  if (Number.isNaN(due)) return null
+  const dateLabel = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(due)
+  if (status === 'DONE') return { label: dateLabel, tone: 'muted' }
+  const diff = due - now
+  if (diff < 0) return { label: `Overdue · ${dateLabel}`, tone: 'overdue' }
+  if (diff <= DAY_MS) return { label: 'Due soon', tone: 'soon' }
+  return { label: dateLabel, tone: 'muted' }
+}
 
 /**
  * E-5: the ONLY subscriber to the high-frequency live-logs context on the
@@ -80,6 +117,8 @@ export const BoardTaskCard = memo(function BoardTaskCard({
   const activeStep = steps.find((s) => s.status === 'active')
   const doneCount = steps.filter((s) => s.status === 'done' || s.status === 'skipped').length
   const currentStep = activeStep || steps[doneCount]
+
+  const due = task.dueDate ? describeDueDate(task.dueDate, task.status) : null
 
   // Grip is a drag handle on the desktop board and a static affordance in the
   // overlay; the mobile view (no sortable, no overlay) renders no grip.
@@ -178,10 +217,26 @@ export const BoardTaskCard = memo(function BoardTaskCard({
           )}
 
           <div className="mt-2 flex items-center justify-between">
-            {task.tag ? (
-              <span className={`rounded px-1.5 py-0.5 text-[9px] ${tagColors[task.tag] || 'bg-surface text-muted-foreground'}`}>
-                {task.tag}
-              </span>
+            {task.tag || due ? (
+              <div className="flex items-center gap-1">
+                {task.tag && (
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] ${tagColors[task.tag] || 'bg-surface text-muted-foreground'}`}>
+                    {task.tag}
+                  </span>
+                )}
+                {due && (
+                  <span
+                    title={`Due ${task.dueDate?.slice(0, 10)}`}
+                    className={cn(
+                      'inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[9px] font-medium',
+                      DUE_TONE_CLASSES[due.tone],
+                    )}
+                  >
+                    <CalendarClock className="h-2.5 w-2.5" />
+                    {due.label}
+                  </span>
+                )}
+              </div>
             ) : <div />}
             {(onEdit || onDelete) && (
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

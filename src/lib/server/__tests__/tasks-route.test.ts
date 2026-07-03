@@ -264,6 +264,35 @@ describe('POST /api/tasks — DAG edge remap', () => {
     expect(createCall.data.status).toBe('IN_PROGRESS')
   })
 
+  test('persists an ISO dueDate into the created task (D-2)', async () => {
+    const res = await POST(
+      makeRequest({ title: 'with due', projectId: 'proj-1', dueDate: '2026-07-10T23:59:59.999Z' }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    const createCall = mockTxTaskCreate.mock.calls[0][0]
+    expect(createCall.data.dueDate).toBeInstanceOf(Date)
+    expect((createCall.data.dueDate as Date).toISOString()).toBe('2026-07-10T23:59:59.999Z')
+  })
+
+  test('a task created without a dueDate stores null (D-2)', async () => {
+    const res = await POST(
+      makeRequest({ title: 'no due', projectId: 'proj-1' }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(200)
+    expect(mockTxTaskCreate.mock.calls[0][0].data.dueDate).toBeNull()
+  })
+
+  test('rejects a garbage dueDate with 400 (D-2)', async () => {
+    const res = await POST(
+      makeRequest({ title: 'bad due', projectId: 'proj-1', dueDate: 'not-a-date' }),
+      { params: Promise.resolve({}) } as any,
+    )
+    expect(res.status).toBe(400)
+    expect(mockTransaction).not.toHaveBeenCalled()
+  })
+
   test('does not auto-start when the task has no steps', async () => {
     // Plain tasks (no chain) keep the BACKLOG default and startChain is
     // never called — auto-dispatching a task the user hasn't committed to

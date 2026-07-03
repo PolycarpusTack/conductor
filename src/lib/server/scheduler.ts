@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { runAutomationSweeps } from '@/lib/server/automation-sweep'
 import { reapExpiredClaims } from '@/lib/server/claim-reaper'
+import { runOverdueReminders } from '@/lib/server/overdue-reminders'
 import { runRecurringTasks } from '@/lib/server/recurring-tasks'
 import { getLogger } from '@/lib/server/logger'
 import { pollAndDispatch } from '@/lib/server/step-queue'
@@ -193,6 +194,11 @@ async function checkScheduledProjects() {
     // Claim-lease reaper (B-2): global sweep returning expired Model-B claims
     // to BACKLOG. Guarded writes make it safe against heartbeat renewals.
     await reapExpiredClaims().catch((error) => log.error('claim reaper failed', error))
+
+    // Overdue reminders (D-2): emit one task_overdue notification per task that
+    // passed its due date without completing. Guarded dueReminderSentAt write
+    // makes it exactly-once, so the 60s tick can re-run safely.
+    await runOverdueReminders().catch((error) => log.error('overdue reminders failed', error))
   } finally {
     checkInProgress = false
   }

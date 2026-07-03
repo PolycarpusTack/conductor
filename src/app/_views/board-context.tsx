@@ -130,6 +130,8 @@ export interface TaskActionsContextValue {
   setTaskNotes: Dispatch<SetStateAction<string>>
   taskRuntimeOverride: string
   setTaskRuntimeOverride: Dispatch<SetStateAction<string>>
+  taskDueDate: string
+  setTaskDueDate: Dispatch<SetStateAction<string>>
   taskSteps: StepDraft[]
   setTaskSteps: Dispatch<SetStateAction<StepDraft[]>>
   // Actions

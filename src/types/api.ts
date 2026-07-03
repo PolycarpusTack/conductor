@@ -35,6 +35,8 @@ export interface CreateTaskBody {
   tag?: string
   agentId?: string
   notes?: string
+  /** D-2: ISO datetime string (end-of-day UTC) or omit for none. */
+  dueDate?: string
   runtimeOverride?: string
   projectId: string
   steps?: StepDraft[]
@@ -48,6 +50,8 @@ export interface UpdateTaskBody {
   tag?: string
   agentId?: string | null
   notes?: string
+  /** D-2: ISO datetime string to set, or null to clear the due date. */
+  dueDate?: string | null
   runtimeOverride?: string | null
 }
 

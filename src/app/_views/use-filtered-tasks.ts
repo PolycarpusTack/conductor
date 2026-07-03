@@ -19,6 +19,12 @@ export interface BoardFilter {
   priority: TaskPriority | null
   /** Exact tag, or null for any. */
   tag: string | null
+  /**
+   * D-2: when true, keep only tasks that are past their due date and not yet
+   * DONE (a completed task is never "overdue"). Tasks with no due date are
+   * excluded. false = no constraint on this dimension.
+   */
+  overdue: boolean
 }
 
 export const emptyBoardFilter: BoardFilter = {
@@ -26,6 +32,7 @@ export const emptyBoardFilter: BoardFilter = {
   agentId: null,
   priority: null,
   tag: null,
+  overdue: false,
 }
 
 /** True when at least one dimension constrains the result set. */
@@ -34,8 +41,16 @@ export function isBoardFilterActive(filter: BoardFilter): boolean {
     filter.text.trim() !== '' ||
     filter.agentId !== null ||
     filter.priority !== null ||
-    filter.tag !== null
+    filter.tag !== null ||
+    filter.overdue
   )
+}
+
+/** A task is overdue when it has a due date in the past and isn't DONE. */
+export function isTaskOverdue(task: Task, now: number = Date.now()): boolean {
+  if (!task.dueDate || task.status === 'DONE') return false
+  const due = new Date(task.dueDate).getTime()
+  return !Number.isNaN(due) && due < now
 }
 
 /**
@@ -46,6 +61,8 @@ export function isBoardFilterActive(filter: BoardFilter): boolean {
 export function filterTasks(tasks: Task[], filter: BoardFilter): Task[] {
   if (!isBoardFilterActive(filter)) return tasks
   const text = filter.text.trim().toLowerCase()
+  // Snapshot "now" once per pass so every task is judged against the same instant.
+  const now = Date.now()
   return tasks.filter((task) => {
     if (text) {
       const haystack = `${task.title} ${task.description ?? ''}`.toLowerCase()
@@ -54,6 +71,7 @@ export function filterTasks(tasks: Task[], filter: BoardFilter): Task[] {
     if (filter.agentId !== null && task.agent?.id !== filter.agentId) return false
     if (filter.priority !== null && task.priority !== filter.priority) return false
     if (filter.tag !== null && task.tag !== filter.tag) return false
+    if (filter.overdue && !isTaskOverdue(task, now)) return false
     return true
   })
 }

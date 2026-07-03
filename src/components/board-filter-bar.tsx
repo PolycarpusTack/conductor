@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { useUiState } from '@/app/_views/board-context'
 import { isBoardFilterActive, type BoardFilter } from '@/app/_views/use-filtered-tasks'
@@ -27,6 +28,7 @@ function activeDimensionCount(filter: BoardFilter): number {
   if (filter.agentId !== null) n += 1
   if (filter.priority !== null) n += 1
   if (filter.tag !== null) n += 1
+  if (filter.overdue) n += 1
   return n
 }
 
@@ -143,6 +145,18 @@ export function BoardFilterBar({ agents, tags, filteredCount, totalCount }: Boar
               </SelectContent>
             </Select>
           </div>
+
+          {/* D-2: overdue-only toggle */}
+          <label className="flex cursor-pointer items-center gap-2 pt-1 text-xs text-foreground">
+            <Checkbox
+              checked={boardFilter.overdue}
+              onCheckedChange={(checked) =>
+                setBoardFilter((f) => ({ ...f, overdue: checked === true }))
+              }
+              aria-label="Show only overdue tasks"
+            />
+            Overdue only
+          </label>
         </PopoverContent>
       </Popover>
 

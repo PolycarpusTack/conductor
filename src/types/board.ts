@@ -49,6 +49,7 @@ export interface Task {
   order: number
   startedAt?: string | null
   completedAt?: string | null
+  dueDate?: string | null
   runtimeOverride?: string | null
   steps?: TaskStepSummary[]
   createdAt?: string

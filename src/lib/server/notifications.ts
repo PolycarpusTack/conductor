@@ -15,6 +15,8 @@ const log = getLogger('notifications')
 //                          into the dead-letter table (dispatch.ts)
 //   - budget_exceeded      a project's dispatch was paused by its budget —
 //                          once per pause episode (budget.ts)
+//   - task_overdue         a task passed its due date without completing —
+//                          once per task (overdue-reminders.ts)
 //
 // Every emit writes a Notification row and broadcasts 'notification-created'
 // so the UI updates live; when SMTP is configured (see getEmailConfig) a
@@ -24,7 +26,11 @@ const log = getLogger('notifications')
 // take dispatch or the budget check down with it.
 // ---------------------------------------------------------------------------
 
-export type NotificationType = 'review_gate_waiting' | 'dead_letter' | 'budget_exceeded'
+export type NotificationType =
+  | 'review_gate_waiting'
+  | 'dead_letter'
+  | 'budget_exceeded'
+  | 'task_overdue'
 
 export interface NotificationInput {
   projectId: string
@@ -140,6 +146,35 @@ export async function notifyDeadLetter(opts: {
     })
   } catch (err) {
     log.warn(`dead-letter notification failed for step ${opts.stepId}: ${String(err)}`)
+  }
+}
+
+/**
+ * A task passed its due date without being completed (D-2-T2). Emitted once
+ * per task by the scheduler's overdue sweep — the sweep's guarded
+ * dueReminderSentAt compare-and-set provides the dedupe, so this just formats
+ * and sends. Never throws.
+ */
+export async function notifyTaskOverdue(opts: {
+  projectId: string
+  taskId: string
+  taskTitle: string
+  dueDate: Date
+}): Promise<void> {
+  try {
+    const dueLabel = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeZone: 'UTC',
+    }).format(opts.dueDate)
+    await createNotification({
+      projectId: opts.projectId,
+      type: 'task_overdue',
+      title: `Task overdue: ${opts.taskTitle}`,
+      body: `This task passed its due date (${dueLabel}) and isn't done yet.`,
+      taskId: opts.taskId,
+    })
+  } catch (err) {
+    log.warn(`task-overdue notification failed for task ${opts.taskId}: ${String(err)}`)
   }
 }
 
