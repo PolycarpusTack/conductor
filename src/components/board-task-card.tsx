@@ -1,11 +1,28 @@
 'use client'
 
+import type { CSSProperties, KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Eye, GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { AgentBadge } from '@/components/agent-badge'
 import { ActivityTail } from '@/components/activity-tail'
+import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 import type { Task, TaskPriority, TaskStepSummary } from '@/types/board'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
+
+/**
+ * dnd-kit wiring supplied by the sortable wrapper on the desktop board (E-4).
+ * When present, the card root is the draggable node and the grip is the drag
+ * handle (pointer + keyboard activator). Absent on the mobile single-column
+ * view and inside the DragOverlay.
+ */
+export interface CardSortable {
+  setNodeRef: (node: HTMLElement | null) => void
+  style: CSSProperties
+  attributes: DraggableAttributes
+  listeners: DraggableSyntheticListeners
+  isDragging: boolean
+}
 
 interface BoardTaskCardProps {
   task: Task
@@ -13,12 +30,13 @@ interface BoardTaskCardProps {
   tagColors: Record<string, string>
   onOpen: (task: Task) => void
   onViewSteps: (viewing: { id: string; title: string; steps: TaskStepSummary[] }) => void
-  /** Desktop-only affordances; omitted in the mobile single-column view */
-  draggable?: boolean
-  onDragStart?: (task: Task) => void
   onEdit?: (task: Task) => void
   onDelete?: (id: string) => void
   liveAgentLogs?: LiveAgentLogEntry[]
+  /** dnd-kit sortable wiring (desktop only). */
+  sortable?: CardSortable
+  /** Rendered inside the DragOverlay: static lifted appearance, no interaction. */
+  overlay?: boolean
 }
 
 export function BoardTaskCard({
@@ -27,27 +45,66 @@ export function BoardTaskCard({
   tagColors,
   onOpen,
   onViewSteps,
-  draggable = false,
-  onDragStart,
   onEdit,
   onDelete,
   liveAgentLogs,
+  sortable,
+  overlay = false,
 }: BoardTaskCardProps) {
   const steps = task.steps ?? []
   const activeStep = steps.find((s) => s.status === 'active')
   const doneCount = steps.filter((s) => s.status === 'done' || s.status === 'skipped').length
   const currentStep = activeStep || steps[doneCount]
 
+  // Grip is a drag handle on the desktop board and a static affordance in the
+  // overlay; the mobile view (no sortable, no overlay) renders no grip.
+  const showGrip = Boolean(sortable) || overlay
+
+  // Enter/Space opens the drawer — but only when the card root itself holds
+  // focus, so the grip handle's own Space/Enter (which the KeyboardSensor uses
+  // to lift the card) never doubles as an "open".
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (overlay) return
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onOpen(task)
+    }
+  }
+
   return (
     <div
-      draggable={draggable}
-      onDragStart={draggable && onDragStart ? () => onDragStart(task) : undefined}
-      onClick={() => onOpen(task)}
-      className="group relative rounded-lg border border-border/40 bg-card p-3 cursor-pointer hover:border-border/60 transition-colors"
+      ref={sortable?.setNodeRef}
+      style={sortable?.style}
+      role="button"
+      tabIndex={overlay ? -1 : 0}
+      aria-label={`Open task: ${task.title}`}
+      onClick={overlay ? undefined : () => onOpen(task)}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        'group relative rounded-lg border border-border/40 bg-card p-3 transition-colors',
+        'hover:border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+        !overlay && 'cursor-pointer',
+        sortable?.isDragging && 'opacity-40',
+        overlay && 'cursor-grabbing shadow-lg ring-1 ring-border/60',
+      )}
     >
       <div className="flex items-start gap-2">
-        {draggable && (
-          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/20 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        {showGrip && (
+          sortable ? (
+            <button
+              type="button"
+              {...sortable.attributes}
+              {...sortable.listeners}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Drag to move task: ${task.title}. Press space or enter to lift, arrow keys to move between columns, space to drop, escape to cancel.`}
+              className="mt-0.5 shrink-0 cursor-grab touch-none rounded text-muted-foreground/20 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <GripVertical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+          )
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">

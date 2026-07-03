@@ -195,30 +195,34 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
     setDraggedTask(task)
   }, [])
 
+  // Retained for the TaskActions context shape (E-3). Native HTML5 drag is
+  // gone (E-4 uses dnd-kit), so nothing calls this anymore; dnd-kit manages
+  // its own drag-over collision detection internally.
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
   }, [])
 
-  const handleDrop = useCallback(async (status: TaskStatus) => {
-    if (!draggedTask || draggedTask.status === status) {
-      setDraggedTask(null)
-      return
-    }
+  /**
+   * Core status-change path shared by the native-drop shim (handleDrop) and
+   * the dnd-kit end handler. Optimistically applies the status locally, then
+   * reconciles with the server's authoritative task; rolls back + toasts on
+   * failure. C-2's optimistic-move guarantee lives here.
+   */
+  const moveTaskToStatus = useCallback(async (task: Task, status: TaskStatus) => {
+    if (task.status === status) return
 
-    // Optimistic move: snapshot the dragged task, apply the status locally, roll back on failure.
-    const movedTask = draggedTask
-    setDraggedTask(null)
+    // Optimistic move: snapshot the task, apply the status locally, roll back on failure.
     setCurrentProject(prev => prev ? {
       ...prev,
-      tasks: prev.tasks.map(t => t.id === movedTask.id ? { ...t, status } : t),
+      tasks: prev.tasks.map(t => t.id === task.id ? { ...t, status } : t),
     } : null)
     const rollback = () => setCurrentProject(prev => prev ? {
       ...prev,
-      tasks: prev.tasks.map(t => t.id === movedTask.id ? movedTask : t),
+      tasks: prev.tasks.map(t => t.id === task.id ? task : t),
     } : null)
 
     try {
-      const updatedTask = await tasksApi.update(movedTask.id, { status }, { errorFallback: 'Failed to update task status' })
+      const updatedTask = await tasksApi.update(task.id, { status }, { errorFallback: 'Failed to update task status' })
       setCurrentProject(prev => prev ? {
         ...prev,
         tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
@@ -233,7 +237,14 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
       rollback()
       toast({ title: 'Failed to update task status', variant: 'destructive' })
     }
-  }, [draggedTask, setCurrentProject, toast])
+  }, [setCurrentProject, toast])
+
+  const handleDrop = useCallback(async (status: TaskStatus) => {
+    const movedTask = draggedTask
+    setDraggedTask(null)
+    if (!movedTask) return
+    await moveTaskToStatus(movedTask, status)
+  }, [draggedTask, moveTaskToStatus])
 
   return {
     editingTask,

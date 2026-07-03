@@ -1,7 +1,28 @@
 'use client'
 
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragCancelEvent,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -11,6 +32,7 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { NoRuntimeBanner } from '@/components/no-runtime-banner'
 import { BoardTaskCard } from '@/components/board-task-card'
 import {
@@ -20,7 +42,42 @@ import {
   useLiveAgentLogs,
 } from '@/app/_views/board-context'
 import { statusColumns, priorityColors, tagColors, showDemoSeed } from '@/app/_views/board-constants'
-import type { TaskStatus } from '@/types/board'
+import type { Task, TaskStatus } from '@/types/board'
+
+/** Drag data carried by every draggable card / droppable column so the end handler can resolve a target status. */
+interface DndData {
+  status: TaskStatus
+  /** Present on cards (draggables) for screen-reader announcements; absent on column droppables. */
+  title?: string
+}
+
+/** Sortable wrapper: makes a BoardTaskCard a keyboard/pointer draggable whose grip is the drag handle. */
+function SortableTaskCard(props: Omit<React.ComponentProps<typeof BoardTaskCard>, 'sortable' | 'overlay'>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.task.id,
+    data: { status: props.task.status, title: props.task.title } satisfies DndData,
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+  }
+  return (
+    <BoardTaskCard
+      {...props}
+      sortable={{ setNodeRef, style, attributes, listeners, isDragging }}
+    />
+  )
+}
+
+/** A status column that accepts drops even when empty (SortableContext alone can't). */
+function DroppableColumn({ status, className, children }: { status: TaskStatus; className?: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: status, data: { status } satisfies DndData })
+  return (
+    <div ref={setNodeRef} className={cn(className, isOver && 'rounded-lg ring-1 ring-ring/40')}>
+      {children}
+    </div>
+  )
+}
 
 /** Card-shaped placeholder mirroring BoardTaskCard's box (rounded-lg border bg-card p-3). */
 function BoardCardSkeleton() {
@@ -142,11 +199,67 @@ export default function BoardPage() {
     setSelectedTask,
     mobileColumn, setMobileColumn,
     handleDeleteTask,
-    handleDragStart, handleDragOver, handleDrop,
+    handleDragStart, handleDrop,
     openEditTaskDialog, openNewTaskDialog,
   } = useTaskActions()
   const { setSettingsTab } = useUiState()
   const liveAgentLogs = useLiveAgentLogs()
+
+  // The card currently lifted, mirrored into a DragOverlay so the pointer/
+  // keyboard drag has a visible, detached representation.
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+
+  // PointerSensor's 8px activation distance lets a plain click/tap through to
+  // the card's onClick (open drawer) instead of starting a drag. KeyboardSensor
+  // with sortableKeyboardCoordinates drives pick-up/arrow-move/drop from the grip.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const statusLabel = useMemo(
+    () => Object.fromEntries(statusColumns.map((c) => [c.id, c.label])) as Record<TaskStatus, string>,
+    [],
+  )
+
+  const announcements: Announcements = useMemo(() => ({
+    onDragStart: ({ active }) => `Picked up task ${active.data.current?.title ?? ''}.`,
+    onDragOver: ({ active, over }) =>
+      over
+        ? `Task ${active.data.current?.title ?? ''} is over the ${statusLabel[over.id as TaskStatus] ?? String(over.id)} column.`
+        : `Task ${active.data.current?.title ?? ''} is no longer over a column.`,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Task ${active.data.current?.title ?? ''} dropped into the ${statusLabel[over.id as TaskStatus] ?? String(over.id)} column.`
+        : `Task ${active.data.current?.title ?? ''} dropped.`,
+    onDragCancel: ({ active }) => `Dragging cancelled. Task ${active.data.current?.title ?? ''} returned.`,
+  }), [statusLabel])
+
+  const handleDndStart = (event: DragStartEvent) => {
+    const task = currentProject?.tasks.find((t) => t.id === event.active.id) ?? null
+    setActiveTask(task)
+    if (task) handleDragStart(task)
+  }
+
+  const resolveStatus = (event: DragEndEvent | DragCancelEvent): TaskStatus | undefined =>
+    (event.over?.data.current as DndData | undefined)?.status ??
+    (event.active.data.current as DndData | undefined)?.status
+
+  const handleDndEnd = (event: DragEndEvent) => {
+    setActiveTask(null)
+    // over resolves to the target column (or the hovered card's column); on a
+    // miss we fall back to the source status so handleDrop no-ops and clears
+    // the dragged task. Same optimistic status-change path native drop used.
+    const status = resolveStatus(event)
+    if (status) void handleDrop(status)
+  }
+
+  const handleDndCancel = (event: DragCancelEvent) => {
+    setActiveTask(null)
+    // Clear the hook's draggedTask without moving (source === target no-ops).
+    const status = resolveStatus(event)
+    if (status) void handleDrop(status)
+  }
 
   return (
     <>
@@ -204,6 +317,14 @@ export default function BoardPage() {
         </div>
       ) : (
         <ScrollArea className="h-[calc(100vh-3.5rem)] custom-scrollbar">
+         <DndContext
+           sensors={sensors}
+           collisionDetection={closestCorners}
+           accessibility={{ announcements }}
+           onDragStart={handleDndStart}
+           onDragEnd={handleDndEnd}
+           onDragCancel={handleDndCancel}
+         >
           <div className="p-4">
             {/* Mobile column tabs */}
             <div className="flex xs:hidden gap-1 mb-3 overflow-x-auto pb-1">
@@ -228,12 +349,7 @@ export default function BoardPage() {
               {statusColumns.map((column) => {
                 const tasks = getTasksByStatus(column.id)
                 return (
-                  <div
-                    key={column.id}
-                    className="min-w-[280px] md:min-w-0"
-                    onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(column.id)}
-                  >
+                  <DroppableColumn key={column.id} status={column.id} className="min-w-[280px] md:min-w-0">
                     <div className="mb-3 flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <span className={`text-[11px] font-medium uppercase tracking-wider ${column.color}`}>
@@ -251,32 +367,32 @@ export default function BoardPage() {
                       </Button>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      {tasks.map((task) => (
-                        <BoardTaskCard
-                          key={task.id}
-                          task={task}
-                          priorityColors={priorityColors}
-                          tagColors={tagColors}
-                          onOpen={setSelectedTask}
-                          onViewSteps={setViewingTaskSteps}
-                          draggable
-                          onDragStart={handleDragStart}
-                          onEdit={openEditTaskDialog}
-                          onDelete={handleDeleteTask}
-                          liveAgentLogs={liveAgentLogs}
-                        />
-                      ))}
+                    <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                      <div className="flex flex-col gap-2">
+                        {tasks.map((task) => (
+                          <SortableTaskCard
+                            key={task.id}
+                            task={task}
+                            priorityColors={priorityColors}
+                            tagColors={tagColors}
+                            onOpen={setSelectedTask}
+                            onViewSteps={setViewingTaskSteps}
+                            onEdit={openEditTaskDialog}
+                            onDelete={handleDeleteTask}
+                            liveAgentLogs={liveAgentLogs}
+                          />
+                        ))}
 
-                      <button
-                        onClick={() => openNewTaskDialog(column.id)}
-                        className="flex items-center gap-2 rounded-lg border border-dashed border-border/30 p-2 text-[11px] text-muted-foreground/50 hover:border-border/50 hover:text-muted-foreground/70 transition-colors"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Add task
-                      </button>
-                    </div>
-                  </div>
+                        <button
+                          onClick={() => openNewTaskDialog(column.id)}
+                          className="flex items-center gap-2 rounded-lg border border-dashed border-border/30 p-2 text-[11px] text-muted-foreground/50 hover:border-border/50 hover:text-muted-foreground/70 transition-colors"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add task
+                        </button>
+                      </div>
+                    </SortableContext>
+                  </DroppableColumn>
                 )
               })}
             </div>
@@ -320,6 +436,22 @@ export default function BoardPage() {
                 })}
             </div>
           </div>
+
+          {/* Detached representation of the lifted card during a drag. */}
+          <DragOverlay>
+            {activeTask ? (
+              <BoardTaskCard
+                task={activeTask}
+                priorityColors={priorityColors}
+                tagColors={tagColors}
+                onOpen={setSelectedTask}
+                onViewSteps={setViewingTaskSteps}
+                liveAgentLogs={liveAgentLogs}
+                overlay
+              />
+            ) : null}
+          </DragOverlay>
+         </DndContext>
         </ScrollArea>
       )}
     </>
