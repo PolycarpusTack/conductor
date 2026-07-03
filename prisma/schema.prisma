@@ -520,9 +520,26 @@ model User {
   isActive     Boolean       @default(true)
   lastLoginAt  DateTime?
   sessions     UserSession[]
+  resetTokens  PasswordResetToken[]
   activities   ActivityLog[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+}
+
+// Self-service password reset + email invites (D-5). Only the SHA-256 hash of
+// the raw token is stored (like UserSession) so a DB leak never yields a live
+// reset link. Single-use: usedAt is stamped on consume; expired/used/unknown
+// tokens are all rejected. Cascade on user delete.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique // SHA-256 of the raw `cr_…` token
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // DB-backed sessions: only the token hash is stored, enabling per-user

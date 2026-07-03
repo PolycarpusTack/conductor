@@ -7,6 +7,12 @@ import { getSessionUser, requireRole } from '@/lib/server/admin-session'
 import { badRequest, conflict, withErrorHandling } from '@/lib/server/api-errors'
 import { createUserSchema } from '@/lib/server/contracts'
 import { createUser } from '@/lib/server/user-auth'
+import {
+  buildSetPasswordLink,
+  isSmtpConfigured,
+  issueResetToken,
+  sendSetPasswordEmail,
+} from '@/lib/server/password-reset'
 
 const USER_SELECT = {
   id: true,
@@ -56,6 +62,20 @@ export const POST = withErrorHandling('api/admin/users', async (request: Request
     password: tempPassword,
     role: parsed.data.role,
   })
+
+  // Invite by email when SMTP is configured: email a tokenized set-password
+  // link instead of surfacing the temp password in-band. Unconfigured
+  // instances fall back to the shown-temp-password behaviour (unchanged).
+  if (isSmtpConfigured()) {
+    const token = await issueResetToken(user.id)
+    await sendSetPasswordEmail({
+      to: user.email,
+      name: user.name,
+      link: buildSetPasswordLink(request, token),
+      invite: true,
+    })
+    return NextResponse.json({ user, invited: true })
+  }
 
   return NextResponse.json({ user, tempPassword })
 })

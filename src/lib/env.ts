@@ -32,6 +32,9 @@ const serverEnvSchema = z
     // Model-B claim-lease window (B-2). Optional with a 15-min default in
     // agent-helpers.ts — validated here so a typo fails fast at boot.
     AGENTBOARD_CLAIM_LEASE_MS: z.coerce.number().int().positive().optional(),
+    // Password-reset / invite token TTL (D-5). Optional with a 1-hour default
+    // in password-reset.ts — validated here so a typo fails fast at boot.
+    AGENTBOARD_RESET_TOKEN_TTL_MS: z.coerce.number().int().positive().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.AGENTBOARD_ADMIN_PASSWORD) {
@@ -75,6 +78,7 @@ export function validateEnv(source: Record<string, string | undefined> = process
     PROMPT_LIBRARY_PATH: source.PROMPT_LIBRARY_PATH,
     OPENAI_API_KEY: source.OPENAI_API_KEY,
     AGENTBOARD_CLAIM_LEASE_MS: source.AGENTBOARD_CLAIM_LEASE_MS,
+    AGENTBOARD_RESET_TOKEN_TTL_MS: source.AGENTBOARD_RESET_TOKEN_TTL_MS,
   })
 
   if (!result.success) {

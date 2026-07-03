@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Bot, Sparkles } from 'lucide-react'
@@ -31,6 +33,8 @@ export function AuthView({
   handleAdminLogin,
   setView,
 }: AuthViewProps) {
+  const [showForgot, setShowForgot] = useState(false)
+
   if (authChecking) {
     return (
       <div className="min-h-screen bg-background dark">
@@ -53,11 +57,18 @@ export function AuthView({
               <Bot className="h-5 w-5 text-background" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold">Admin Access</h1>
-              <p className="text-sm text-muted-foreground">Sign in to manage projects, agents, and task workflow.</p>
+              <h1 className="text-lg font-semibold">{showForgot ? 'Reset password' : 'Admin Access'}</h1>
+              <p className="text-sm text-muted-foreground">
+                {showForgot
+                  ? 'Enter your account email and we will send a reset link.'
+                  : 'Sign in to manage projects, agents, and task workflow.'}
+              </p>
             </div>
           </div>
 
+          {showForgot ? (
+            <ForgotPasswordForm initialEmail={adminEmail} onBack={() => setShowForgot(false)} />
+          ) : (
           <div className="space-y-4">
             {usersExist && (
               <div className="grid gap-2">
@@ -111,8 +122,81 @@ export function AuthView({
                 Back
               </Button>
             </div>
+
+            {usersExist && (
+              <button
+                type="button"
+                className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
+                onClick={() => setShowForgot(true)}
+              >
+                Forgot password?
+              </button>
+            )}
           </div>
+          )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ForgotPasswordForm({ initialEmail, onBack }: { initialEmail: string; onBack: () => void }) {
+  const [email, setEmail] = useState(initialEmail)
+  const [submitting, setSubmitting] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  const submit = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      // Always resolves 200 (no account enumeration); we ignore the body and
+      // show the same confirmation regardless.
+      await fetch('/api/auth/reset/request', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(() => {})
+      setSent(true)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-border/30 bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+          If an account exists for that email, a reset link is on its way. Check your inbox.
+        </div>
+        <Button variant="outline" className="w-full" onClick={onBack}>
+          Back to sign in
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2">
+        <label className="text-sm font-medium">Email</label>
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          autoComplete="username"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submit()
+          }}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button className="flex-1" onClick={submit} disabled={submitting || !email}>
+          Send reset link
+        </Button>
+        <Button variant="outline" onClick={onBack}>
+          Back
+        </Button>
       </div>
     </div>
   )
