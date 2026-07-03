@@ -33,9 +33,9 @@ interface DaemonStatusResponse {
 
 
 const STATUS_STYLES: Record<string, { icon: React.ReactNode; className: string }> = {
-  online: { icon: <Wifi className="w-3.5 h-3.5" />, className: 'bg-green-500/15 text-green-600 border-green-500/30' },
-  stale: { icon: <AlertTriangle className="w-3.5 h-3.5" />, className: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
-  offline: { icon: <WifiOff className="w-3.5 h-3.5" />, className: 'bg-red-500/15 text-red-600 border-red-500/30' },
+  online: { icon: <Wifi className="w-3.5 h-3.5" />, className: 'bg-[var(--op-green-bg)] text-[var(--op-green)] border-[var(--op-green-dim)]' },
+  stale: { icon: <AlertTriangle className="w-3.5 h-3.5" />, className: 'bg-[var(--op-amber-bg)] text-[var(--op-amber)] border-[var(--op-amber-dim)]' },
+  offline: { icon: <WifiOff className="w-3.5 h-3.5" />, className: 'bg-[var(--op-red-bg)] text-[var(--op-red)] border-[var(--op-red-dim)]' },
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -114,9 +114,9 @@ export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2">
-              <Wifi className="w-4 h-4 text-green-500" />
+              <Wifi className="w-4 h-4 text-[var(--op-green)]" />
               <div>
-                <p className="text-2xl font-bold text-green-600">{summary.online}</p>
+                <p className="text-2xl font-bold text-[var(--op-green)]">{summary.online}</p>
                 <p className="text-xs text-muted-foreground">Online</p>
               </div>
             </div>
@@ -125,9 +125,9 @@ export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-500" />
+              <AlertTriangle className="w-4 h-4 text-[var(--op-amber)]" />
               <div>
-                <p className="text-2xl font-bold text-yellow-600">{summary.stale}</p>
+                <p className="text-2xl font-bold text-[var(--op-amber)]">{summary.stale}</p>
                 <p className="text-xs text-muted-foreground">Stale</p>
               </div>
             </div>
@@ -136,9 +136,9 @@ export function RuntimeDashboard({ liveAgentLogs }: RuntimeDashboardProps) {
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-2">
-              <WifiOff className="w-4 h-4 text-red-500" />
+              <WifiOff className="w-4 h-4 text-[var(--op-red)]" />
               <div>
-                <p className="text-2xl font-bold text-red-600">{summary.offline}</p>
+                <p className="text-2xl font-bold text-[var(--op-red)]">{summary.offline}</p>
                 <p className="text-xs text-muted-foreground">Offline</p>
               </div>
             </div>

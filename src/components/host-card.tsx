@@ -24,9 +24,9 @@ export interface HostSummary {
 }
 
 const STATUS_STYLES: Record<string, { icon: React.ReactNode; className: string }> = {
-  online: { icon: <Wifi className="w-3.5 h-3.5" />, className: 'bg-green-500/15 text-green-600 border-green-500/30' },
-  stale: { icon: <AlertTriangle className="w-3.5 h-3.5" />, className: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
-  offline: { icon: <WifiOff className="w-3.5 h-3.5" />, className: 'bg-red-500/15 text-red-600 border-red-500/30' },
+  online: { icon: <Wifi className="w-3.5 h-3.5" />, className: 'bg-[var(--op-green-bg)] text-[var(--op-green)] border-[var(--op-green-dim)]' },
+  stale: { icon: <AlertTriangle className="w-3.5 h-3.5" />, className: 'bg-[var(--op-amber-bg)] text-[var(--op-amber)] border-[var(--op-amber-dim)]' },
+  offline: { icon: <WifiOff className="w-3.5 h-3.5" />, className: 'bg-[var(--op-red-bg)] text-[var(--op-red)] border-[var(--op-red-dim)]' },
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -36,10 +36,10 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 
 const TRUST_STYLES: Record<string, string> = {
-  local: 'bg-green-500/10 text-green-600',
-  lan: 'bg-blue-500/10 text-blue-500',
-  remote: 'bg-yellow-500/10 text-yellow-600',
-  cloud: 'bg-purple-500/10 text-purple-500',
+  local: 'bg-[var(--op-green-bg)] text-[var(--op-green)]',
+  lan: 'bg-[var(--op-blue-bg)] text-[var(--op-blue)]',
+  remote: 'bg-[var(--op-amber-bg)] text-[var(--op-amber)]',
+  cloud: 'bg-[var(--op-purple-bg)] text-[var(--op-purple)]',
 }
 
 function relativeTime(iso: string | null): string | null {

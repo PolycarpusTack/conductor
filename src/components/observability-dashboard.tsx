@@ -189,7 +189,7 @@ export function ObservabilityDashboard({ projectId }: ObservabilityDashboardProp
                       </td>
                       <td className="text-right py-2 px-2 tabular-nums">{agent.totalExecutions}</td>
                       <td className="text-right py-2 px-2 tabular-nums">
-                        <span className={agent.successRate >= 0.8 ? 'text-green-500' : agent.successRate >= 0.5 ? 'text-amber-500' : 'text-red-500'}>
+                        <span className={agent.successRate >= 0.8 ? 'text-[var(--op-green)]' : agent.successRate >= 0.5 ? 'text-[var(--op-amber)]' : 'text-[var(--op-red)]'}>
                           {Math.round(agent.successRate * 100)}%
                         </span>
                       </td>
@@ -232,7 +232,7 @@ export function ObservabilityDashboard({ projectId }: ObservabilityDashboardProp
                       </td>
                       <td className="text-right py-2 px-2 tabular-nums">{rt.totalExecutions}</td>
                       <td className="text-right py-2 px-2 tabular-nums">
-                        <span className={rt.errorRate <= 0.1 ? 'text-green-500' : rt.errorRate <= 0.3 ? 'text-amber-500' : 'text-red-500'}>
+                        <span className={rt.errorRate <= 0.1 ? 'text-[var(--op-green)]' : rt.errorRate <= 0.3 ? 'text-[var(--op-amber)]' : 'text-[var(--op-red)]'}>
                           {Math.round(rt.errorRate * 100)}%
                         </span>
                       </td>
@@ -257,8 +257,8 @@ export function ObservabilityDashboard({ projectId }: ObservabilityDashboardProp
             failures.map((f, i) => (
               <div key={i} className="p-3 rounded-lg border border-border/50 bg-muted/30">
                 <div className="flex items-start justify-between gap-2">
-                  <code className="text-xs text-red-400 break-all">{f.errorPattern}</code>
-                  <span className="shrink-0 text-xs font-medium bg-red-500/10 text-red-500 px-2 py-0.5 rounded">
+                  <code className="text-xs text-[var(--op-red)] break-all">{f.errorPattern}</code>
+                  <span className="shrink-0 text-xs font-medium bg-[var(--op-red-bg)] text-[var(--op-red)] px-2 py-0.5 rounded">
                     {f.count}x
                   </span>
                 </div>

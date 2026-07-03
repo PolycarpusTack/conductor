@@ -42,13 +42,13 @@ interface WorkflowEditorProps {
   onStepsChange: (steps: DagStep[]) => void
 }
 
-const MODE_COLORS: Record<string, string> = {
-  analyze: '#60A5FA',
-  verify: '#F59E0B',
-  develop: '#4ADE80',
-  review: '#2DD4BF',
-  draft: '#A78BFA',
-  human: '#9CA3AF',
+const MODE_COLORS: Record<string, { color: string; bg: string }> = {
+  analyze: { color: 'var(--op-blue)', bg: 'var(--op-blue-bg)' },
+  verify: { color: 'var(--op-amber)', bg: 'var(--op-amber-bg)' },
+  develop: { color: 'var(--op-green)', bg: 'var(--op-green-bg)' },
+  review: { color: 'var(--op-teal)', bg: 'var(--op-teal-bg)' },
+  draft: { color: 'var(--op-purple)', bg: 'var(--op-purple-bg)' },
+  human: { color: 'var(--text-3)', bg: 'color-mix(in srgb, var(--text-3) 8%, transparent)' },
 }
 
 let nextId = 1
@@ -107,7 +107,7 @@ function ConditionEditor({
         placeholder="value"
         className="text-[9px] bg-card border border-border/30 rounded px-1 py-0.5 w-20"
       />
-      <button onClick={onRemove} className="text-[9px] text-red-400 hover:text-red-300">
+      <button onClick={onRemove} className="text-[9px] text-[var(--op-red)] hover:text-[var(--op-red)]/80">
         <X className="h-2.5 w-2.5" />
       </button>
     </div>
@@ -134,7 +134,7 @@ function StepNode({
   onStartConnect: () => void
 }) {
   const agent = agents.find(a => a.id === step.agentId)
-  const modeColor = MODE_COLORS[step.mode] || '#9CA3AF'
+  const modeColor = MODE_COLORS[step.mode] || MODE_COLORS.human
 
   return (
     <div
@@ -150,12 +150,12 @@ function StepNode({
       {/* Badges */}
       <div className="flex items-center gap-1 mb-1.5">
         {step.isParallelRoot && (
-          <span className="text-[8px] font-mono bg-blue-500/10 text-blue-400 px-1 rounded">
+          <span className="text-[8px] font-mono bg-[var(--op-blue-bg)] text-[var(--op-blue)] px-1 rounded">
             <GitBranch className="h-2 w-2 inline mr-0.5" />FORK
           </span>
         )}
         {step.isMergePoint && (
-          <span className="text-[8px] font-mono bg-purple-500/10 text-purple-400 px-1 rounded">
+          <span className="text-[8px] font-mono bg-[var(--op-purple-bg)] text-[var(--op-purple)] px-1 rounded">
             <GitMerge className="h-2 w-2 inline mr-0.5" />JOIN
           </span>
         )}
@@ -170,7 +170,7 @@ function StepNode({
       <div className="flex items-center gap-2 mb-1">
         <span
           className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded"
-          style={{ backgroundColor: `${modeColor}15`, color: modeColor }}
+          style={{ backgroundColor: modeColor.bg, color: modeColor.color }}
         >
           {step.mode}
         </span>

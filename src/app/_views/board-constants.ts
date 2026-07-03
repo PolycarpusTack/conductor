@@ -25,7 +25,7 @@ export const tagColors: Record<string, string> = {
   research: 'bg-[var(--op-purple-bg)] text-[var(--op-purple)] border border-[var(--op-purple-dim)]',
   docs: 'bg-[var(--op-blue-bg)] text-[var(--op-blue)] border border-[var(--op-blue-dim)]',
   backend: 'bg-[var(--op-teal-bg)] text-[var(--op-teal)] border border-[var(--op-teal-dim)]',
-  frontend: 'bg-pink-500/10 text-pink-400 border border-pink-500/20',
+  frontend: 'bg-[var(--op-green-bg)] text-[var(--op-green)] border border-[var(--op-green-dim)]',
   devops: 'bg-[var(--op-amber-bg)] text-[var(--op-amber)] border border-[var(--op-amber-dim)]',
   copy: 'bg-[var(--op-amber-bg)] text-[var(--op-amber)] border border-[var(--op-amber-dim)]',
   design: 'bg-[var(--op-purple-bg)] text-[var(--op-purple)] border border-[var(--op-purple-dim)]',

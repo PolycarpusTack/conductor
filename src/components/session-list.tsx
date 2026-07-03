@@ -29,12 +29,12 @@ export interface AgentSessionSummary {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  starting: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
-  active: 'bg-green-500/15 text-green-600 border-green-500/30',
-  idle: 'bg-gray-500/15 text-gray-500 border-gray-500/30',
-  waiting: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30',
-  exited: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
-  failed: 'bg-red-500/15 text-red-600 border-red-500/30',
+  starting: 'bg-[var(--op-blue-bg)] text-[var(--op-blue)] border-[var(--op-blue-dim)]',
+  active: 'bg-[var(--op-green-bg)] text-[var(--op-green)] border-[var(--op-green-dim)]',
+  idle: 'bg-muted text-muted-foreground border-border',
+  waiting: 'bg-[var(--op-amber-bg)] text-[var(--op-amber)] border-[var(--op-amber-dim)]',
+  exited: 'bg-muted text-muted-foreground border-border',
+  failed: 'bg-[var(--op-red-bg)] text-[var(--op-red)] border-[var(--op-red-dim)]',
 }
 
 function relativeTime(iso: string | null): string | null {

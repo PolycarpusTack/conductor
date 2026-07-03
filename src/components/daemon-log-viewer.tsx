@@ -34,12 +34,12 @@ interface DaemonLogViewerProps {
 
 function EventBadge({ type }: { type: AgentEvent['type'] }) {
   const variants: Record<string, { label: string; className: string }> = {
-    thinking: { label: 'thinking', className: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30' },
-    tool_call: { label: 'tool', className: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
-    tool_result: { label: 'result', className: 'bg-cyan-500/15 text-cyan-600 border-cyan-500/30' },
-    text: { label: 'output', className: 'bg-gray-500/15 text-gray-600 border-gray-500/30' },
-    completed: { label: 'done', className: 'bg-green-500/15 text-green-600 border-green-500/30' },
-    error: { label: 'error', className: 'bg-red-500/15 text-red-600 border-red-500/30' },
+    thinking: { label: 'thinking', className: 'bg-[var(--op-amber-bg)] text-[var(--op-amber)] border-[var(--op-amber-dim)]' },
+    tool_call: { label: 'tool', className: 'bg-[var(--op-blue-bg)] text-[var(--op-blue)] border-[var(--op-blue-dim)]' },
+    tool_result: { label: 'result', className: 'bg-[var(--op-teal-bg)] text-[var(--op-teal)] border-[var(--op-teal-dim)]' },
+    text: { label: 'output', className: 'bg-muted text-muted-foreground border-border' },
+    completed: { label: 'done', className: 'bg-[var(--op-green-bg)] text-[var(--op-green)] border-[var(--op-green-dim)]' },
+    error: { label: 'error', className: 'bg-[var(--op-red-bg)] text-[var(--op-red)] border-[var(--op-red-dim)]' },
   }
 
   const v = variants[type] || variants.text
@@ -49,11 +49,11 @@ function EventBadge({ type }: { type: AgentEvent['type'] }) {
 function EventContent({ event }: { event: AgentEvent }) {
   switch (event.type) {
     case 'thinking':
-      return <span className="text-yellow-600 italic">Thinking...</span>
+      return <span className="text-[var(--op-amber)] italic">Thinking...</span>
     case 'tool_call':
       return (
         <span>
-          <span className="text-blue-500 font-medium">{event.name}</span>
+          <span className="text-[var(--op-blue)] font-medium">{event.name}</span>
           {event.args != null && (
             <span className="text-muted-foreground text-xs ml-1">
               ({typeof event.args === 'string' ? event.args : JSON.stringify(event.args).slice(0, 120)})
@@ -63,7 +63,7 @@ function EventContent({ event }: { event: AgentEvent }) {
       )
     case 'tool_result':
       return (
-        <span className={event.ok ? 'text-cyan-600' : 'text-red-500'}>
+        <span className={event.ok ? 'text-[var(--op-teal)]' : 'text-[var(--op-red)]'}>
           {(event.output || '').slice(0, 200)}
           {event.truncated && <span className="text-muted-foreground"> [truncated]</span>}
         </span>
@@ -71,9 +71,9 @@ function EventContent({ event }: { event: AgentEvent }) {
     case 'text':
       return <span className="whitespace-pre-wrap">{event.chunk}</span>
     case 'completed':
-      return <span className="text-green-600 font-medium">{event.summary || 'Completed'}</span>
+      return <span className="text-[var(--op-green)] font-medium">{event.summary || 'Completed'}</span>
     case 'error':
-      return <span className="text-red-500">{event.message}</span>
+      return <span className="text-[var(--op-red)]">{event.message}</span>
     default:
       return null
   }
@@ -95,21 +95,21 @@ export function DaemonLogViewer({ taskId, entries, isRunning, onKill }: DaemonLo
     <div className="border rounded-md bg-black/5 dark:bg-white/5">
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+          <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-[var(--op-green)] animate-pulse' : 'bg-muted-foreground/50'}`} />
           <span className="text-xs font-medium">
             Daemon Output {taskEntries.length > 0 && `(${taskEntries.length} events)`}
           </span>
         </div>
         <div className="flex items-center gap-1">
           {isRunning && onKill && (
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-red-500 hover:text-red-600" onClick={onKill}>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-[var(--op-red)] hover:text-[var(--op-red)]/80" onClick={onKill}>
               <Square className="w-3 h-3 mr-1" /> Kill
             </Button>
           )}
           <Button
             variant="ghost"
             size="sm"
-            className={`h-6 px-2 text-xs ${autoScroll ? 'text-blue-500' : 'text-muted-foreground'}`}
+            className={`h-6 px-2 text-xs ${autoScroll ? 'text-[var(--op-blue)]' : 'text-muted-foreground'}`}
             onClick={() => setAutoScroll(!autoScroll)}
           >
             <ChevronDown className="w-3 h-3" />
