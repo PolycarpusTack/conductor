@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "bun index.ts",
-    "register": "bun index.ts --register"
+    "register": "bun index.ts --register",
+    "test": "bun test"
   }
 }

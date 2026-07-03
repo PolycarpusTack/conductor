@@ -15,8 +15,30 @@ import { appendStepEvent } from '@/lib/server/step-events'
  * `invocationMode = 'DAEMON'`. The daemon runs the step locally (CLI tools,
  * local files) and reports back via POST /api/daemon/steps.
  *
+ * The `step` object is the daemon's Execution Payload (payloadVersion 1) —
+ * its shape is contract-tested against the daemon runner's
+ * `validateExecutionPayload` and documented in
+ * docs/gpm/state/snapshots/daemon-execution-payload.md. Bump `payloadVersion`
+ * on any breaking change.
+ *
  * Also refreshes the daemon's heartbeat.
  */
+
+/**
+ * Tokens a commandTemplate may reference — server-owned scalars only, never
+ * user/LLM prose (A-1 AC 3: unknown tokens are rejected loudly, not silently
+ * resolved to empty strings — one dropped token would run a mangled command).
+ */
+const COMMAND_TEMPLATE_TOKENS = new Set(['agent.runtimeModel', 'task.id', 'step.id', 'step.mode'])
+
+function unknownTemplateTokens(template: string | null | undefined): string[] {
+  if (!template) return []
+  const unknown: string[] = []
+  for (const match of template.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g)) {
+    if (!COMMAND_TEMPLATE_TOKENS.has(match[1])) unknown.push(match[1])
+  }
+  return unknown
+}
 export const GET = withErrorHandling('api/daemon/steps/next', async (request: Request) => {
   const rawToken = extractDaemonToken(request)
   if (!rawToken) throw unauthorized('Missing daemon token')
@@ -77,6 +99,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
     // Session policy from the agent's runtime config; the sessionKey is
     // computed server-side so reuse semantics live in one place.
     const policy = parseSessionPolicy(step.agent?.runtime?.config)
+    const badTokens = unknownTemplateTokens(policy.commandTemplate)
     const session = {
       policy: policy.sessionPolicy,
       backend: policy.sessionBackend,
@@ -85,12 +108,21 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         taskId: step.taskId,
         stepId: step.id,
       }),
-      command: resolveCommandTemplate(policy.commandTemplate, {
-        'agent.runtimeModel': step.agent?.runtimeModel,
-        'task.id': step.taskId,
-        'step.id': step.id,
-        'step.mode': step.mode,
-      }),
+      command:
+        badTokens.length > 0
+          ? null
+          : resolveCommandTemplate(policy.commandTemplate, {
+              'agent.runtimeModel': step.agent?.runtimeModel,
+              'task.id': step.taskId,
+              'step.id': step.id,
+              'step.mode': step.mode,
+            }),
+      // Loud rejection — the daemon fails the step with this message instead
+      // of executing a command with silently-dropped tokens.
+      commandError:
+        badTokens.length > 0
+          ? `commandTemplate references unknown tokens: ${badTokens.join(', ')} (allowed: ${[...COMMAND_TEMPLATE_TOKENS].join(', ')})`
+          : null,
       workingDirectoryPolicy: policy.workingDirectoryPolicy,
       idleRequiredBeforeCommand: policy.idleRequiredBeforeCommand,
       maxOutputPreviewChars: policy.maxOutputPreviewChars,
@@ -117,6 +149,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
 
     return NextResponse.json({
       step: {
+        payloadVersion: 1,
         id: step.id,
         taskId: step.taskId,
         order: step.order,
@@ -138,6 +171,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
               systemPrompt: step.agent.systemPrompt,
               modeInstructions: step.agent.modeInstructions,
               mcpConnectionIds: step.agent.mcpConnectionIds,
+              runtimeModel: step.agent.runtimeModel,
             }
           : null,
         task: {

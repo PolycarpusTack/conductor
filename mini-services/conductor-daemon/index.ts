@@ -5,26 +5,45 @@
  *   → create/reuse a session per the server's session block → execute →
  *   stream output as session events → complete/fail the step with sessionId.
  *
- * SAFETY DEFAULT: without an explicit commandTemplate on the runtime config,
- * this daemon NEVER executes step instructions as shell. It runs a no-op
- * echo runner that proves the protocol. Point commandTemplate at a real tool
- * (claude-code, codex, a build script) to do real work.
+ * SAFETY DEFAULT: real execution is opt-in. Without `DAEMON_RUNNER=claude`
+ * or a server-configured commandTemplate, this daemon NEVER executes step
+ * instructions — it runs a shell-less no-op echo runner that proves the
+ * protocol. Runner mechanics (spawn spec, stdin prompt delivery, stream-json
+ * parsing) live in runner.ts, built per SPIKE A-0's invocation contract.
  *
  * Run: bun index.ts            (needs CONDUCTOR_DAEMON_TOKEN)
  *      bun index.ts --register (one-time; needs an admin session cookie)
  */
 
-import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, platform, arch } from 'node:os'
 import { join } from 'node:path'
+
+import {
+  buildSpawnSpec,
+  interpretResult,
+  resolveRunnerKind,
+  runSpawnSpec,
+  validateExecutionPayload,
+  type ClaudeRunnerOptions,
+  type ExecutionPayload,
+  type RunnerKind,
+} from './runner'
 
 const BASE_URL = (process.env.CONDUCTOR_URL || 'http://localhost:3000').replace(/\/$/, '')
 const TOKEN = process.env.CONDUCTOR_DAEMON_TOKEN || ''
 const CAPABILITY = process.env.DAEMON_CAPABILITY || 'claude-code'
 const POLL_INTERVAL_MS = Number(process.env.DAEMON_POLL_INTERVAL_MS || 5000)
 const HEARTBEAT_INTERVAL_MS = 30_000
+
+// Runner configuration — real execution is opt-in (see resolveRunnerKind).
+const RUNNER_ENV = process.env.DAEMON_RUNNER
+const CLAUDE_OPTS: ClaudeRunnerOptions = {
+  binArgv: [process.env.DAEMON_CLAUDE_BIN || 'claude'],
+  maxTurns: Number(process.env.DAEMON_CLAUDE_MAX_TURNS || 30),
+  systemPromptMode: process.env.DAEMON_SYSTEM_PROMPT_MODE === 'arg' ? 'arg' : 'file',
+}
 
 // ---------------------------------------------------------------------------
 // Installation identity — survives hostname changes (roadmap decision D1)
@@ -121,15 +140,7 @@ async function heartbeat(): Promise<void> {
 // Session reporting
 // ---------------------------------------------------------------------------
 
-interface SessionBlock {
-  policy: string
-  backend: string
-  sessionKey: string
-  command: string | null
-  maxOutputPreviewChars: number
-}
-
-async function upsertSession(step: StepPayload): Promise<string | null> {
+async function upsertSession(step: ExecutionPayload): Promise<string | null> {
   try {
     const res = await api('/api/daemon/sessions', {
       method: 'POST',
@@ -163,103 +174,107 @@ async function sessionEvent(sessionId: string, event: Record<string, unknown>): 
 }
 
 // ---------------------------------------------------------------------------
-// Step execution
+// Step execution — spawn spec + failure semantics live in runner.ts
 // ---------------------------------------------------------------------------
 
-interface StepPayload {
-  id: string
-  taskId: string
-  mode: string
-  instructions: string | null
-  timeoutMs: number | null
-  session: SessionBlock
-  agent: { id: string; name: string } | null
-  task: { id: string; title: string }
-}
-
-function buildCommand(step: StepPayload): { cmd: string; args: string[] } {
-  if (step.session.command) {
-    // Explicitly configured command template — run through the shell
-    const shell = platform() === 'win32' ? 'cmd' : 'sh'
-    const flag = platform() === 'win32' ? '/c' : '-c'
-    return { cmd: shell, args: [flag, step.session.command] }
+async function reportStep(
+  step: ExecutionPayload,
+  result: { ok: boolean; output: string; error: string | null },
+  sessionId: string | null,
+): Promise<void> {
+  try {
+    await api('/api/daemon/steps', {
+      method: 'POST',
+      body: JSON.stringify(
+        result.ok
+          ? {
+              stepId: step.id,
+              action: 'complete',
+              output: result.output.slice(0, 50_000),
+              sessionId: sessionId ?? undefined,
+            }
+          : {
+              stepId: step.id,
+              action: 'fail',
+              error: result.error ?? 'unknown runner failure',
+              willRetry: false,
+              sessionId: sessionId ?? undefined,
+            },
+      ),
+    })
+    console.log(`[step] ${step.id} ${result.ok ? 'completed' : `failed (${result.error})`}`)
+  } catch (err) {
+    console.error(`[step] ${step.id} completion report failed:`, err)
   }
-  // SAFETY DEFAULT: no-op echo runner. Never execute instructions as shell.
-  const summary = `conductor-daemon echo runner: step ${step.id} (${step.mode}) of task "${step.task.title}"`
-  return platform() === 'win32'
-    ? { cmd: 'cmd', args: ['/c', 'echo', summary] }
-    : { cmd: 'echo', args: [summary] }
 }
 
-async function executeStep(step: StepPayload): Promise<void> {
+async function executeStep(step: ExecutionPayload): Promise<void> {
   console.log(`[step] ${step.id} (${step.mode}) — session ${step.session.sessionKey}`)
   runningTasks++
 
   const sessionId = await upsertSession(step)
   if (sessionId) activeSessions++
 
-  const { cmd, args } = buildCommand(step)
-  if (sessionId) {
-    await sessionEvent(sessionId, { type: 'command', commandSummary: [cmd, ...args].join(' ').slice(0, 500) })
-  }
-
-  const child = spawn(cmd, args, { shell: false })
-  let output = ''
-
-  const stream = (streamName: 'stdout' | 'stderr') => (chunk: Buffer) => {
-    const text = chunk.toString()
-    output += text
-    if (sessionId) {
-      void sessionEvent(sessionId, { type: 'output', stream: streamName, chunk: text.slice(0, 8000) })
-    }
-  }
-  child.stdout?.on('data', stream('stdout'))
-  child.stderr?.on('data', stream('stderr'))
-
-  const timeoutMs = step.timeoutMs ?? 300_000
-  const exitCode: number = await new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      child.kill()
-      resolve(124)
-    }, timeoutMs)
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      resolve(code ?? 1)
-    })
-    child.on('error', () => {
-      clearTimeout(timer)
-      resolve(127)
-    })
-  })
-
-  if (sessionId) {
-    await sessionEvent(sessionId, {
-      type: 'status',
-      status: exitCode === 0 ? 'exited' : 'failed',
-      exitCode,
-    })
-    activeSessions = Math.max(0, activeSessions - 1)
-  }
-
   try {
-    await api('/api/daemon/steps', {
-      method: 'POST',
-      body: JSON.stringify(
-        exitCode === 0
-          ? { stepId: step.id, action: 'complete', output: output.slice(0, 50_000), sessionId: sessionId ?? undefined }
-          : {
-              stepId: step.id,
-              action: 'fail',
-              error: `exit code ${exitCode}: ${output.slice(-500)}`,
-              willRetry: false,
-              sessionId: sessionId ?? undefined,
-            },
-      ),
+    // Contract guard — a payload the runner cannot interpret fails loudly
+    // instead of half-executing.
+    const payloadProblems = validateExecutionPayload(step)
+    if (payloadProblems.length > 0) {
+      await reportStep(step, { ok: false, output: '', error: `invalid execution payload: ${payloadProblems.join('; ')}` }, sessionId)
+      return
+    }
+
+    // Server-side template rejection (unknown tokens) — never execute.
+    if (step.session.commandError) {
+      await reportStep(step, { ok: false, output: '', error: `command template rejected: ${step.session.commandError}` }, sessionId)
+      return
+    }
+
+    const kind: RunnerKind = resolveRunnerKind(RUNNER_ENV, Boolean(step.session.command))
+    let spec
+    try {
+      spec = buildSpawnSpec(kind, step, CLAUDE_OPTS)
+    } catch (err) {
+      // e.g. TemplateTokenError — loud failure, no spawn.
+      await reportStep(step, { ok: false, output: '', error: `runner spec rejected: ${String(err instanceof Error ? err.message : err)}` }, sessionId)
+      return
+    }
+
+    if (sessionId) {
+      await sessionEvent(sessionId, { type: 'command', commandSummary: spec.summary })
+    }
+
+    const streamTo = (streamName: 'stdout' | 'stderr') => (chunk: string) => {
+      if (sessionId) {
+        void sessionEvent(sessionId, { type: 'output', stream: streamName, chunk: chunk.slice(0, 8000) })
+      }
+    }
+
+    const proc = await runSpawnSpec(spec, {
+      timeoutMs: step.timeoutMs ?? 300_000,
+      onStdout: streamTo('stdout'),
+      onStderr: streamTo('stderr'),
     })
-    console.log(`[step] ${step.id} ${exitCode === 0 ? 'completed' : `failed (${exitCode})`}`)
-  } catch (err) {
-    console.error(`[step] ${step.id} completion report failed:`, err)
+    const outcome = interpretResult(spec.kind, proc)
+
+    if (outcome.claude) {
+      console.log(
+        `[step] ${step.id} claude result: cost=$${outcome.claude.totalCostUsd ?? '?'} ` +
+          `turns=${outcome.claude.numTurns ?? '?'} session=${outcome.claude.sessionId ?? '?'}`,
+      )
+    }
+
+    if (sessionId) {
+      await sessionEvent(sessionId, {
+        type: 'status',
+        status: outcome.ok ? 'exited' : 'failed',
+        exitCode: outcome.exitCode,
+      })
+    }
+
+    await reportStep(step, outcome, sessionId)
   } finally {
+    if (sessionId) activeSessions = Math.max(0, activeSessions - 1)
     runningTasks = Math.max(0, runningTasks - 1)
   }
 }
@@ -280,7 +295,7 @@ async function poll(): Promise<void> {
 
     busy = true
     try {
-      await executeStep(body.step as StepPayload)
+      await executeStep(body.step as ExecutionPayload)
     } finally {
       busy = false
     }
@@ -304,7 +319,19 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`conductor-daemon → ${BASE_URL} (capability: ${CAPABILITY})`)
+  // Fail loudly at startup on a misconfigured runner — not mid-step.
+  try {
+    resolveRunnerKind(RUNNER_ENV, false)
+  } catch (err) {
+    console.error(String(err instanceof Error ? err.message : err))
+    process.exit(1)
+  }
+  const runnerLabel =
+    (RUNNER_ENV ?? '').trim() === 'claude'
+      ? `claude (${CLAUDE_OPTS.binArgv?.join(' ')})`
+      : 'echo/template (server commandTemplate decides; set DAEMON_RUNNER=claude for the claude runner)'
+
+  console.log(`conductor-daemon → ${BASE_URL} (capability: ${CAPABILITY}, runner: ${runnerLabel})`)
   await heartbeat()
   setInterval(heartbeat, HEARTBEAT_INTERVAL_MS)
   setInterval(poll, POLL_INTERVAL_MS)

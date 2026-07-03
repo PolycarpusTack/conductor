@@ -36,6 +36,8 @@
 | ID | Description | File | Severity | Resolution |
 |----|-------------|------|----------|------------|
 | TD-015 | Workspace-less step retries every poll tick and writes one `daemon_dispatch_failed` activity entry per tick — no dedupe in daemon-dispatch | src/lib/server/daemon-dispatch.ts | Low | Dedupe or park the step after N identical failures; revisit in B-3/F-5 |
+| TD-016 | commandTemplate tokens are validated at poll/spawn time, not when ProjectRuntime.config is written — bad templates surface late | src/app/api/daemon/steps/next/route.ts | Low | Add validation to the runtime-config settings API (EPIC C/D settings work) |
+| TD-017 | Generic runner argv split is whitespace-based — no quoting for args containing spaces (documented in daemon README) | mini-services/conductor-daemon/runner.ts | Low | Add quoted-arg parsing if a real template ever needs it |
 
 ## Epic 4 — Wizard LLM Composition (2026-04-29)
 
