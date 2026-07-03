@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 
+import type { z } from 'zod'
+
 import { db } from '@/lib/db'
 import { badRequest, forbidden, notFound, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
+import { stepArtifactSchema } from '@/lib/server/contracts'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
 import { advanceChain, resolveTaskStatus } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
@@ -10,6 +13,10 @@ import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { appendStepEvent } from '@/lib/server/step-events'
 
 const log = getLogger('api/daemon/steps')
+
+// A-3: evidence artifacts riding a completion report (git diff --stat, run
+// metadata). Bounded — a daemon must not be able to flood the artifact table.
+const MAX_REPORT_ARTIFACTS = 10
 
 export const POST = withErrorHandling('api/daemon/steps', async (request: Request) => {
     const rawToken = extractDaemonToken(request)
@@ -19,16 +26,35 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
     if (!daemon) throw unauthorized('Invalid daemon token')
 
     const body = await request.json()
-    const { stepId, action, output, error: errorMsg, willRetry, sessionId } = body as {
+    const { stepId, action, output, error: errorMsg, willRetry, sessionId, artifacts } = body as {
       stepId?: string
       action?: 'complete' | 'fail'
       output?: string
       error?: string
       willRetry?: boolean
       sessionId?: string
+      artifacts?: unknown
     }
 
     if (!stepId || !action) throw badRequest('stepId and action are required')
+
+    // A-3: evidence artifacts are accepted on BOTH actions — a failed step's
+    // git evidence is exactly what a reviewer needs. Validated up front (same
+    // schema as the agent completion path) so a bad report changes nothing.
+    const parsedArtifacts: Array<z.infer<typeof stepArtifactSchema>> = []
+    if (artifacts !== undefined) {
+      if (!Array.isArray(artifacts)) throw badRequest('artifacts must be an array')
+      if (artifacts.length > MAX_REPORT_ARTIFACTS) {
+        throw badRequest(`too many artifacts (max ${MAX_REPORT_ARTIFACTS})`)
+      }
+      for (const [index, raw] of artifacts.entries()) {
+        const parsed = stepArtifactSchema.safeParse(raw)
+        if (!parsed.success) {
+          throw badRequest(`artifacts[${index}]: ${parsed.error.issues[0]?.message || 'invalid artifact'}`)
+        }
+        parsedArtifacts.push(parsed.data)
+      }
+    }
 
     const step = await db.taskStep.findUnique({
       where: { id: stepId },
@@ -69,6 +95,22 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
       }
     }
 
+    const persistArtifacts = async () => {
+      for (const artifact of parsedArtifacts) {
+        await db.stepArtifact.create({
+          data: {
+            stepId,
+            type: artifact.type,
+            label: artifact.label,
+            content: artifact.content || null,
+            url: artifact.url || null,
+            mimeType: artifact.mimeType || null,
+            metadata: artifact.metadata ? JSON.stringify(artifact.metadata) : null,
+          },
+        })
+      }
+    }
+
     if (action === 'complete') {
       const truncated = output ? output.length > 5000 : false
       await db.taskStep.update({
@@ -81,6 +123,8 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
           leasedAt: null,
         },
       })
+
+      await persistArtifacts()
 
       await appendStepEvent(stepId, 'succeeded', {
         source: 'daemon',
@@ -116,6 +160,8 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
           leasedAt: willRetry && retryDelayMs > 0 ? new Date(Date.now() + retryDelayMs) : null,
         },
       })
+
+      await persistArtifacts()
 
       await appendStepEvent(stepId, 'failed', {
         source: 'daemon',

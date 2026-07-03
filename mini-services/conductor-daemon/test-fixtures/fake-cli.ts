@@ -11,6 +11,9 @@
  *   FAKE_NO_RESULT '1' → omit the final result line entirely
  *   FAKE_STDERR    text emitted on stderr
  *   FAKE_SLEEP_MS  delay before exiting (daemon-timeout tests)
+ *   FAKE_STREAM_LINES     emit N extra assistant NDJSON lines before the
+ *                         result line (live-streaming tests, A-3)
+ *   FAKE_STREAM_DELAY_MS  delay between those lines
  *
  * The result line's `result` field is a JSON string reporting what the fake
  * actually received (args, stdin byte length and edges, system prompt), so
@@ -43,6 +46,17 @@ console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'fake-
 console.log(
   JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'working' }] } }),
 )
+
+// Live-streaming simulation (A-3): NDJSON lines spread over time, so tests
+// can assert batched, in-order delivery WHILE the process is still running.
+const streamLines = Number(process.env.FAKE_STREAM_LINES || 0)
+const streamDelayMs = Number(process.env.FAKE_STREAM_DELAY_MS || 0)
+for (let i = 0; i < streamLines; i++) {
+  console.log(
+    JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: `stream line ${i + 1}` }] } }),
+  )
+  if (streamDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, streamDelayMs))
+}
 
 if (process.env.FAKE_NO_RESULT !== '1') {
   const isError = process.env.FAKE_IS_ERROR === '1'

@@ -38,6 +38,8 @@
 | TD-015 | Workspace-less step retries every poll tick and writes one `daemon_dispatch_failed` activity entry per tick — no dedupe in daemon-dispatch | src/lib/server/daemon-dispatch.ts | Low | Dedupe or park the step after N identical failures; revisit in B-3/F-5 |
 | TD-016 | commandTemplate tokens are validated at poll/spawn time, not when ProjectRuntime.config is written — bad templates surface late | src/app/api/daemon/steps/next/route.ts | Low | Add validation to the runtime-config settings API (EPIC C/D settings work) |
 | TD-017 | Generic runner argv split is whitespace-based — no quoting for args containing spaces (documented in daemon README) | mini-services/conductor-daemon/runner.ts | Low | Add quoted-arg parsing if a real template ever needs it |
+| TD-018 | Daemon runs create no StepExecution rows — cost/turns/session_id ride a JSON artifact instead of execution history; adapter-reported cost also dropped on the HTTP path (succeedExecution cost param never passed) | src/lib/server/dispatch.ts, mini-services/conductor-daemon/evidence.ts | Medium | Wire both into StepExecution in B-7 (budget enforcement needs recorded cost) |
+| TD-019 | Server persists step output at MAX_OUTPUT_CHARS=5000 (head-truncated) while the daemon ships a 64KB tail — full text survives only in artifacts/session events | src/app/api/daemon/steps/route.ts | Low | Revisit cap when the board renders long outputs |
 
 ## Epic 4 — Wizard LLM Composition (2026-04-29)
 

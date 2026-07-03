@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, platform, arch } from 'node:os'
 import { join } from 'node:path'
 
+import { buildCompletionArtifacts, collectGitEvidence, type StepArtifactInput } from './evidence'
 import {
   buildSpawnSpec,
   interpretResult,
@@ -30,6 +31,7 @@ import {
   type ExecutionPayload,
   type RunnerKind,
 } from './runner'
+import { OutputBatcher } from './streaming'
 import { resolveStepCwd, resolveWorkspaceRoot } from './workspace'
 
 const BASE_URL = (process.env.CONDUCTOR_URL || 'http://localhost:3000').replace(/\/$/, '')
@@ -183,10 +185,19 @@ async function sessionEvent(sessionId: string, event: Record<string, unknown>): 
 // Step execution — spawn spec + failure semantics live in runner.ts
 // ---------------------------------------------------------------------------
 
+// Daemon-side output cap for the completion report. TAIL, not head: for
+// generic runners the end of stdout is where the answer lives (the claude
+// runner's result text is small anyway). The server additionally clamps
+// persisted step output to its own MAX_OUTPUT_CHARS.
+const OUTPUT_REPORT_CAP_CHARS = 64_000
+const capOutputTail = (text: string) =>
+  text.length > OUTPUT_REPORT_CAP_CHARS ? text.slice(-OUTPUT_REPORT_CAP_CHARS) : text
+
 async function reportStep(
   step: ExecutionPayload,
   result: { ok: boolean; output: string; error: string | null },
   sessionId: string | null,
+  artifacts: StepArtifactInput[] = [],
 ): Promise<void> {
   try {
     await api('/api/daemon/steps', {
@@ -196,8 +207,9 @@ async function reportStep(
           ? {
               stepId: step.id,
               action: 'complete',
-              output: result.output.slice(0, 50_000),
+              output: capOutputTail(result.output),
               sessionId: sessionId ?? undefined,
+              artifacts: artifacts.length > 0 ? artifacts : undefined,
             }
           : {
               stepId: step.id,
@@ -205,6 +217,7 @@ async function reportStep(
               error: result.error ?? 'unknown runner failure',
               willRetry: false,
               sessionId: sessionId ?? undefined,
+              artifacts: artifacts.length > 0 ? artifacts : undefined,
             },
       ),
     })
@@ -265,19 +278,32 @@ async function executeStep(step: ExecutionPayload): Promise<void> {
       await sessionEvent(sessionId, { type: 'command', commandSummary: spec.summary })
     }
 
-    const streamTo = (streamName: 'stdout' | 'stderr') => (chunk: string) => {
-      if (sessionId) {
-        void sessionEvent(sessionId, { type: 'output', stream: streamName, chunk: chunk.slice(0, 8000) })
-      }
-    }
+    // Live streaming (A-3): batched, line-complete, order-preserving. A-1's
+    // per-chunk fire-and-forget posts could reorder and split NDJSON lines.
+    const batcher = sessionId
+      ? new OutputBatcher({ send: (event) => sessionEvent(sessionId, event as unknown as Record<string, unknown>) })
+      : null
 
-    const proc = await runSpawnSpec(spec, {
-      timeoutMs: step.timeoutMs ?? 300_000,
-      cwd: cwdResolution.cwd,
-      onStdout: streamTo('stdout'),
-      onStderr: streamTo('stderr'),
-    })
+    let proc
+    try {
+      proc = await runSpawnSpec(spec, {
+        timeoutMs: step.timeoutMs ?? 300_000,
+        cwd: cwdResolution.cwd,
+        onStdout: (chunk) => batcher?.push('stdout', chunk),
+        onStderr: (chunk) => batcher?.push('stderr', chunk),
+      })
+    } finally {
+      // Flush the trailing partial line and drain in-flight event posts
+      // before the completion report, so events never arrive after 'done'.
+      await batcher?.close()
+    }
     const outcome = interpretResult(spec.kind, proc)
+
+    // Evidence (A-3): git diff --stat + dirty count when the cwd is a repo
+    // (success OR failure); claude cost metadata rides a json artifact.
+    // Best-effort by contract — collectGitEvidence never throws.
+    const gitEvidence = await collectGitEvidence(cwdResolution.cwd)
+    const artifacts = buildCompletionArtifacts(outcome, gitEvidence)
 
     if (outcome.claude) {
       console.log(
@@ -294,7 +320,7 @@ async function executeStep(step: ExecutionPayload): Promise<void> {
       })
     }
 
-    await reportStep(step, outcome, sessionId)
+    await reportStep(step, outcome, sessionId, artifacts)
   } finally {
     if (sessionId) activeSessions = Math.max(0, activeSessions - 1)
     runningTasks = Math.max(0, runningTasks - 1)

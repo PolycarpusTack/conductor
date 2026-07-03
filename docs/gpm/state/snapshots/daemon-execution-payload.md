@@ -1,7 +1,9 @@
 # CONTRACT SNAPSHOT: Daemon Execution Payload
 
 Version: 1 (`payloadVersion: 1`)
-Date: 2026-07-03 (A-1; daemon-side cwd/policy semantics added in A-2 — payload shape unchanged)
+Date: 2026-07-03 (A-1; daemon-side cwd/policy semantics added in A-2; output
+streaming + evidence artifacts added in A-3 — payload shape unchanged, the
+completion report gained an optional `artifacts` field)
 
 ## Public Interface
 
@@ -75,8 +77,43 @@ The daemon reports back via `POST /api/daemon/steps`
   dialog, spike A-0 §2.6)
 
 On success: claude runner reports the result line's `result` string as step
-output (cost/session metadata logged; evidence capture is A-3); generic and
-echo runners report raw stdout.
+output; generic and echo runners report raw stdout. The daemon tail-caps the
+reported output at 64_000 chars (tail, not head — for generic runners the end
+of stdout is the answer); the server clamps persisted step output to its own
+`MAX_OUTPUT_CHARS` (5000).
+
+## Output Streaming & Evidence (A-3)
+
+Live streaming — while the child runs, stdout/stderr flow to
+`POST /api/daemon/sessions/[sessionId]/events` as `{ type: 'output', stream,
+chunk, truncated? }` events (existing `sessionEventSchema`, unchanged),
+batched by `mini-services/conductor-daemon/streaming.ts` (`OutputBatcher`):
+
+- flush every 1.5s or when a stream buffer exceeds 4000 chars
+- only COMPLETE lines ship mid-run (NDJSON lines never split); the trailing
+  partial line ships on the final flush
+- one ordered send queue — events reach the server in flush order
+- per-event chunk cap 8000 (schema max); per-stream total cap 256_000 chars,
+  beyond which output is dropped with a single `truncated: true` marker (the
+  completion report still carries the authoritative output)
+- send failures are swallowed — session reporting never breaks execution
+
+Completion evidence — `POST /api/daemon/steps` (both `complete` AND `fail`)
+accepts an optional `artifacts` field: max 10 entries, each validated with the
+shared `stepArtifactSchema` (`src/lib/server/contracts.ts`: type enum, label ≤
+240, content ≤ 50_000, metadata object). Invalid artifacts → 400, nothing
+persisted. The daemon attaches (`mini-services/conductor-daemon/evidence.ts`):
+
+- `{ type: 'diff', label: 'git diff --stat' }` — when the resolved cwd is
+  inside a git work tree (`git rev-parse --is-inside-work-tree`, spawn array,
+  shell: false): `git diff --stat` output (tail-capped 16_000 chars) plus
+  `metadata.dirtyFiles` (non-empty `git status --porcelain` lines). Emitted on
+  success AND failure; not a repo / git missing → skipped silently.
+- `{ type: 'json', label: 'claude run metadata' }` — total_cost_usd,
+  num_turns, session_id from the final stream-json result line. Parked as an
+  artifact because the daemon lease path has no StepExecution row and TaskStep
+  has no cost fields (no schema change allowed in A-3) — B-7 should move this
+  into `StepExecution.cost`/`tokensUsed`.
 
 ## Delivery Mechanics (spike A-0 contract)
 

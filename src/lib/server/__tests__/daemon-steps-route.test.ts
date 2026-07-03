@@ -18,6 +18,7 @@ const mockTaskUpdate = mock(() => Promise.resolve({})) as any
 const mockSessionFindUnique = mock(() => Promise.resolve(null)) as any
 const mockSessionUpdate = mock(() => Promise.resolve({})) as any
 const mockStepEventCreate = mock(() => Promise.resolve({ id: 'evt-1' })) as any
+const mockArtifactCreate = mock(() => Promise.resolve({ id: 'art-1' })) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -38,6 +39,9 @@ mock.module('@/lib/db', () => ({
     stepEvent: {
       create: mockStepEventCreate,
       findFirst: () => Promise.resolve(null),
+    },
+    stepArtifact: {
+      create: mockArtifactCreate,
     },
     activityLog: { create: () => Promise.resolve({}) },
   },
@@ -93,6 +97,8 @@ beforeEach(() => {
   mockSessionUpdate.mockResolvedValue({})
   mockStepEventCreate.mockReset()
   mockStepEventCreate.mockResolvedValue({ id: 'evt-1' })
+  mockArtifactCreate.mockReset()
+  mockArtifactCreate.mockResolvedValue({ id: 'art-1' })
   mockResolveDaemonByToken.mockReset()
   mockResolveDaemonByToken.mockResolvedValue(DAEMON)
   mockExtractDaemonToken.mockReset()
@@ -194,5 +200,82 @@ describe('POST /api/daemon/steps — step events', () => {
     const res = await POST(makeRequest({ stepId: 'step-1', action: 'complete', output: 'x' }), params)
     expect(res.status).toBe(403)
     expect(mockStepEventCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/daemon/steps — evidence artifacts (A-3)', () => {
+  const gitArtifact = {
+    type: 'diff',
+    label: 'git diff --stat',
+    content: ' app.ts | 2 +-\n 1 file changed',
+    metadata: { dirtyFiles: 2, truncated: false },
+  }
+
+  test('complete persists validated artifacts with stringified metadata', async () => {
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done', artifacts: [gitArtifact] }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(mockArtifactCreate).toHaveBeenCalledTimes(1)
+    const data = mockArtifactCreate.mock.calls[0][0].data
+    expect(data.stepId).toBe('step-1')
+    expect(data.type).toBe('diff')
+    expect(data.label).toBe('git diff --stat')
+    expect(data.content).toContain('1 file changed')
+    expect(JSON.parse(data.metadata)).toEqual({ dirtyFiles: 2, truncated: false })
+  })
+
+  test('fail also persists artifacts — git evidence of a failed run', async () => {
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: false, artifacts: [gitArtifact] }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(mockArtifactCreate).toHaveBeenCalledTimes(1)
+  })
+
+  test('an invalid artifact type → 400 and nothing is written', async () => {
+    const res = await POST(
+      makeRequest({
+        stepId: 'step-1',
+        action: 'complete',
+        output: 'done',
+        artifacts: [{ type: 'not-a-type', label: 'x' }],
+      }),
+      params,
+    )
+    expect(res.status).toBe(400)
+    expect(mockArtifactCreate).not.toHaveBeenCalled()
+    expect(mockStepUpdate).not.toHaveBeenCalled()
+  })
+
+  test('artifacts that is not an array → 400', async () => {
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done', artifacts: 'nope' }),
+      params,
+    )
+    expect(res.status).toBe(400)
+    expect(mockStepUpdate).not.toHaveBeenCalled()
+  })
+
+  test('more than 10 artifacts → 400 (flood guard)', async () => {
+    const res = await POST(
+      makeRequest({
+        stepId: 'step-1',
+        action: 'complete',
+        output: 'done',
+        artifacts: Array.from({ length: 11 }, () => gitArtifact),
+      }),
+      params,
+    )
+    expect(res.status).toBe(400)
+    expect(mockArtifactCreate).not.toHaveBeenCalled()
+  })
+
+  test('a report without artifacts still completes (backward compatible)', async () => {
+    const res = await POST(makeRequest({ stepId: 'step-1', action: 'complete', output: 'done' }), params)
+    expect(res.status).toBe(200)
+    expect(mockArtifactCreate).not.toHaveBeenCalled()
   })
 })
