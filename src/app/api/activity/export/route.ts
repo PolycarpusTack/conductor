@@ -1,11 +1,11 @@
 import { db } from '@/lib/db'
-import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
+import { assertKeyProjectAccess, authorizeAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 
 export const GET = withErrorHandling('api/activity/export', async (request: Request) => {
     // Admin session OR a scoped API key with "read" — integration-friendly
-    const unauthorized = await requireAdminOrScopedKey(request, 'read')
-    if (unauthorized) return unauthorized
+    const auth = await authorizeAdminOrScopedKey(request, 'read')
+    if (!auth.ok) return auth.response
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
@@ -15,6 +15,9 @@ export const GET = withErrorHandling('api/activity/export', async (request: Requ
     const limit = Math.min(parseInt(searchParams.get('limit') || '10000', 10) || 10000, 50000)
 
     if (!projectId) throw badRequest('projectId is required')
+
+    // Project-scoped keys (B-4): bound keys may only export their own project
+    assertKeyProjectAccess(auth, projectId)
 
     const where: Record<string, unknown> = { projectId }
     if (from || to) {

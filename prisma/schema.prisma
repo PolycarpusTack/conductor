@@ -31,6 +31,7 @@ model Project {
   recurringTasks     RecurringTask[]
   memories           AgentMemory[]
   triggers           Trigger[]
+  scopedKeys         ApiKey[] // B-4: scoped integration keys bound to this project
   // Automation scheduler config
   automationMode     String                 @default("manual") // manual, always, scheduled, startup
   automationSchedule String? // JSON: { startDay, startTime, endDay, endTime }
@@ -690,7 +691,14 @@ model ApiKey {
   keyHash    String    @unique // SHA-256 of the full raw key — never store the raw key
   label      String
   scopes     String    @default("[]") // JSON: ["read", "write", "mcp:execute"]
+  // Project binding (B-4): null = legacy unbound key (instance-wide, deprecated).
+  // Cascade on project delete — a bound key must never silently widen back to
+  // instance-wide when its project disappears.
+  projectId  String?
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
   revokedAt  DateTime?
+
+  @@index([projectId])
 }

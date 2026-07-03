@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Check, Copy, Plus, ShieldOff } from 'lucide-react'
 
 interface ScopedKey {
@@ -12,10 +13,21 @@ interface ScopedKey {
   prefix: string
   label: string
   scopes: string[]
+  projectId: string | null
+  projectName: string | null
   createdAt: string
   lastUsedAt: string | null
   revokedAt: string | null
 }
+
+interface ProjectOption {
+  id: string
+  name: string
+}
+
+// Radix Select items can't carry an empty-string value — sentinel for the
+// legacy "all projects" (unbound) choice.
+const ALL_PROJECTS = '__all__'
 
 /**
  * Integration (scoped) API keys — for CI, webhooks, dashboards.
@@ -24,7 +36,9 @@ interface ScopedKey {
  */
 export function SettingsScopedKeys() {
   const [keys, setKeys] = useState<ScopedKey[]>([])
+  const [projects, setProjects] = useState<ProjectOption[]>([])
   const [label, setLabel] = useState('')
+  const [projectId, setProjectId] = useState<string>(ALL_PROJECTS)
   const [scopeRead, setScopeRead] = useState(true)
   const [scopeWrite, setScopeWrite] = useState(false)
   const [issuing, setIssuing] = useState(false)
@@ -46,6 +60,16 @@ export function SettingsScopedKeys() {
 
   useEffect(() => { fetchKeys() }, [fetchKeys])
 
+  useEffect(() => {
+    // Project options for binding a new key (B-4)
+    fetch('/api/projects', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: ProjectOption[]) => setProjects(Array.isArray(data) ? data.map((p) => ({ id: p.id, name: p.name })) : []))
+      .catch(() => {
+        // informational list — the selector just stays on "all projects"
+      })
+  }, [])
+
   const issue = async () => {
     const scopes = [...(scopeRead ? ['read'] : []), ...(scopeWrite ? ['write'] : [])]
     if (!label.trim() || scopes.length === 0) return
@@ -55,7 +79,11 @@ export function SettingsScopedKeys() {
       const res = await fetch('/api/admin/api-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: label.trim(), scopes }),
+        body: JSON.stringify({
+          label: label.trim(),
+          scopes,
+          ...(projectId !== ALL_PROJECTS ? { projectId } : {}),
+        }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -94,7 +122,8 @@ export function SettingsScopedKeys() {
       <h4 className="text-sm font-medium mb-2">Integration Keys (scoped)</h4>
       <p className="text-xs text-muted-foreground mb-3">
         For CI pipelines, webhooks, and dashboards. <code>read</code> can pull activity, analytics, hosts, and
-        sessions; <code>write</code> can create tasks. The full key is shown once — only a prefix and hash are stored.
+        sessions; <code>write</code> can create tasks. Bind a key to a project to limit it to that project —
+        unbound keys work everywhere and are deprecated. The full key is shown once — only a prefix and hash are stored.
       </p>
 
       {freshKey && (
@@ -120,6 +149,13 @@ export function SettingsScopedKeys() {
             {key.scopes.map((s) => (
               <Badge key={s} variant="secondary" className="text-[9px]">{s}</Badge>
             ))}
+            {key.projectId ? (
+              <Badge variant="outline" className="text-[9px]">{key.projectName || key.projectId}</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[9px] text-muted-foreground" title="Unbound legacy key — works across every project. Deprecated: reissue bound to a project.">
+                all projects
+              </Badge>
+            )}
             {key.revokedAt && (
               <Badge variant="outline" className="text-[9px] text-[var(--op-red,#F87171)] border-[var(--op-red-dim,rgba(248,113,113,0.2))]">revoked</Badge>
             )}
@@ -142,6 +178,15 @@ export function SettingsScopedKeys() {
           placeholder="Label (e.g. github-actions)"
           className="h-8 text-xs flex-1"
         />
+        <Select value={projectId} onValueChange={setProjectId}>
+          <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_PROJECTS} className="text-xs">All projects (deprecated)</SelectItem>
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <label className="flex items-center gap-1.5 text-xs">
           <Checkbox checked={scopeRead} onCheckedChange={(v) => setScopeRead(v === true)} /> read
         </label>

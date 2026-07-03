@@ -35,6 +35,8 @@ function makeRecord(rawKey: string, overrides: Record<string, unknown> = {}) {
     keyHash: sha256(rawKey),
     label: 'CI',
     scopes: '["read"]',
+    projectId: null,
+    project: null,
     createdAt: new Date(),
     lastUsedAt: null,
     revokedAt: null,
@@ -71,6 +73,18 @@ describe('issueApiKey', () => {
     const b = await issueApiKey('b', ['read'])
     expect(a.rawKey).not.toBe(b.rawKey)
   })
+
+  test('stores the project binding when a projectId is given', async () => {
+    await issueApiKey('CI key', ['write'], 'proj-1')
+    const { data } = mockCreate.mock.calls[0][0]
+    expect(data.projectId).toBe('proj-1')
+  })
+
+  test('stores a null projectId (legacy instance-wide) when omitted', async () => {
+    await issueApiKey('CI key', ['write'])
+    const { data } = mockCreate.mock.calls[0][0]
+    expect(data.projectId).toBeNull()
+  })
 })
 
 describe('validateApiKey', () => {
@@ -97,11 +111,18 @@ describe('validateApiKey', () => {
     expect(await validateApiKey(rawKey, 'write')).toBeNull()
   })
 
-  test('returns id and scopes for a valid key with the required scope', async () => {
+  test('returns id, scopes, and projectId for a valid key with the required scope', async () => {
     const rawKey = 'd'.repeat(64)
     mockFindUnique.mockResolvedValueOnce(makeRecord(rawKey, { scopes: '["read","write"]' }))
     const result = await validateApiKey(rawKey, 'write')
-    expect(result).toEqual({ id: 'key-1', scopes: ['read', 'write'] })
+    expect(result).toEqual({ id: 'key-1', scopes: ['read', 'write'], projectId: null })
+  })
+
+  test('surfaces the project binding of a bound key', async () => {
+    const rawKey = 'a1'.repeat(32)
+    mockFindUnique.mockResolvedValueOnce(makeRecord(rawKey, { projectId: 'proj-1' }))
+    const result = await validateApiKey(rawKey, 'read')
+    expect(result?.projectId).toBe('proj-1')
   })
 
   test('returns null for corrupt scopes JSON', async () => {
@@ -119,6 +140,22 @@ describe('listApiKeys', () => {
     expect(list[0].prefix).toBe('ffffffff')
     expect(list[0].scopes).toEqual(['read'])
     expect(JSON.stringify(list[0])).not.toContain(sha256('f'.repeat(64)))
+  })
+
+  test('includes the bound project id and name when present', async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeRecord('f'.repeat(64), { projectId: 'proj-1', project: { name: 'Calendar App' } }),
+    ])
+    const list = await listApiKeys()
+    expect(list[0].projectId).toBe('proj-1')
+    expect(list[0].projectName).toBe('Calendar App')
+  })
+
+  test('reports null projectId and projectName for legacy unbound keys', async () => {
+    mockFindMany.mockResolvedValueOnce([makeRecord('f'.repeat(64))])
+    const list = await listApiKeys()
+    expect(list[0].projectId).toBeNull()
+    expect(list[0].projectName).toBeNull()
   })
 })
 

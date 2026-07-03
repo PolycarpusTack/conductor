@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
 import { assertSameOrigin } from '@/lib/csrf'
+import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { issueApiKey, listApiKeys, revokeApiKey } from '@/lib/server/scoped-api-keys'
@@ -9,6 +10,9 @@ import { issueApiKey, listApiKeys, revokeApiKey } from '@/lib/server/scoped-api-
 const issueSchema = z.object({
   label: z.string().trim().min(1).max(100),
   scopes: z.array(z.string().trim().min(1)).min(1),
+  // B-4: binds the key to one project; omitted = legacy instance-wide key
+  // (deprecated migration path).
+  projectId: z.string().trim().min(1).optional(),
 })
 
 /** GET /api/admin/api-keys — list issued keys (prefixes only, never hashes) */
@@ -30,8 +34,14 @@ export const POST = withErrorHandling('api/admin/api-keys', async (request: Requ
     throw badRequest(parsed.error.issues[0]?.message || 'Invalid API key payload')
   }
 
-  const { label, scopes } = parsed.data
-  const { id, rawKey } = await issueApiKey(label, scopes)
+  const { label, scopes, projectId } = parsed.data
+
+  if (projectId) {
+    const project = await db.project.findUnique({ where: { id: projectId }, select: { id: true } })
+    if (!project) throw badRequest('Unknown projectId — the key must be bound to an existing project')
+  }
+
+  const { id, rawKey } = await issueApiKey(label, scopes, projectId ?? null)
 
   return NextResponse.json({ id, rawKey }, { status: 201 })
 })

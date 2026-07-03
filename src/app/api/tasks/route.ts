@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
-import { authorizeAdminOrScopedKey } from '@/lib/server/api-auth'
+import { assertKeyProjectAccess, authorizeAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { scanForPromptInjection, wrapExternalContent } from '@/lib/server/content-safety'
 import { createTaskSchema } from '@/lib/server/contracts'
@@ -52,6 +52,10 @@ export const POST = withErrorHandling('api/tasks', async (request: Request) => {
 
   const { title, status, priority, tag, projectId, agentId, notes, runtimeOverride } = parsed.data
   let { description } = parsed.data
+
+  // Project-scoped keys (B-4): a key bound to project P must not create tasks
+  // (and thereby drive agent execution/spend) in any other project.
+  assertKeyProjectAccess(auth, projectId)
 
   // Key-created tasks are external content: their description flows into
   // agent prompts at dispatch. Scan always; wrap as data when flagged.

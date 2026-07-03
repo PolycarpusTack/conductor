@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
+import { assertKeyProjectAccess, authorizeAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import {
   getProjectStats,
@@ -16,10 +16,13 @@ export const GET = withErrorHandling(
     { params }: { params: Promise<{ id: string }> },
   ) => {
     // Admin session OR a scoped API key with "read" — integration-friendly
-    const unauthorized = await requireAdminOrScopedKey(request, 'read')
-    if (unauthorized) return unauthorized
+    const auth = await authorizeAdminOrScopedKey(request, 'read')
+    if (!auth.ok) return auth.response
 
     const { id: projectId } = await params
+
+    // Project-scoped keys (B-4): bound keys may only read their own project
+    assertKeyProjectAccess(auth, projectId)
     const { searchParams } = new URL(request.url)
     const view = searchParams.get('view') || 'overview'
 

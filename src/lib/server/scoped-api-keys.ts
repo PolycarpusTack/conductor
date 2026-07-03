@@ -32,13 +32,22 @@ export interface IssuedApiKey {
   rawKey: string
 }
 
-export async function issueApiKey(label: string, scopes: string[]): Promise<IssuedApiKey> {
+/**
+ * Issues a scoped key. `projectId` binds the key to one project (B-4) —
+ * routes reject requests that target a different project. Null/omitted
+ * issues a legacy instance-wide key (deprecated; kept as migration path).
+ */
+export async function issueApiKey(
+  label: string,
+  scopes: string[],
+  projectId?: string | null,
+): Promise<IssuedApiKey> {
   const rawKey = randomBytes(32).toString('hex') // 64-char hex string
   const prefix = rawKey.slice(0, PREFIX_LENGTH)
   const keyHash = hashKey(rawKey)
 
   const created = await db.apiKey.create({
-    data: { prefix, keyHash, label, scopes: JSON.stringify(scopes) },
+    data: { prefix, keyHash, label, scopes: JSON.stringify(scopes), projectId: projectId ?? null },
   })
 
   return { rawKey, id: created.id }
@@ -47,6 +56,8 @@ export async function issueApiKey(label: string, scopes: string[]): Promise<Issu
 export interface ValidatedApiKey {
   id: string
   scopes: string[]
+  /** Bound project, or null for a legacy instance-wide key (deprecated). */
+  projectId: string | null
 }
 
 /**
@@ -77,7 +88,7 @@ export async function validateApiKey(
     .update({ where: { id: record.id }, data: { lastUsedAt: new Date() } })
     .catch(() => {})
 
-  return { id: record.id, scopes }
+  return { id: record.id, scopes, projectId: record.projectId ?? null }
 }
 
 export interface ApiKeySummary {
@@ -85,6 +96,9 @@ export interface ApiKeySummary {
   prefix: string
   label: string
   scopes: string[]
+  /** Bound project, or null for a legacy instance-wide key (deprecated). */
+  projectId: string | null
+  projectName: string | null
   createdAt: Date
   lastUsedAt: Date | null
   revokedAt: Date | null
@@ -92,12 +106,17 @@ export interface ApiKeySummary {
 
 /** Lists all keys without hashes — safe to return to the admin UI. */
 export async function listApiKeys(): Promise<ApiKeySummary[]> {
-  const records = await db.apiKey.findMany({ orderBy: { createdAt: 'desc' } })
+  const records = await db.apiKey.findMany({
+    include: { project: { select: { name: true } } },
+    orderBy: { createdAt: 'desc' },
+  })
   return records.map((r) => ({
     id: r.id,
     prefix: r.prefix,
     label: r.label,
     scopes: safeParseScopes(r.scopes),
+    projectId: r.projectId ?? null,
+    projectName: r.project?.name ?? null,
     createdAt: r.createdAt,
     lastUsedAt: r.lastUsedAt,
     revokedAt: r.revokedAt,

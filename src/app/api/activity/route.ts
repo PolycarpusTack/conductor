@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { db } from '@/lib/db'
-import { requireAdminOrScopedKey } from '@/lib/server/api-auth'
+import { assertKeyProjectAccess, authorizeAdminOrScopedKey } from '@/lib/server/api-auth'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { activityQuerySchema } from '@/lib/server/contracts'
 import { purgeProjectLogs } from '@/lib/server/activity-logger'
@@ -9,8 +9,8 @@ import { purgeDeletedTasks, purgeProjectArtifacts } from '@/lib/server/retention
 
 export const GET = withErrorHandling('api/activity', async (request: Request) => {
   // Admin session OR a scoped API key with "read" — integration-friendly
-  const unauthorized = await requireAdminOrScopedKey(request, 'read')
-  if (unauthorized) return unauthorized
+  const auth = await authorizeAdminOrScopedKey(request, 'read')
+  if (!auth.ok) return auth.response
 
   const { searchParams } = new URL(request.url)
   const parsed = activityQuerySchema.safeParse({
@@ -30,6 +30,9 @@ export const GET = withErrorHandling('api/activity', async (request: Request) =>
   }
 
   const { projectId, limit, agentId, level, component, search, traceId, from, to } = parsed.data
+
+  // Project-scoped keys (B-4): bound keys may only read their own project
+  assertKeyProjectAccess(auth, projectId)
 
   const where: Record<string, unknown> = { projectId }
   if (agentId) where.agentId = agentId
