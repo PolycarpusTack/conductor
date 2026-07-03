@@ -110,6 +110,11 @@ model Task {
   completedAt DateTime? // When task was completed
   deletedAt   DateTime? // Soft delete (Epic S3); hard-purged after 30 days
   archivedAt  DateTime? // Archive (Epic S7): kept forever, hidden from the board
+  // Claim Lease (B-2, Model B): liveness bound on an external agent's task
+  // claim. Set on claim/start, renewed by agent heartbeats, cleared on
+  // completion. Dispatcher-driven tasks NEVER set this — the reaper uses it
+  // to distinguish reapable Model-B claims from chain-dispatch IN_PROGRESS.
+  claimExpiresAt DateTime?
   order            Int           @default(0)
   runtimeOverride  String?       // Per-task runtime override (claude-code | codex | copilot)
   activities       ActivityLog[]
@@ -118,6 +123,8 @@ model Task {
   @@index([projectId, status])
   @@index([projectId, deletedAt])
   @@index([projectId, archivedAt])
+  // Reaper sweep: IN_PROGRESS tasks with an expired claim lease
+  @@index([status, claimExpiresAt])
 }
 
 model ActivityLog {

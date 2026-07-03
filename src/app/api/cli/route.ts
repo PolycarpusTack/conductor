@@ -212,10 +212,11 @@ export async function POST(request: Request) {
             return new Response('ERROR: Step already completed or no longer active', { status: 409 })
           }
 
-          // Save output on task but don't change status — let advanceChain handle it
+          // Save output on task but don't change status — let advanceChain
+          // handle it. Completion releases the Model-B claim lease (B-2).
           await db.task.update({
             where: { id: taskId },
-            data: { output: output || null },
+            data: { output: output || null, claimExpiresAt: null },
             include: taskBoardInclude,
           })
 
@@ -255,6 +256,7 @@ export async function POST(request: Request) {
             status: 'DONE',
             completedAt: new Date(),
             output: output || null,
+            claimExpiresAt: null, // completion releases the claim lease (B-2)
           },
           include: taskBoardInclude,
         })

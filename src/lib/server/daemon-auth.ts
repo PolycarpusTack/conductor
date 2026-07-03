@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'crypto'
 
 import { db } from '@/lib/db'
+import { reclaimStaleDaemonLeases } from '@/lib/server/daemon-dispatch'
 import { getLogger } from '@/lib/server/logger'
 
 const log = getLogger('daemon-auth')
@@ -82,13 +83,32 @@ export async function markDaemonOffline(daemonId: string) {
 export async function markStaleDaemons(thresholdMs: number = 30_000) {
   const cutoff = new Date(Date.now() - thresholdMs)
 
-  await db.daemon.updateMany({
+  const staleDaemons = await db.daemon.findMany({
     where: {
       status: 'online',
       lastSeenAt: { lt: cutoff },
     },
+    select: { id: true },
+  })
+
+  if (staleDaemons.length === 0) return
+
+  const staleIds = staleDaemons.map((d) => d.id)
+
+  await db.daemon.updateMany({
+    where: { id: { in: staleIds }, status: 'online' },
     data: { status: 'stale' },
   })
+
+  // B-3: a stale daemon is presumed dead — release its step leases NOW so
+  // the next poll re-dispatches, instead of waiting out LEASE_TIMEOUT_MS.
+  const reclaimed = await reclaimStaleDaemonLeases(staleIds)
+  if (reclaimed > 0) {
+    log.info('reclaimed step leases from stale daemons', {
+      daemonIds: staleIds,
+      reclaimed,
+    })
+  }
 }
 
 let lastStaleSweep = 0

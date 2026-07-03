@@ -130,9 +130,11 @@ export const PUT = withErrorHandling(
         if (existingTask.agentId !== agent.id) {
           throw forbidden('Task is not assigned to this agent')
         }
-        // For chained tasks, don't set DONE — let advanceChain handle it
+        // For chained tasks, don't set DONE — let advanceChain handle it.
+        // Completion always releases the Model-B claim lease (B-2).
         updateData = {
           output: output || existingTask.output,
+          claimExpiresAt: null,
         }
         // Only set DONE for non-chained tasks
         if (!existingTask.steps || existingTask.steps.length === 0) {
@@ -310,7 +312,9 @@ export const DELETE = withErrorHandling(
 
     const updatedTask = await db.task.update({
       where: { id },
-      data: { agentId: null, status: 'BACKLOG' },
+      // Unassign releases the claim lease too (B-2) — the task goes back to
+      // the pool, so no liveness bound should survive on it.
+      data: { agentId: null, status: 'BACKLOG', claimExpiresAt: null },
     })
 
     await db.activityLog.create({

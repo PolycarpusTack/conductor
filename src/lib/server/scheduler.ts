@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { runAutomationSweeps } from '@/lib/server/automation-sweep'
+import { reapExpiredClaims } from '@/lib/server/claim-reaper'
 import { runRecurringTasks } from '@/lib/server/recurring-tasks'
 import { getLogger } from '@/lib/server/logger'
 import { pollAndDispatch } from '@/lib/server/step-queue'
@@ -188,6 +189,10 @@ async function checkScheduledProjects() {
     // Recurring tasks: due rows are claimed atomically, so the 60s tick is
     // just the heartbeat — cadence lives on each row's nextRunAt.
     await runRecurringTasks().catch((error) => log.error('recurring tasks failed', error))
+
+    // Claim-lease reaper (B-2): global sweep returning expired Model-B claims
+    // to BACKLOG. Guarded writes make it safe against heartbeat renewals.
+    await reapExpiredClaims().catch((error) => log.error('claim reaper failed', error))
   } finally {
     checkInProgress = false
   }

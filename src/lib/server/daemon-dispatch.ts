@@ -242,6 +242,64 @@ export async function dispatchStepToDaemon(
   return { dispatched: true, daemonId: daemon.daemonId }
 }
 
+/**
+ * Release the step leases held by daemons that just went stale (B-3).
+ *
+ * Called from the stale sweep (daemon-auth.ts) so a dead daemon's steps are
+ * re-dispatchable on the next poll instead of waiting out the full
+ * LEASE_TIMEOUT_MS. Each release is guarded on `leasedBy` still pointing at
+ * the stale daemon, and audited with the same 'lease_reclaimed' activity
+ * convention this module writes on lease expiry.
+ *
+ * Returns the number of leases reclaimed.
+ */
+export async function reclaimStaleDaemonLeases(daemonIds: string[]): Promise<number> {
+  if (daemonIds.length === 0) return 0
+
+  const leasedSteps = await db.taskStep.findMany({
+    where: {
+      leasedBy: { in: daemonIds },
+      status: 'active',
+    },
+    select: {
+      id: true,
+      taskId: true,
+      agentId: true,
+      leasedBy: true,
+      task: { select: { projectId: true } },
+    },
+  })
+
+  let reclaimed = 0
+
+  for (const step of leasedSteps) {
+    // Guarded per-step release: if the step completed or was re-leased between
+    // the read and this write, leave it alone (count 0 → no audit row).
+    const cleared = await db.taskStep.updateMany({
+      where: { id: step.id, leasedBy: step.leasedBy },
+      data: { leasedBy: null, leasedAt: null },
+    })
+    if (cleared.count !== 1) continue
+    reclaimed++
+
+    await db.activityLog.create({
+      data: {
+        action: 'lease_reclaimed',
+        taskId: step.taskId,
+        agentId: step.agentId,
+        projectId: step.task.projectId,
+        details: JSON.stringify({
+          stepId: step.id,
+          previousLeaseholder: step.leasedBy,
+          reason: 'daemon_stale',
+        }),
+      },
+    })
+  }
+
+  return reclaimed
+}
+
 export function runtimeFromProjectRuntime(adapter: string): string | null {
   const mapping: Record<string, string> = {
     anthropic: 'claude-code',

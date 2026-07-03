@@ -29,6 +29,9 @@ const serverEnvSchema = z
     AGENTBOARD_WS_INTERNAL_SECRET: z.string().min(16, 'AGENTBOARD_WS_INTERNAL_SECRET must be at least 16 characters').optional(),
     PROMPT_LIBRARY_PATH: z.string().optional(),
     OPENAI_API_KEY: z.string().optional(),
+    // Model-B claim-lease window (B-2). Optional with a 15-min default in
+    // agent-helpers.ts — validated here so a typo fails fast at boot.
+    AGENTBOARD_CLAIM_LEASE_MS: z.coerce.number().int().positive().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && !env.AGENTBOARD_ADMIN_PASSWORD) {
@@ -71,6 +74,7 @@ export function validateEnv(source: Record<string, string | undefined> = process
     AGENTBOARD_WS_INTERNAL_SECRET: source.AGENTBOARD_WS_INTERNAL_SECRET,
     PROMPT_LIBRARY_PATH: source.PROMPT_LIBRARY_PATH,
     OPENAI_API_KEY: source.OPENAI_API_KEY,
+    AGENTBOARD_CLAIM_LEASE_MS: source.AGENTBOARD_CLAIM_LEASE_MS,
   })
 
   if (!result.success) {
