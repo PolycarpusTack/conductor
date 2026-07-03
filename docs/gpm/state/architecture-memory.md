@@ -12,7 +12,7 @@ Updated: 2026-07-03 (post EPICs A+B — see phase-summaries/phase-summary-epics-
 - **Pull-claim API (Model B, `/api/agent/*`, `/api/cli`)**: claims carry a renewable 15-min lease (Task.claimExpiresAt); claim-reaper.ts (60s tick) returns expired claims to BACKLOG; stale daemons release step leases in ~30s
 - **Realtime (`mini-services/board-ws`)**: Socket.IO service; app pushes via authed internal /broadcast; silently disabled if WS secret unset
 - **Persistence (Prisma)**: SQLite default / Postgres+pgvector optional; embeddings as String cast via raw SQL on PG; schema provider hardcoded sqlite — fragile duality
-- **Frontend (`src/components/**`)**: shadcn/Radix primitives solid; ~110-prop BoardView, no memoization, no routing; TanStack Query / dnd-kit / next-intl installed but UNUSED
+- **Frontend**: App Router route group `src/app/(board)/` (board/runtime/skills client pages + server-rendered /help) over a shared `board-shell.tsx` that runs the four hooks once and packages them into six memoized contexts (`board-context.tsx`); components are prop-less context consumers; typed API client (`src/lib/api/`); dnd-kit keyboard-accessible board with memoized cards; mobile authoring via slide-over Sheet. next-intl/zustand removed; react-query installed-but-unused (deferred, TD-023)
 
 ## Key ADRs (current)
 
@@ -41,7 +41,7 @@ None recorded. (Finding: ADR coverage ABSENT — decisions like SQLite/PG dualit
 ## Active Technical Debt (top — full register in TECHNICAL_DEBT.md)
 
 - ~~TD-A daemon execution~~ ~~TD-B claim reaper~~ ~~TD-C dispatch race~~ ~~TD-D key scoping~~ — RESOLVED (EPICs A+B, 2026-07-03)
-- TD-E: frontend stack drift (unused deps, prop drilling, no memoization, a11y) — EPIC E next
+- ~~TD-E frontend stack drift~~ — RESOLVED (EPIC E, 2026-07-03: routing, contexts, typed client, dnd-kit a11y, memoization, dep cleanup)
 - TD-F-remainder: no Dockerfile; ESLint rules mostly off — EPIC F
 - TD-018-remainder: daemon runs create no StepExecution rows (budgets/cost blind for DAEMON agents); daemon failures never dead-letter
 - ADR-1..3 (runner model, leasing/idempotency, budget enforcement point) promised by the plan, not yet written

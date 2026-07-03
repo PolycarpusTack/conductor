@@ -156,16 +156,41 @@ Mode DELIVERY. Objective: a user can always tell broken from empty from loading,
 - C-7: Landing CTA de-dupe + `/api/chain` copy fix + prod-safe demo seed decision. (S)
 Smoke story: kill the API mid-session → user sees error states and a reconnect, never a fake-empty board.
 
-### EPIC D — Product Completeness (AFTER EPIC E — see sequencing note)
+### EPIC D — Product Completeness — EXPANDED 2026-07-03 (ready to execute on the refactored board)
 
-Mode DELIVERY. Objective: table-stakes task-management features on the refactored board.
-- D-1: Board search + filters (text, agent, priority, tag) consuming existing API pagination. (M)
-- D-2: Due dates: schema + card badge + overdue filter + optional reminder Notification. (M)
-- D-3: Bulk operations (multi-select move/archive/delete with undo). (M)
-- D-4: Agent pause toggle surfaced (isActive one-click) + "silently skipped" fix: paused agents shown as such on cards. (S)
-- D-5: Self-service password reset + email invites (reuses C-4 transport). (M)
-- D-6: Project export/import (JSON bundle: tasks, chains, agents sans keys) + backup guidance. (M)
-- D-7: README/docs truth pass (5 columns, feature list, help-page release notes as source). (S)
+Mode DELIVERY (TDD). Objective: table-stakes task-management features. Now builds on E's context/typed-client/query-free board. ADR-6 "Task filter/query model". Sequencing: D-1 first (establishes the filter state pattern the board + D-3 selection reuse); D-2/D-4 are schema+card work (share the card render — serialize or one agent); D-5/D-6 are server-heavy and parallel-safe with the UI stories; D-7 done already (commit d1e5cfb).
+Schema-lane stories (exclusive Prisma access, serialize): D-2, D-6-import. Card-render stories (share board-task-card.tsx, serialize): D-2 badge, D-4 badge, D-1/D-3 selection overlay.
+
+**D-1 — Board search + filters.** As an operator with a busy board, I want to filter tasks by text/agent/priority/tag so I can find work without scrolling.
+AC: header search box + filter popover; filters apply client-side over the loaded project (the board already holds all tasks) with a result count; empty-filter state distinct from empty-board (C-1) and error (C-1); filter state lives in a new UiState slice (survives view switches, encodable to URL per E-1's ?filter= later — not required now). No server change (board loads all tasks today; pagination is D-1b if task counts grow). Size M.
+- D-1-T1 (FEATURE, X): filter state in board-context UiState + a `useFilteredTasks` selector memoized over tasks+filters; feeds tasksByStatus. Tests: selector filters by each dimension + combinations.
+- D-1-T2 (FEATURE, X): search box + filter popover UI (Command/Popover primitives — note ui/command.tsx was deleted in E-8; use Popover + inputs or re-add cmdk only if needed), result count, clear-all. END OF STORY.
+
+**D-2 — Due dates.** As an operator, I want due dates on tasks so scheduling and overdue work are visible.
+AC: `Task.dueDate DateTime?` (+ migration/rollback); date picker in TaskDialog; card badge (op-amber soon / op-red overdue); overdue filter integrates with D-1; optional reminder Notification (reuse C-4 notifications.ts) emitted by the scheduler when a task goes overdue (dedupe once per task). Size M. Schema lane + card lane.
+- D-2-T1 (FEATURE, X): schema + TaskDialog picker + contracts validation + card badge. Pull Gate: D-1 card render.
+- D-2-T2 (FEATURE, X): overdue reminder emit in scheduler tick + Notification; test dedupe + boundary. END OF STORY.
+
+**D-3 — Bulk operations.** As an operator, I want multi-select move/archive/delete with undo so I can clear a board fast.
+AC: selection mode toggle; checkbox overlay on cards (keyboard-accessible per E-4 patterns); bulk move-to-status / archive / delete via existing task routes (batch client-side calls or a new batch endpoint — prefer batch endpoint POST /api/tasks/batch to avoid N round-trips; server change); undo via a toast action restoring prior state (reuse soft-delete/restore for delete, status snapshot for move). Size M-L.
+- D-3-T1 (FEATURE, X): POST /api/tasks/batch (move/archive/delete, project-scoped auth) + tests.
+- D-3-T2 (FEATURE, X): selection UI + bulk action bar + undo toast. Pull Gate: D-1 selection scaffolding. END OF STORY.
+
+**D-4 — Agent pause toggle.** As an operator, I want a one-click pause on an agent so I can stop it dispatching without deleting it, and see paused agents clearly.
+AC: `Agent.isActive` already exists — surface a toggle in settings-agents + sidebar agent list; paused agents show a "paused" badge on their card contributions and in the agent list; the dispatcher already skips inactive agents (verify in step-queue) — the fix is visibility, not logic. Size S.
+- D-4-T1 (FEATURE, X): toggle + optimistic update + badges; test the PUT path + skip behavior assertion. END OF STORY.
+
+**D-5 — Self-service password reset + email invites.** As an admin, I want to invite users by email and let them reset passwords, so onboarding doesn't require sharing temp passwords in-band.
+AC: reuse email-transport.ts (C-4); invite creates the user + emails a one-time set-password link (tokenized, expiring — new PasswordResetToken model, hashed like sessions); reset flow (request → email → set). Env-gated on SMTP (unconfigured falls back to today's shown-temp-password). Size M. Schema lane (token model).
+- D-5-T1 (FEATURE, X): token model + issue/consume service (hashed, expiring) + tests.
+- D-5-T2 (FEATURE, X): invite + reset API routes + email; AuthView "forgot password" + set-password page. END OF STORY.
+
+**D-6 — Project export / import + backup guidance.** As an operator, I want to export a project (tasks, chains, agents sans secrets) and re-import it, so I can back up and move projects.
+AC: GET /api/projects/[id]/export → JSON bundle (no API keys/hashes); POST import creates a new project from a bundle (validate shape, remap ids, never import secrets); INSTALL/README backup section (SQLite file + export). Size M. Schema-read only for export; import is a write path (idempotency: new ids).
+- D-6-T1 (FEATURE, X): export route + bundle schema + redaction test (no secret fields present).
+- D-6-T2 (FEATURE, X): import route (id remap, validation, no-secret enforcement) + tests. END OF STORY.
+
+**D-7 — DONE** (commit d1e5cfb, with C-7).
 
 ### EPIC E — Frontend Architecture Refactor
 
