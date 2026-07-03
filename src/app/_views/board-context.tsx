@@ -6,6 +6,7 @@ import type { Task, TaskStatus, TaskPriority, TaskStepSummary, Project, Agent, P
 import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, TaskTemplate, StepDraft } from '@/types/settings'
 import type { IntegrationTrigger } from '@/components/settings-integrations'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
+import type { BoardFilter } from './use-filtered-tasks'
 
 /**
  * Board contexts (E-3). page.tsx keeps running the four state hooks
@@ -169,6 +170,12 @@ export interface UiStateContextValue {
   setCurrentWorkspaceId: Dispatch<SetStateAction<string | null>>
   authError: string | null
   handleAdminLogout: () => void
+  // D-1: board text/agent/priority/tag filter. Lives in the shell state so it
+  // survives view switches (like view/settingsTab). Consumed by BoardPage
+  // (via useFilteredTasks) and the board filter bar.
+  boardFilter: BoardFilter
+  setBoardFilter: Dispatch<SetStateAction<BoardFilter>>
+  clearBoardFilter: () => void
 }
 
 export interface RealtimeContextValue {

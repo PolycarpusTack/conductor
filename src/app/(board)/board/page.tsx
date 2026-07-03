@@ -31,17 +31,24 @@ import {
   FolderPlus,
   Plus,
   RefreshCw,
+  Search,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NoRuntimeBanner } from '@/components/no-runtime-banner'
 import { BoardTaskCard } from '@/components/board-task-card'
+import { BoardFilterBar } from '@/components/board-filter-bar'
 import {
   useProjectDataCtx,
   useTaskActions,
   useUiState,
 } from '@/app/_views/board-context'
+import { useFilteredTasks, isBoardFilterActive } from '@/app/_views/use-filtered-tasks'
 import { statusColumns, priorityColors, tagColors, showDemoSeed } from '@/app/_views/board-constants'
 import type { Task, TaskStatus } from '@/types/board'
+
+/** Stable empty-array reference so useFilteredTasks' memo isn't invalidated pre-load. */
+const EMPTY_TASKS: Task[] = []
 
 /** Drag data carried by every draggable card / droppable column so the end handler can resolve a target status. */
 interface DndData {
@@ -209,27 +216,44 @@ export default function BoardPage() {
     handleDragStart, handleDrop,
     openEditTaskDialog, openNewTaskDialog,
   } = useTaskActions()
-  const { setSettingsTab } = useUiState()
+  const { setSettingsTab, boardFilter, clearBoardFilter } = useUiState()
+
+  // D-1: apply the board filter client-side over the full loaded task set.
+  // Inactive filter returns the same array reference, so tasksByStatus below
+  // keeps its identity when no filter is applied.
+  const allTasks = currentProject?.tasks ?? EMPTY_TASKS
+  const filteredTasks = useFilteredTasks(allTasks, boardFilter)
+  const filterActive = isBoardFilterActive(boardFilter)
+  const totalCount = allTasks.length
+  const filteredCount = filteredTasks.length
+
+  // D-1: distinct tags present on the project's tasks, for the filter popover.
+  const filterTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const task of allTasks) {
+      if (task.tag) set.add(task.tag)
+    }
+    return Array.from(set).sort()
+  }, [allTasks])
 
   // E-5: group tasks into per-column arrays ONCE per tasks-change instead of
   // running getTasksByStatus (filter+sort over all tasks) five separate times
-  // on every render. Keyed on the tasks array identity, so a re-render that
-  // doesn't touch tasks (e.g. drag `activeTask` toggling) reuses the same map
-  // and the same per-column array references — feeding stable `items`/props to
-  // the memoized columns and cards. Mirrors getTasksByStatus exactly (status
-  // filter + order sort); the context method stays for other consumers.
+  // on every render. Keyed on the FILTERED tasks array identity (D-1), so a
+  // re-render that doesn't touch tasks/filter reuses the same map and the same
+  // per-column array references — feeding stable `items`/props to the memoized
+  // columns and cards. Mirrors getTasksByStatus (status filter + order sort).
   const tasksByStatus = useMemo(() => {
     const grouped = Object.fromEntries(
       statusColumns.map((c) => [c.id, [] as Task[]]),
     ) as Record<TaskStatus, Task[]>
-    for (const task of currentProject?.tasks ?? []) {
+    for (const task of filteredTasks) {
       grouped[task.status]?.push(task)
     }
     for (const status of Object.keys(grouped) as TaskStatus[]) {
       grouped[status].sort((a, b) => a.order - b.order)
     }
     return grouped
-  }, [currentProject?.tasks])
+  }, [filteredTasks])
 
   // The card currently lifted, mirrored into a DragOverlay so the pointer/
   // keyboard drag has a visible, detached representation.
@@ -343,6 +367,37 @@ export default function BoardPage() {
         </div>
       ) : (
         <ScrollArea className="h-[calc(100vh-3.5rem)] custom-scrollbar">
+          <div className="p-4">
+            {/* D-1: search + filter controls above the board */}
+            <BoardFilterBar
+              agents={currentProject.agents}
+              tags={filterTags}
+              filteredCount={filteredCount}
+              totalCount={totalCount}
+            />
+
+            {/* D-1: no-filter-match state — distinct from the empty-board (no
+                projects) and error states above; only shown when a filter is
+                active and hides every task on a non-empty board. */}
+            {filterActive && filteredCount === 0 && totalCount > 0 ? (
+              <div className="flex min-h-[40vh] items-center justify-center px-6">
+                <div className="max-w-md rounded-2xl border border-border/30 bg-card p-6 text-center">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/40">
+                    <Search className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <h2 className="text-lg font-semibold">No tasks match your filters</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    None of the {totalCount} task{totalCount === 1 ? '' : 's'} on this board match the current search and filters.
+                  </p>
+                  <div className="mt-5 flex justify-center">
+                    <Button variant="outline" onClick={clearBoardFilter}>
+                      <X className="mr-2 h-4 w-4" />
+                      Clear filters
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
          <DndContext
            sensors={sensors}
            collisionDetection={closestCorners}
@@ -351,7 +406,7 @@ export default function BoardPage() {
            onDragEnd={handleDndEnd}
            onDragCancel={handleDndCancel}
          >
-          <div className="p-4">
+          <>
             {/* Mobile column tabs */}
             <div className="flex xs:hidden gap-1 mb-3 overflow-x-auto pb-1">
               {statusColumns.map((col) => (
@@ -461,7 +516,7 @@ export default function BoardPage() {
                   )
                 })}
             </div>
-          </div>
+          </>
 
           {/* Detached representation of the lifted card during a drag. */}
           <DragOverlay>
@@ -478,6 +533,8 @@ export default function BoardPage() {
             ) : null}
           </DragOverlay>
          </DndContext>
+            )}
+          </div>
         </ScrollArea>
       )}
     </>

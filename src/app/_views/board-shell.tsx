@@ -12,6 +12,7 @@ import { useWebSocket } from '@/hooks/useWebSocket'
 import { AuthView } from './AuthView'
 import { BoardProvider } from './board-context'
 import { viewToPath, viewFromPathname, VIEW_PATHS } from './view-routes'
+import { emptyBoardFilter, type BoardFilter } from './use-filtered-tasks'
 import { BoardHeader } from '@/components/board-header'
 import { BoardSidebar } from '@/components/board-sidebar'
 import { TaskDialog } from '@/components/task-dialog'
@@ -71,6 +72,10 @@ export function BoardShell({ children }: { children: ReactNode }) {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTabType>(null)
+  // D-1: board filter lives in the persistent shell so it survives navigation
+  // between the (board) routes, matching the other UiState fields.
+  const [boardFilter, setBoardFilter] = useState<BoardFilter>(emptyBoardFilter)
+  const clearBoardFilter = useCallback(() => setBoardFilter(emptyBoardFilter), [])
 
   const {
     isAdminAuthenticated,
@@ -358,8 +363,10 @@ export function BoardShell({ children }: { children: ReactNode }) {
     currentWorkspaceId, setCurrentWorkspaceId,
     authError,
     handleAdminLogout,
+    boardFilter, setBoardFilter, clearBoardFilter,
   }), [
     view, setView, sidebarOpen, settingsTab, currentWorkspaceId, authError, handleAdminLogout,
+    boardFilter, clearBoardFilter,
   ])
 
   const realtime = useMemo<RealtimeContextValue>(() => ({
