@@ -21,6 +21,7 @@ A professional-grade orchestration platform for AI agents with workflow chains, 
 - **Observability & Analytics**: Cross-project KPIs, per-agent dashboards, and per-project cost analytics
 - **Dead-Letter Recovery**: Steps that exhaust retries are snapshotted for review and requeue
 - **Activity Logging**: Full audit trail of agent actions with level/component filters and JSONL/CSV export
+- **Project Export & Import**: Back up or move a project as a secret-free JSON bundle and re-import it as a fresh copy
 
 ## Requirements
 

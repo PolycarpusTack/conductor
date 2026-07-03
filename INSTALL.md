@@ -138,6 +138,37 @@ via `bun run doctor`, the Runtime Dashboard's Hosts/Sessions tabs, and
 Windows service) is a manual setup — wrap the `bun index.ts` start command
 in your service manager of choice.
 
+## Backup & export
+
+Two independent ways to keep a copy of your data:
+
+**Whole-instance backup (SQLite):** the entire database is a single file at
+`prisma/dev.db` (or wherever `DATABASE_URL` points). Stop the app (or ensure
+no writes are in flight) and copy it:
+
+```bash
+cp prisma/dev.db backups/dev-$(date +%F).db
+```
+
+Restore by putting the file back and running `bun run start`. On PostgreSQL,
+use `pg_dump` / `pg_restore` instead. SQLite WAL files (`dev.db-wal`,
+`dev.db-shm`) are safe to copy alongside the main file for a hot backup.
+
+**Per-project export:** `GET /api/projects/<id>/export` (admin session, or a
+scoped `read` key bound to the project) returns a versioned JSON bundle with
+the project's tasks, chains, agents, modes and runtimes — **never any secrets**
+(API keys, key hashes, and runtime `config` blobs are stripped). Re-import it
+into a brand-new project with `POST /api/projects/import` (`{ "bundle": … }`),
+which mints fresh ids and preserves all internal relationships. Imported
+agents come back **keyless and inactive** — rotate a key from the API Keys tab
+before they can run again.
+
+```bash
+curl -b cookies.txt http://localhost:3000/api/projects/<id>/export > project.json
+curl -b cookies.txt -X POST http://localhost:3000/api/projects/import \
+  -H 'content-type: application/json' -d "{\"bundle\": $(cat project.json)}"
+```
+
 ## Upgrading
 
 ```bash
