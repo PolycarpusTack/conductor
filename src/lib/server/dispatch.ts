@@ -4,6 +4,7 @@ import { buildWorkingMemory, buildRelevantMemoryWithHits } from '@/lib/server/me
 import { resolvePrompt } from '@/lib/server/resolve-prompt'
 import { fireProjectEvent as broadcastProjectEvent } from '@/lib/server/project-event'
 import { resolveMcpTools, executeMcpTool } from '@/lib/server/mcp-resolver'
+import { estimateCost } from '@/lib/server/cost-estimator'
 import { createExecution, succeedExecution, failExecution, timeoutExecution } from '@/lib/server/execution-log'
 import { resolveNextSteps, type StepEdge } from '@/lib/server/condition-evaluator'
 import { findPreviousAgentStep, normalizeDagEdges, hasDagEdges } from '@/lib/server/dag-edges'
@@ -426,7 +427,20 @@ async function executeDispatch(stepId: string, prepared: PreparedDispatch) {
       ),
     ])
 
-    await succeedExecution(execution.id, result.output, result.tokensUsed)
+    // TD-018: persist the recorded cost on the execution row. Prefer the
+    // adapter-reported figure; when the adapter reports token usage but no
+    // cost (the Anthropic SDK path), fall back to the model-rate estimate so
+    // B-7 budget enforcement has a recorded spend to aggregate. Unknown
+    // models estimate to 0 → recorded as null, never a fake zero. Adapters
+    // report no cost on the failure path (they throw), so only success
+    // records spend.
+    const recordedCost =
+      result.cost ??
+      (result.tokensUsed != null
+        ? estimateCost(agent.runtimeModel || '', result.tokensUsed) || undefined
+        : undefined)
+
+    await succeedExecution(execution.id, result.output, result.tokensUsed, recordedCost)
 
     await db.taskStep.update({
       where: { id: stepId },

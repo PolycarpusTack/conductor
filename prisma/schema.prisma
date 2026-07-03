@@ -47,6 +47,9 @@ model Project {
   lastAutomationSweepAt  DateTime? // sweep claim timestamp (max once/hour)
   // Artifact retention for DONE tasks (null = keep forever)
   artifactRetentionDays  Int?
+  // B-7 spend budget: month-to-date recorded cost >= budgetUsd pauses dispatch.
+  // Nullable column IS the feature flag (null = no budget = unchanged behaviour).
+  budgetUsd              Float?
   // Workspace container (nullable; backfilled)
   workspaceId        String?
   workspace          Workspace?             @relation(fields: [workspaceId], references: [id], onDelete: SetNull)

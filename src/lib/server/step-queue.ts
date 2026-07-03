@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { filterBudgetPausedProjects } from '@/lib/server/budget'
 import { sweepStaleDaemonsThrottled } from '@/lib/server/daemon-auth'
 import { dispatchStepToDaemon } from '@/lib/server/daemon-dispatch'
 import { dispatchStep } from '@/lib/server/dispatch'
@@ -51,6 +52,7 @@ export async function pollAndDispatch(projectId?: string) {
     select: {
       id: true,
       agent: { select: { invocationMode: true } },
+      task: { select: { projectId: true } },
     },
     take: POLL_BATCH_SIZE,
     orderBy: { createdAt: 'asc' },
@@ -72,6 +74,7 @@ export async function pollAndDispatch(projectId?: string) {
       prevSteps: true,
       isMergePoint: true,
       agent: { select: { invocationMode: true } },
+      task: { select: { projectId: true } },
     },
     take: POLL_BATCH_SIZE,
     orderBy: { createdAt: 'asc' },
@@ -127,11 +130,23 @@ export async function pollAndDispatch(projectId?: string) {
 
   if (allSteps.length === 0) return { polled: 0, succeeded: 0, failed: 0 }
 
+  // B-7 spend budgets: projects whose month-to-date recorded cost has
+  // reached Project.budgetUsd are skipped entirely (HTTP and daemon paths
+  // alike). Skipped steps stay active and unleased, so dispatch resumes
+  // automatically on the first tick after the budget is raised or the UTC
+  // month rolls over. Projects without a budget never reach the spend query.
+  const pausedProjects = await filterBudgetPausedProjects(
+    [...new Set(allSteps.map(step => step.task.projectId))],
+  )
+  const dispatchable = pausedProjects.size > 0
+    ? allSteps.filter(step => !pausedProjects.has(step.task.projectId))
+    : allSteps
+
   // Route each step by its agent's invocationMode.
   // HTTP: the Next server executes via provider SDKs.
   // DAEMON: lease the step to an online daemon; the daemon pulls and runs.
   const results = await Promise.allSettled(
-    allSteps.map(step =>
+    dispatchable.map(step =>
       step.agent?.invocationMode === 'DAEMON'
         ? dispatchStepToDaemon(step.id)
         : dispatchStep(step.id),
@@ -139,7 +154,7 @@ export async function pollAndDispatch(projectId?: string) {
   )
 
   return {
-    polled: allSteps.length,
+    polled: dispatchable.length,
     succeeded: results.filter(r => r.status === 'fulfilled').length,
     failed: results.filter(r => r.status === 'rejected').length,
   }

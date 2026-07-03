@@ -121,6 +121,9 @@ function GeneralTab({
   const [artifactRetention, setArtifactRetention] = useState(
     project.artifactRetentionDays ? String(project.artifactRetentionDays) : 'forever',
   )
+  const [budgetInput, setBudgetInput] = useState(
+    project.budgetUsd != null ? String(project.budgetUsd) : '',
+  )
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [deleteConfirm, setDeleteConfirm] = useState('')
@@ -133,9 +136,14 @@ function GeneralTab({
     setDefaultStepMode(project.defaultStepMode ?? 'none')
     setDefaultChainTemplateId(project.defaultChainTemplateId ?? 'none')
     setArtifactRetention(project.artifactRetentionDays ? String(project.artifactRetentionDays) : 'forever')
+    setBudgetInput(project.budgetUsd != null ? String(project.budgetUsd) : '')
     setStatus('idle')
     setDeleteConfirm('')
-  }, [project.id, project.name, project.description, project.defaultStepMode, project.defaultChainTemplateId, project.artifactRetentionDays])
+  }, [project.id, project.name, project.description, project.defaultStepMode, project.defaultChainTemplateId, project.artifactRetentionDays, project.budgetUsd])
+
+  // Blank = no budget (null clears it server-side).
+  const parsedBudget = budgetInput.trim() === '' ? null : Number(budgetInput)
+  const budgetInvalid = parsedBudget !== null && (!Number.isFinite(parsedBudget) || parsedBudget < 0)
 
   const patch = {
     name: name.trim(),
@@ -143,6 +151,7 @@ function GeneralTab({
     defaultStepMode: defaultStepMode === 'none' ? null : defaultStepMode,
     defaultChainTemplateId: defaultChainTemplateId === 'none' ? null : defaultChainTemplateId,
     artifactRetentionDays: artifactRetention === 'forever' ? null : parseInt(artifactRetention, 10),
+    budgetUsd: budgetInvalid ? null : parsedBudget,
   }
 
   const dirty =
@@ -150,7 +159,8 @@ function GeneralTab({
     patch.description !== (project.description ?? null) ||
     patch.defaultStepMode !== (project.defaultStepMode ?? null) ||
     patch.defaultChainTemplateId !== (project.defaultChainTemplateId ?? null) ||
-    patch.artifactRetentionDays !== (project.artifactRetentionDays ?? null)
+    patch.artifactRetentionDays !== (project.artifactRetentionDays ?? null) ||
+    patch.budgetUsd !== (project.budgetUsd ?? null)
 
   const save = async () => {
     if (!patch.name) return
@@ -254,8 +264,35 @@ function GeneralTab({
         </div>
       </div>
 
+      <div className="rounded-lg border border-border/30 p-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium">Spend Budget</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Monthly cap on recorded agent spend (USD, UTC calendar month). When month-to-date
+            cost reaches the budget, dispatch pauses until the budget is raised. Blank = no budget.
+          </p>
+        </div>
+        <div className="grid gap-1.5">
+          <label htmlFor="settings-budget-usd" className="text-xs font-medium">Monthly budget (USD)</label>
+          <Input
+            id="settings-budget-usd"
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            placeholder="No budget"
+            value={budgetInput}
+            onChange={(e) => setBudgetInput(e.target.value)}
+            className="h-8 text-xs w-48"
+          />
+          {budgetInvalid && (
+            <p className="text-xs text-[var(--op-red)]">Budget must be zero or a positive amount.</p>
+          )}
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
-        <Button size="sm" onClick={save} disabled={saving || !dirty || !patch.name}>
+        <Button size="sm" onClick={save} disabled={saving || !dirty || !patch.name || budgetInvalid}>
           {saving ? 'Saving…' : 'Save changes'}
         </Button>
         {status === 'saved' && !dirty && <span className="text-xs text-emerald-400">Saved.</span>}

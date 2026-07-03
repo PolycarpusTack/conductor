@@ -38,6 +38,8 @@ export const updateProjectSchema = createProjectSchema
     artifactRetentionDays: z.number().int().min(1).max(3650).nullable().optional(),
     autoArchiveDays: z.number().int().min(1).max(3650).nullable().optional(),
     reviewEscalationHours: z.number().int().min(1).max(720).nullable().optional(),
+    // B-7 spend budget: null clears the budget (no enforcement); 0 is a hard pause.
+    budgetUsd: z.number().min(0, 'Budget must be zero or a positive amount').max(1_000_000).nullable().optional(),
   })
   .partial()
   .refine(

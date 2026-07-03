@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { assertSameOrigin } from '@/lib/csrf'
 import { requireAdminSession, requireRole } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
+import { getMonthToDateSpend } from '@/lib/server/budget'
 import { updateProjectSchema } from '@/lib/server/contracts'
 import { agentSummarySelect } from '@/lib/server/selects'
 
@@ -23,6 +24,7 @@ export const GET = withErrorHandling(
         defaultStepMode: true,
         defaultChainTemplateId: true,
         artifactRetentionDays: true,
+        budgetUsd: true,
         agents: {
           select: agentSummarySelect,
         },
@@ -53,7 +55,18 @@ export const GET = withErrorHandling(
 
     if (!project) throw notFound('Project not found')
 
-    return NextResponse.json(project)
+    // B-7: the board header needs the budget state. Spend is only computed
+    // when a budget is set — the no-budget path stays exactly as before
+    // (the nullable column is the feature flag).
+    const spentThisMonthUsd =
+      project.budgetUsd != null ? await getMonthToDateSpend(id) : null
+
+    return NextResponse.json({
+      ...project,
+      spentThisMonthUsd,
+      budgetPaused:
+        project.budgetUsd != null && (spentThisMonthUsd ?? 0) >= project.budgetUsd,
+    })
   },
 )
 
@@ -72,7 +85,7 @@ export const PUT = withErrorHandling(
     const {
       name, description, color, logRetentionDays,
       defaultStepMode, defaultChainTemplateId, artifactRetentionDays,
-      autoArchiveDays, reviewEscalationHours,
+      autoArchiveDays, reviewEscalationHours, budgetUsd,
     } = parsed.data
 
     const project = await db.project.update({
@@ -80,7 +93,7 @@ export const PUT = withErrorHandling(
       data: {
         name, description, color, logRetentionDays,
         defaultStepMode, defaultChainTemplateId, artifactRetentionDays,
-        autoArchiveDays, reviewEscalationHours,
+        autoArchiveDays, reviewEscalationHours, budgetUsd,
       },
       select: {
         id: true,
@@ -92,6 +105,7 @@ export const PUT = withErrorHandling(
         artifactRetentionDays: true,
         autoArchiveDays: true,
         reviewEscalationHours: true,
+        budgetUsd: true,
       },
     })
 

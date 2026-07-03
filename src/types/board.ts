@@ -62,6 +62,11 @@ export interface Project {
   defaultStepMode?: string | null
   defaultChainTemplateId?: string | null
   artifactRetentionDays?: number | null
+  // B-7 spend budget (null/undefined = no budget). Spend + paused state are
+  // computed server-side in the project GET payload when a budget is set.
+  budgetUsd?: number | null
+  spentThisMonthUsd?: number | null
+  budgetPaused?: boolean
   agents: Agent[]
   tasks: Task[]
 }

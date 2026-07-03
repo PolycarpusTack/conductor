@@ -24,6 +24,10 @@ import {
 import type { Project, ProjectListItem } from '@/types/board'
 
 type ViewType = 'landing' | 'board' | 'runtime' | 'skills' | 'help'
+
+function formatUsd(value: number): string {
+  return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`
+}
 type SettingsTabType = 'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
 
 interface BoardHeaderProps {
@@ -78,6 +82,29 @@ export function BoardHeader({
               <div className={`h-1.5 w-1.5 rounded-full ${wsConnected ? 'bg-[var(--op-teal)] animate-pulse' : 'bg-muted-foreground/50'}`} />
               {wsConnected ? 'Live' : realtimeConfigured ? 'Offline' : 'Realtime Off'}
             </div>
+
+            {/* B-7: month-to-date spend vs budget; destructive chip while dispatch is budget-paused */}
+            {currentProject?.budgetUsd != null && (() => {
+              const budget = currentProject.budgetUsd
+              const spent = currentProject.spentThisMonthUsd ?? 0
+              const paused = spent >= budget
+              return paused ? (
+                <div
+                  className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-mono bg-[var(--op-red-bg)] text-[var(--op-red)] border border-[var(--op-red-dim)]"
+                  title="Monthly budget reached — agent dispatch is paused until the budget is raised"
+                >
+                  <div className="h-1.5 w-1.5 rounded-full bg-[var(--op-red)]" />
+                  Budget paused · {formatUsd(spent)} / {formatUsd(budget)}
+                </div>
+              ) : (
+                <span
+                  className="hidden sm:inline text-[10px] font-mono text-muted-foreground/60"
+                  title="Month-to-date recorded spend / monthly budget"
+                >
+                  {formatUsd(spent)} / {formatUsd(budget)}
+                </span>
+              )
+            })()}
           </div>
 
           <div className="flex items-center gap-3">
