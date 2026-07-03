@@ -11,9 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingsModes } from '@/components/settings-modes'
 import { SettingsRuntimes } from '@/components/settings-runtimes'
 import { SettingsMcp } from '@/components/settings-mcp'
@@ -46,6 +45,51 @@ import type { ProjectMode, ChainTemplate } from '@/types/settings'
 import { useProjectDataCtx, useAgentActions, useUiState } from '@/app/_views/board-context'
 import type { SettingsTabType } from '@/app/_views/board-context'
 import { statusColumns } from '@/app/_views/board-constants'
+
+type SettingsTab = NonNullable<SettingsTabType>
+
+/**
+ * Grouped information architecture for the settings surface (story E-6).
+ * Tab values are unchanged — they are the public deep-link contract
+ * (SettingsTabType in board-context.tsx); only their presentation is grouped.
+ */
+const SETTINGS_NAV: ReadonlyArray<{
+  group: string
+  tabs: ReadonlyArray<{ value: SettingsTab; label: string }>
+}> = [
+  {
+    group: 'Project',
+    tabs: [
+      { value: 'general', label: 'General' },
+      { value: 'templates', label: 'Templates' },
+      { value: 'modes', label: 'Modes' },
+    ],
+  },
+  {
+    group: 'Execution',
+    tabs: [
+      { value: 'agents', label: 'Agents' },
+      { value: 'runtimes', label: 'Runtimes' },
+      { value: 'mcp', label: 'MCP' },
+      { value: 'automation', label: 'Automation' },
+    ],
+  },
+  {
+    group: 'Observe',
+    tabs: [
+      { value: 'activity', label: 'Activity' },
+      { value: 'analytics', label: 'Analytics' },
+    ],
+  },
+  {
+    group: 'Access & Integrations',
+    tabs: [
+      { value: 'api', label: 'API Keys' },
+      { value: 'security', label: 'Security' },
+      { value: 'integrations', label: 'Integrations' },
+    ],
+  },
+]
 
 const ARTIFACT_RETENTION_OPTIONS = [
   { value: 'forever', label: 'Keep forever' },
@@ -341,32 +385,71 @@ export function SettingsDialog() {
     }
   }
 
+  const activeTab: SettingsTab = settingsTab ?? 'general'
+
   return (
     <Dialog open={settingsTab !== null} onOpenChange={(open) => !open && setSettingsTab(null)}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden">
+      <DialogContent className="sm:max-w-[800px] h-[80vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Project Settings</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={settingsTab || 'general'} onValueChange={(v) => setSettingsTab(v as NonNullable<SettingsTabType>)}>
-          <TabsList className="flex flex-wrap gap-1 w-full">
-            <TabsTrigger value="general" className="text-xs">General</TabsTrigger>
-            <TabsTrigger value="agents" className="text-xs">Agents</TabsTrigger>
-            <TabsTrigger value="api" className="text-xs">API Keys</TabsTrigger>
-            <TabsTrigger value="security" className="text-xs">Security</TabsTrigger>
-            <TabsTrigger value="activity" className="text-xs">Activity</TabsTrigger>
-            <TabsTrigger value="modes" className="text-xs">Modes</TabsTrigger>
-            <TabsTrigger value="runtimes" className="text-xs">Runtimes</TabsTrigger>
-            <TabsTrigger value="mcp" className="text-xs">MCP</TabsTrigger>
-            <TabsTrigger value="templates" className="text-xs">Templates</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
-            <TabsTrigger value="automation" className="text-xs">Automation</TabsTrigger>
-            <TabsTrigger value="integrations" className="text-xs">Integrations</TabsTrigger>
-          </TabsList>
+        <div className="flex min-h-0 flex-col gap-4 sm:flex-row">
+          {/* Below sm the grouped nav collapses into a select. */}
+          <div className="sm:hidden">
+            <Select value={activeTab} onValueChange={(v) => setSettingsTab(v as SettingsTab)}>
+              <SelectTrigger className="w-full" aria-label="Settings section">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SETTINGS_NAV.map((group) => (
+                  <SelectGroup key={group.group}>
+                    <SelectLabel>{group.group}</SelectLabel>
+                    {group.tabs.map((tab) => (
+                      <SelectItem key={tab.value} value={tab.value}>{tab.label}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <div className="mt-4 overflow-y-auto max-h-[50vh]">
-            <TabsContent value="general" className="mt-0">
-              {currentProject && (
+          <nav
+            aria-label="Settings sections"
+            className="hidden w-44 shrink-0 overflow-y-auto border-r border-border/30 pr-3 sm:block"
+          >
+            {SETTINGS_NAV.map((group, groupIndex) => (
+              <div key={group.group} className={groupIndex > 0 ? 'mt-4' : undefined}>
+                <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {group.group}
+                </p>
+                <ul className="space-y-0.5">
+                  {group.tabs.map((tab) => {
+                    const active = activeTab === tab.value
+                    return (
+                      <li key={tab.value}>
+                        <button
+                          type="button"
+                          onClick={() => setSettingsTab(tab.value)}
+                          aria-current={active ? 'page' : undefined}
+                          className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                            active
+                              ? 'bg-muted font-medium text-foreground'
+                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
+          </nav>
+
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto sm:pr-1">
+            {activeTab === 'general' && currentProject && (
                 <GeneralTab
                   key={currentProject.id}
                   project={currentProject}
@@ -387,10 +470,9 @@ export function SettingsDialog() {
                     </div>
                   </div>
                 </GeneralTab>
-              )}
-            </TabsContent>
+            )}
 
-            <TabsContent value="agents" className="mt-0">
+            {activeTab === 'agents' && (
               <div className="space-y-3">
                 {projectRuntimes.length === 0 && (
                   <div className="rounded-lg border border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)] p-4">
@@ -430,9 +512,9 @@ export function SettingsDialog() {
                   />
                 )}
               </div>
-            </TabsContent>
+            )}
 
-            <TabsContent value="api" className="mt-0">
+            {activeTab === 'api' && (
               <div className="space-y-4">
                 <div className="rounded-lg border border-border/30 p-4">
                   <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
@@ -555,51 +637,44 @@ export function SettingsDialog() {
                   </div>
                 </div>
               </div>
-            </TabsContent>
+            )}
 
-            <TabsContent value="security" className="mt-0">
+            {activeTab === 'security' && (
               <div className="space-y-6">
                 <SettingsUsers />
                 <SettingsSecurity />
               </div>
-            </TabsContent>
+            )}
 
-            <TabsContent value="activity" className="mt-0">
-              {currentProject && <SettingsActivity projectId={currentProject.id} />}
-            </TabsContent>
+            {activeTab === 'activity' && currentProject && (
+              <SettingsActivity projectId={currentProject.id} />
+            )}
 
-            <TabsContent value="modes" className="mt-0">
-              {currentProject && (
-                <SettingsModes
-                  projectId={currentProject.id}
-                  modes={projectModes}
-                  onModesChange={setProjectModes}
-                />
-              )}
-            </TabsContent>
+            {activeTab === 'modes' && currentProject && (
+              <SettingsModes
+                projectId={currentProject.id}
+                modes={projectModes}
+                onModesChange={setProjectModes}
+              />
+            )}
 
-            <TabsContent value="runtimes" className="mt-0">
-              {currentProject && (
-                <SettingsRuntimes
-                  projectId={currentProject.id}
-                  runtimes={projectRuntimes}
-                  onRuntimesChange={setProjectRuntimes}
-                />
-              )}
-            </TabsContent>
+            {activeTab === 'runtimes' && currentProject && (
+              <SettingsRuntimes
+                projectId={currentProject.id}
+                runtimes={projectRuntimes}
+                onRuntimesChange={setProjectRuntimes}
+              />
+            )}
 
-            <TabsContent value="mcp" className="mt-0">
-              {currentProject && (
-                <SettingsMcp
-                  projectId={currentProject.id}
-                  connections={projectMcpConnections}
-                  onConnectionsChange={setProjectMcpConnections}
-                />
-              )}
-            </TabsContent>
+            {activeTab === 'mcp' && currentProject && (
+              <SettingsMcp
+                projectId={currentProject.id}
+                connections={projectMcpConnections}
+                onConnectionsChange={setProjectMcpConnections}
+              />
+            )}
 
-            <TabsContent value="templates" className="mt-0">
-              {currentProject && (
+            {activeTab === 'templates' && currentProject && (
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-sm font-semibold mb-2">Chain templates</h3>
@@ -622,28 +697,25 @@ export function SettingsDialog() {
                     />
                   </div>
                 </div>
-              )}
-            </TabsContent>
+            )}
 
-            <TabsContent value="analytics" className="mt-0">
-              {currentProject && <ObservabilityDashboard projectId={currentProject.id} />}
-            </TabsContent>
+            {activeTab === 'analytics' && currentProject && (
+              <ObservabilityDashboard projectId={currentProject.id} />
+            )}
 
-            <TabsContent value="automation" className="mt-0">
-              {currentProject && <SettingsAutomation projectId={currentProject.id} />}
-            </TabsContent>
+            {activeTab === 'automation' && currentProject && (
+              <SettingsAutomation projectId={currentProject.id} />
+            )}
 
-            <TabsContent value="integrations" className="mt-0">
-              {currentProject && (
-                <SettingsIntegrations
-                  projectId={currentProject.id}
-                  triggers={triggers}
-                  onTriggersChange={setTriggers}
-                />
-              )}
-            </TabsContent>
+            {activeTab === 'integrations' && currentProject && (
+              <SettingsIntegrations
+                projectId={currentProject.id}
+                triggers={triggers}
+                onTriggersChange={setTriggers}
+              />
+            )}
           </div>
-        </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   )

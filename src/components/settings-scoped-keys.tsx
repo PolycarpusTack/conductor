@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ConfirmDialog } from '@/components/settings-confirm-dialog'
 import { Check, Copy, Plus, ShieldOff } from 'lucide-react'
 
 interface ScopedKey {
@@ -45,6 +46,7 @@ export function SettingsScopedKeys() {
   const [freshKey, setFreshKey] = useState<{ id: string; rawKey: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [revokeTarget, setRevokeTarget] = useState<ScopedKey | null>(null)
 
   const fetchKeys = useCallback(async () => {
     try {
@@ -101,7 +103,6 @@ export function SettingsScopedKeys() {
   }
 
   const revoke = async (key: ScopedKey) => {
-    if (!window.confirm(`Revoke "${key.label}" (${key.prefix}…)? Integrations using it will stop working immediately.`)) return
     try {
       const res = await fetch(`/api/admin/api-keys?id=${encodeURIComponent(key.id)}`, { method: 'DELETE' })
       if (res.ok) await fetchKeys()
@@ -163,7 +164,7 @@ export function SettingsScopedKeys() {
               {key.lastUsedAt ? `used ${new Date(key.lastUsedAt).toLocaleDateString()}` : 'never used'}
             </span>
             {!key.revokedAt && (
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Revoke" onClick={() => revoke(key)}>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Revoke" onClick={() => setRevokeTarget(key)}>
                 <ShieldOff className="h-3 w-3 text-muted-foreground hover:text-destructive" />
               </Button>
             )}
@@ -205,6 +206,15 @@ export function SettingsScopedKeys() {
         </Button>
       </div>
       {error && <p className="text-[11px] text-[var(--op-red,#F87171)] mt-2">{error}</p>}
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(open) => { if (!open) setRevokeTarget(null) }}
+        title={revokeTarget ? `Revoke "${revokeTarget.label}" (${revokeTarget.prefix}…)?` : 'Revoke key?'}
+        description="Integrations using this key will stop working immediately. This cannot be undone."
+        confirmLabel="Revoke key"
+        onConfirm={() => { if (revokeTarget) void revoke(revokeTarget) }}
+      />
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/settings-confirm-dialog'
 import { toast } from 'sonner'
 
 type Memory = {
@@ -23,6 +24,7 @@ export function AgentMemoryPanel({
 }) {
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!agentApiKey) return
@@ -45,7 +47,6 @@ export function AgentMemoryPanel({
 
   const remove = async (memoryId: string) => {
     if (!agentApiKey) return
-    if (!confirm('Delete this memory?')) return
     const res = await fetch(`/api/agents/${agentId}/memories/${memoryId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${agentApiKey}` },
@@ -85,9 +86,17 @@ export function AgentMemoryPanel({
               reinforced {m.reinforcement}x · {new Date(m.createdAt).toLocaleDateString()}
             </div>
           </div>
-          <Button variant="ghost" size="sm" aria-label="Delete memory" onClick={() => remove(m.id)}>×</Button>
+          <Button variant="ghost" size="sm" aria-label="Delete memory" onClick={() => setDeleteTarget(m.id)}>×</Button>
         </div>
       ))}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Delete this memory?"
+        description="The agent loses this learned memory permanently. This cannot be undone."
+        confirmLabel="Delete memory"
+        onConfirm={() => { if (deleteTarget) void remove(deleteTarget) }}
+      />
     </div>
   )
 }

@@ -43,6 +43,12 @@
 | TD-020 | HTTP-path cost fallback uses blended per-token estimates (cost-estimator MODEL_COSTS) when the adapter reports tokens but no true cost — recorded spend is approximate for the Anthropic SDK path; unknown models record null (budget never binds on estimate alone for them) | src/lib/server/dispatch.ts, src/lib/server/cost-estimator.ts | Low | Have adapters compute true cost from per-direction token counts (B-7 follow-up / EPIC C-5 cost surfacing) |
 | TD-021 | budget_lifted is only written on the first tick where the resumed project has a dispatchable step; project GET recomputes spend per request instead of caching | src/lib/server/budget.ts, src/app/api/projects/[id]/route.ts | Low | Acceptable — activity is audit-only and the aggregate is one indexed SUM; revisit with C-5 per-project cost chip |
 
+## GPM Plan — EPIC E (2026-07-03)
+
+| ID | Description | File | Severity | Resolution |
+|----|-------------|------|----------|------------|
+| TD-022 | `agent-memory-panel.tsx` load/delete error toasts use sonner, whose `<Toaster>` is never mounted (only `ui/toaster` + use-toast is) — those errors render nowhere | src/components/agent-memory-panel.tsx | Low | Migrate to use-toast or mount sonner; fold into a toast-system consolidation |
+
 ## Epic 4 — Wizard LLM Composition (2026-04-29)
 
 | ID | Description | File | Severity | Resolution |

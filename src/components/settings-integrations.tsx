@@ -15,6 +15,8 @@ import { Switch } from '@/components/ui/switch'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { ConfirmDialog } from '@/components/settings-confirm-dialog'
+import { useToast } from '@/hooks/use-toast'
 
 type TriggerFilter = {
   field: string
@@ -212,10 +214,12 @@ function ReactionRow({
   const [editing, setEditing] = useState(false)
   const [config, setConfig] = useState(JSON.stringify(reaction.config, null, 2))
   const [name, setName] = useState(reaction.name)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const { toast } = useToast()
 
   const save = async () => {
     let parsedConfig: Record<string, unknown>
-    try { parsedConfig = JSON.parse(config) } catch { alert('Config is not valid JSON'); return }
+    try { parsedConfig = JSON.parse(config) } catch { toast({ title: 'Config is not valid JSON', variant: 'destructive' }); return }
 
     const res = await fetch(
       `/api/projects/${projectId}/triggers/${triggerId}/reactions/${reaction.id}`,
@@ -233,7 +237,6 @@ function ReactionRow({
   }
 
   const remove = async () => {
-    if (!confirm(`Delete reaction "${reaction.name}"?`)) return
     await fetch(`/api/projects/${projectId}/triggers/${triggerId}/reactions/${reaction.id}`, {
       method: 'DELETE',
     })
@@ -292,9 +295,17 @@ function ReactionRow({
           </button>
           <Switch checked={reaction.enabled} onCheckedChange={toggleEnabled} />
           <Button variant="ghost" size="sm" onClick={() => setEditing(e => !e)}>Edit</Button>
-          <Button variant="ghost" size="sm" onClick={remove}>Delete</Button>
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>Delete</Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`Delete reaction "${reaction.name}"?`}
+        description="The reaction is removed from this trigger and will no longer run. This cannot be undone."
+        confirmLabel="Delete reaction"
+        onConfirm={() => { void remove() }}
+      />
       {reaction.lastError && (
         <p className="text-destructive text-xs">Last error: {reaction.lastError}</p>
       )}
@@ -342,6 +353,8 @@ function TriggerCard({
   const [newRxnDryRun, setNewRxnDryRun] = useState(false)
   const [newRxnOrder, setNewRxnOrder] = useState(trigger.reactions.length)
   const [testing, setTesting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const { toast } = useToast()
 
   const toggleEnabled = async () => {
     const res = await fetch(`/api/projects/${projectId}/triggers/${trigger.id}`, {
@@ -354,7 +367,6 @@ function TriggerCard({
   }
 
   const removeTrigger = async () => {
-    if (!confirm(`Delete trigger "${trigger.name}"?`)) return
     await fetch(`/api/projects/${projectId}/triggers/${trigger.id}`, { method: 'DELETE' })
     onDelete(trigger.id)
   }
@@ -367,10 +379,10 @@ function TriggerCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payload: {} }),
       })
-      if (res.ok) alert('Test fired successfully')
+      if (res.ok) toast({ title: 'Test fired successfully' })
       else {
         const err = await res.json() as { error?: string }
-        alert(`Test failed: ${err.error ?? 'Unknown error'}`)
+        toast({ title: `Test failed: ${err.error ?? 'Unknown error'}`, variant: 'destructive' })
       }
     } finally {
       setTesting(false)
@@ -379,14 +391,14 @@ function TriggerCard({
 
   const addReaction = async () => {
     let parsedConfig: Record<string, unknown>
-    try { parsedConfig = JSON.parse(newRxnConfig) } catch { alert('Config is not valid JSON'); return }
+    try { parsedConfig = JSON.parse(newRxnConfig) } catch { toast({ title: 'Config is not valid JSON', variant: 'destructive' }); return }
 
     const res = await fetch(`/api/projects/${projectId}/triggers/${trigger.id}/reactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newRxnName, type: newRxnType, config: parsedConfig, order: newRxnOrder, dryRun: newRxnDryRun }),
     })
-    if (!res.ok) { const e = await res.json() as { error?: string }; alert(e.error); return }
+    if (!res.ok) { const e = await res.json() as { error?: string }; toast({ title: e.error ?? 'Failed to add reaction', variant: 'destructive' }); return }
     const created = await res.json() as Reaction
     created.config = parsedConfig
     onUpdate({ ...trigger, reactions: [...trigger.reactions, created] })
@@ -411,9 +423,17 @@ function TriggerCard({
           <Button variant="outline" size="sm" disabled={testing} onClick={testFire}>
             {testing ? 'Testing…' : 'Test'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={removeTrigger}>Delete</Button>
+          <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)}>Delete</Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`Delete trigger "${trigger.name}"?`}
+        description="The trigger and all of its reactions are removed and will no longer fire. This cannot be undone."
+        confirmLabel="Delete trigger"
+        onConfirm={() => { void removeTrigger() }}
+      />
 
       <CollapsibleContent className="space-y-2 pt-2">
         <div className="space-y-2">
@@ -495,13 +515,14 @@ export function SettingsIntegrations({ projectId, triggers, onTriggersChange }: 
   const [newType, setNewType] = useState<'event' | 'poll:sentry'>('event')
   const [newEventType, setNewEventType] = useState('chain-completed')
   const [newPollConfig, setNewPollConfig] = useState('{}')
+  const { toast } = useToast()
 
   const createTrigger = async () => {
     const body: Record<string, unknown> = { name: newName, type: newType }
     if (newType === 'event') {
       body.eventType = newEventType
     } else {
-      try { body.pollConfig = JSON.parse(newPollConfig) } catch { alert('Poll config is not valid JSON'); return }
+      try { body.pollConfig = JSON.parse(newPollConfig) } catch { toast({ title: 'Poll config is not valid JSON', variant: 'destructive' }); return }
     }
 
     const res = await fetch(`/api/projects/${projectId}/triggers`, {
@@ -509,7 +530,7 @@ export function SettingsIntegrations({ projectId, triggers, onTriggersChange }: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!res.ok) { const e = await res.json() as { error?: string }; alert(e.error); return }
+    if (!res.ok) { const e = await res.json() as { error?: string }; toast({ title: e.error ?? 'Failed to create trigger', variant: 'destructive' }); return }
     const created = await res.json() as IntegrationTrigger
     onTriggersChange([...triggers, created])
     setCreating(false)
