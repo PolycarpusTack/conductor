@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -24,51 +23,22 @@ import {
 } from '@/components/ui/select'
 import { ChainBuilder } from '@/components/chain-builder'
 import { AgentBadge } from '@/components/agent-badge'
-import type { Task, TaskStatus, TaskPriority, Project } from '@/types/board'
-import type { ProjectMode, ChainTemplate, TaskTemplate, StepDraft } from '@/types/settings'
+import type { TaskStatus, TaskPriority, Project } from '@/types/board'
 import { resolveStepAgents } from '@/lib/resolve-step-agents'
+import { useProjectDataCtx, useTaskActions } from '@/app/_views/board-context'
+import { statusColumns } from '@/app/_views/board-constants'
 
-interface TaskDialogProps {
-  taskDialogOpen: boolean
-  setTaskDialogOpen: Dispatch<SetStateAction<boolean>>
-  editingTask: Task | null
-  taskTitle: string
-  setTaskTitle: Dispatch<SetStateAction<string>>
-  taskDescription: string
-  setTaskDescription: Dispatch<SetStateAction<string>>
-  taskStatus: TaskStatus
-  setTaskStatus: Dispatch<SetStateAction<TaskStatus>>
-  taskPriority: TaskPriority
-  setTaskPriority: Dispatch<SetStateAction<TaskPriority>>
-  taskTag: string
-  setTaskTag: Dispatch<SetStateAction<string>>
-  taskAgentId: string
-  setTaskAgentId: Dispatch<SetStateAction<string>>
-  taskNotes: string
-  setTaskNotes: Dispatch<SetStateAction<string>>
-  taskRuntimeOverride: string
-  setTaskRuntimeOverride: Dispatch<SetStateAction<string>>
-  taskSteps: StepDraft[]
-  setTaskSteps: Dispatch<SetStateAction<StepDraft[]>>
-  handleSaveTask: () => Promise<void>
-  resetTaskForm: () => void
-  currentProject: Project | null
-  projectModes: ProjectMode[]
-  chainTemplates: ChainTemplate[]
-  taskTemplates: TaskTemplate[]
-  statusColumns: { id: TaskStatus; label: string; color: string }[]
-}
-
-export function TaskDialog({
-  taskDialogOpen, setTaskDialogOpen, editingTask,
-  taskTitle, setTaskTitle, taskDescription, setTaskDescription,
-  taskStatus, setTaskStatus, taskPriority, setTaskPriority,
-  taskTag, setTaskTag, taskAgentId, setTaskAgentId,
-  taskNotes, setTaskNotes, taskRuntimeOverride, setTaskRuntimeOverride,
-  taskSteps, setTaskSteps,
-  handleSaveTask, resetTaskForm,
-  currentProject, projectModes, chainTemplates, taskTemplates, statusColumns,
-}: TaskDialogProps) {
+export function TaskDialog() {
+  const { currentProject, projectModes, chainTemplates, taskTemplates } = useProjectDataCtx()
+  const {
+    taskDialogOpen, setTaskDialogOpen, editingTask,
+    taskTitle, setTaskTitle, taskDescription, setTaskDescription,
+    taskStatus, setTaskStatus, taskPriority, setTaskPriority,
+    taskTag, setTaskTag, taskAgentId, setTaskAgentId,
+    taskNotes, setTaskNotes, taskRuntimeOverride, setTaskRuntimeOverride,
+    taskSteps, setTaskSteps,
+    handleSaveTask, resetTaskForm,
+  } = useTaskActions()
   // Agent picker grouped by category (library-scale projects)
   const agentGroups = (() => {
     const map = new Map<string, Project['agents']>()

@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -26,9 +25,7 @@ import {
   LogOut,
   AlertTriangle,
 } from 'lucide-react'
-import type { Project, ProjectListItem } from '@/types/board'
-
-type ViewType = 'landing' | 'board' | 'runtime' | 'skills' | 'help'
+import { useProjectDataCtx, useTaskActions, useUiState, useRealtime } from '@/app/_views/board-context'
 
 function formatUsd(value: number): string {
   return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`
@@ -45,36 +42,24 @@ async function fetchDeadLetterCount(projectId: string): Promise<number | null> {
     return null
   }
 }
-type SettingsTabType = 'general' | 'agents' | 'api' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
 
-interface BoardHeaderProps {
-  view: ViewType
-  setView: (v: ViewType) => void
-  sidebarOpen: boolean
-  setSidebarOpen: Dispatch<SetStateAction<boolean>>
-  projects: ProjectListItem[]
-  currentProject: Project | null
-  switchProject: (id: string) => Promise<void>
-  wsConnected: boolean
-  realtimeConfigured: boolean
-  setProjectDialogOpen: Dispatch<SetStateAction<boolean>>
-  setSettingsTab: (tab: SettingsTabType) => void
-  handleAdminLogout: () => void
-  currentWorkspaceId: string | null
-  setCurrentWorkspaceId: (id: string | null) => void
-  notificationVersion?: number
-  onOpenTask?: (taskId: string) => void
-}
+export function BoardHeader() {
+  const { projects, currentProject, switchProject, setProjectDialogOpen } = useProjectDataCtx()
+  const { setSelectedTask } = useTaskActions()
+  const {
+    view, setView,
+    sidebarOpen, setSidebarOpen,
+    setSettingsTab,
+    currentWorkspaceId, setCurrentWorkspaceId,
+    handleAdminLogout,
+  } = useUiState()
+  const { wsConnected, realtimeConfigured, notificationVersion } = useRealtime()
 
-export function BoardHeader({
-  view, setView,
-  sidebarOpen, setSidebarOpen,
-  projects, currentProject, switchProject,
-  wsConnected, realtimeConfigured,
-  setProjectDialogOpen, setSettingsTab, handleAdminLogout,
-  currentWorkspaceId, setCurrentWorkspaceId,
-  notificationVersion, onOpenTask,
-}: BoardHeaderProps) {
+  // C-4: notification bell task links open the task drawer on the board
+  const onOpenTask = useCallback((taskId: string) => {
+    const t = currentProject?.tasks.find(task => task.id === taskId)
+    if (t) setSelectedTask(t)
+  }, [currentProject, setSelectedTask])
   // C-5: dead-letter count chip. No polling — refreshed whenever the project
   // payload is refetched (the WS step-failed/chain-* handlers replace
   // currentProject, which re-runs this effect) and when the panel dialog closes.

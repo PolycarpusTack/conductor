@@ -1,6 +1,5 @@
 'use client'
 
-import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,34 +19,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ChainBuilder } from '@/components/chain-builder'
-import type { TaskPriority, Project } from '@/types/board'
-import type { ProjectMode, ChainTemplate, StepDraft } from '@/types/settings'
+import type { TaskPriority } from '@/types/board'
+import { useProjectDataCtx, useTaskActions } from '@/app/_views/board-context'
 
-interface ChainDialogProps {
-  chainDialogOpen: boolean
-  setChainDialogOpen: Dispatch<SetStateAction<boolean>>
-  taskTitle: string
-  setTaskTitle: Dispatch<SetStateAction<string>>
-  taskDescription: string
-  setTaskDescription: Dispatch<SetStateAction<string>>
-  taskPriority: TaskPriority
-  setTaskPriority: Dispatch<SetStateAction<TaskPriority>>
-  taskSteps: StepDraft[]
-  setTaskSteps: Dispatch<SetStateAction<StepDraft[]>>
-  handleCreateChain: () => Promise<void>
-  resetTaskForm: () => void
-  currentProject: Project | null
-  projectModes: ProjectMode[]
-  chainTemplates: ChainTemplate[]
-}
-
-export function ChainDialog({
-  chainDialogOpen, setChainDialogOpen,
-  taskTitle, setTaskTitle, taskDescription, setTaskDescription,
-  taskPriority, setTaskPriority, taskSteps, setTaskSteps,
-  handleCreateChain, resetTaskForm,
-  currentProject, projectModes, chainTemplates,
-}: ChainDialogProps) {
+export function ChainDialog() {
+  const { currentProject, projectModes, chainTemplates } = useProjectDataCtx()
+  const {
+    chainDialogOpen, setChainDialogOpen,
+    taskTitle, setTaskTitle, taskDescription, setTaskDescription,
+    taskPriority, setTaskPriority, taskSteps, setTaskSteps,
+    handleCreateChain, resetTaskForm,
+  } = useTaskActions()
   return (
     <Dialog open={chainDialogOpen} onOpenChange={(open) => { setChainDialogOpen(open); if (!open) resetTaskForm() }}>
       <DialogContent className="sm:max-w-[780px] max-h-[90vh] flex flex-col overflow-hidden">

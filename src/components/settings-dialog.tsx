@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -42,53 +41,11 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react'
-import type { Project, TaskStatus, Agent } from '@/types/board'
-import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, TaskTemplate } from '@/types/settings'
-import type { IntegrationTrigger } from '@/components/settings-integrations'
-
-type SettingsTabType = 'general' | 'agents' | 'api' | 'security' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
-
-interface SettingsDialogProps {
-  settingsTab: SettingsTabType
-  setSettingsTab: (tab: SettingsTabType) => void
-  currentProject: Project | null
-  getTasksByStatus: (status: TaskStatus) => { id: string }[]
-  statusColumns: { id: TaskStatus; label: string; color: string }[]
-  projectModes: ProjectMode[]
-  setProjectModes: Dispatch<SetStateAction<ProjectMode[]>>
-  projectRuntimes: ProjectRuntime[]
-  setProjectRuntimes: Dispatch<SetStateAction<ProjectRuntime[]>>
-  projectMcpConnections: ProjectMcpConnection[]
-  setProjectMcpConnections: Dispatch<SetStateAction<ProjectMcpConnection[]>>
-  chainTemplates: ChainTemplate[]
-  setChainTemplates: Dispatch<SetStateAction<ChainTemplate[]>>
-  taskTemplates: TaskTemplate[]
-  setTaskTemplates: Dispatch<SetStateAction<TaskTemplate[]>>
-  triggers: IntegrationTrigger[]
-  setTriggers: Dispatch<SetStateAction<IntegrationTrigger[]>>
-  projectApiKey: string | null
-  projectApiPreview: string | null
-  agentApiKeys: Record<string, string>
-  agentApiPreviews: Record<string, string>
-  loadingApiKeys: boolean
-  rotatingKeyId: string | null
-  legacyKeyStatus: { projectsWithPlaintext: number; agentsWithPlaintext: number; totalWithPlaintext: number } | null
-  migratingLegacyKeys: boolean
-  copiedKey: string | null
-  copyToClipboard: (text: string, key: string) => Promise<void>
-  rotateProjectApiKey: () => Promise<void>
-  rotateAgentApiKey: (agentId: string) => Promise<void>
-  migrateLegacyKeys: () => Promise<void>
-  expandedAgentStats: string | null
-  setExpandedAgentStats: Dispatch<SetStateAction<string | null>>
-  openEditAgentDialog: (agent: Agent) => Promise<void>
-  handleDeleteAgent: (id: string) => Promise<void>
-  resetAgentForm: () => void
-  setAgentDialogOpen: Dispatch<SetStateAction<boolean>>
-  onProjectUpdated: (patch: Partial<Project>) => void
-  onProjectDeleted: () => void
-  onLibraryImported: () => void
-}
+import type { Project } from '@/types/board'
+import type { ProjectMode, ChainTemplate } from '@/types/settings'
+import { useProjectDataCtx, useAgentActions, useUiState } from '@/app/_views/board-context'
+import type { SettingsTabType } from '@/app/_views/board-context'
+import { statusColumns } from '@/app/_views/board-constants'
 
 const ARTIFACT_RETENTION_OPTIONS = [
   { value: 'forever', label: 'Keep forever' },
@@ -330,21 +287,42 @@ function GeneralTab({
   )
 }
 
-export function SettingsDialog({
-  settingsTab, setSettingsTab,
-  currentProject, getTasksByStatus, statusColumns,
-  projectModes, setProjectModes,
-  projectRuntimes, setProjectRuntimes,
-  projectMcpConnections, setProjectMcpConnections,
-  chainTemplates, setChainTemplates, taskTemplates, setTaskTemplates,
-  triggers, setTriggers,
-  projectApiKey, projectApiPreview, agentApiKeys, agentApiPreviews,
-  loadingApiKeys, rotatingKeyId, legacyKeyStatus, migratingLegacyKeys, copiedKey,
-  copyToClipboard, rotateProjectApiKey, rotateAgentApiKey, migrateLegacyKeys,
-  expandedAgentStats, setExpandedAgentStats,
-  openEditAgentDialog, handleDeleteAgent, resetAgentForm, setAgentDialogOpen,
-  onProjectUpdated, onProjectDeleted, onLibraryImported,
-}: SettingsDialogProps) {
+export function SettingsDialog() {
+  const {
+    projects,
+    currentProject, setCurrentProject,
+    getTasksByStatus,
+    projectModes, setProjectModes,
+    projectRuntimes, setProjectRuntimes,
+    projectMcpConnections, setProjectMcpConnections,
+    chainTemplates, setChainTemplates, taskTemplates, setTaskTemplates,
+    triggers, setTriggers,
+    projectApiKey, projectApiPreview, agentApiKeys, agentApiPreviews,
+    loadingApiKeys, rotatingKeyId, legacyKeyStatus, migratingLegacyKeys, copiedKey,
+    copyToClipboard, rotateProjectApiKey, rotateAgentApiKey, migrateLegacyKeys,
+    switchProject,
+  } = useProjectDataCtx()
+  const { openEditAgentDialog, handleDeleteAgent, resetAgentForm, setAgentDialogOpen } = useAgentActions()
+  const { settingsTab, setSettingsTab } = useUiState()
+
+  // Callbacks formerly injected by BoardView — same logic, now sourced from context.
+  const onProjectUpdated = (patch: Partial<Project>) =>
+    setCurrentProject(prev => (prev ? { ...prev, ...patch } : prev))
+
+  const onLibraryImported = () => {
+    if (currentProject) void switchProject(currentProject.id)
+  }
+
+  const onProjectDeleted = () => {
+    setSettingsTab(null)
+    const survivor = projects.find(p => p.id !== currentProject?.id)
+    if (survivor) {
+      switchProject(survivor.id)
+    } else {
+      setCurrentProject(null)
+    }
+  }
+
   const handleDuplicateAgent = async (agentId: string) => {
     try {
       const res = await fetch(`/api/agents/${agentId}/duplicate`, { method: 'POST' })

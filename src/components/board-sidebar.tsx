@@ -1,30 +1,17 @@
 'use client'
 
-import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
 import { ChevronDown, Plus } from 'lucide-react'
 import { APP_VERSION_SHORT } from '@/lib/version'
-import type { Project, ProjectListItem, Agent } from '@/types/board'
+import { useProjectDataCtx, useTaskActions, useAgentActions } from '@/app/_views/board-context'
 
-interface BoardSidebarProps {
-  projects: ProjectListItem[]
-  currentProject: Project | null
-  switchProject: (id: string) => Promise<void>
-  openEditAgentDialog: (agent: Agent) => Promise<void>
-  setEditingAgent: Dispatch<SetStateAction<Agent | null>>
-  setAgentDialogOpen: Dispatch<SetStateAction<boolean>>
-  setWizardOpen: Dispatch<SetStateAction<boolean>>
-  openNewChainDialog: () => void
-}
-
-export function BoardSidebar({
-  projects, currentProject, switchProject,
-  openEditAgentDialog, setEditingAgent, setAgentDialogOpen, setWizardOpen,
-  openNewChainDialog,
-}: BoardSidebarProps) {
+export function BoardSidebar() {
+  const { projects, currentProject, switchProject } = useProjectDataCtx()
+  const { openNewChainDialog } = useTaskActions()
+  const { openEditAgentDialog, setEditingAgent, setAgentDialogOpen, setWizardOpen } = useAgentActions()
   return (
     <aside className="hidden md:block w-56 shrink-0 border-r border-border/15 p-3 min-h-[calc(100vh-3.5rem)]">
       <div className="mb-4 flex items-center gap-1.5">

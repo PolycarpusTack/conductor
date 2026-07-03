@@ -1,6 +1,5 @@
 'use client'
 
-import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -25,140 +24,18 @@ import { TaskDialog } from '@/components/task-dialog'
 import { ChainDialog } from '@/components/chain-dialog'
 import { ProjectDialog } from '@/components/project-dialog'
 import { SettingsDialog } from '@/components/settings-dialog'
-import type { Task, TaskStatus, TaskPriority, TaskStepSummary, Project, Agent, ProjectListItem } from '@/types/board'
-import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, TaskTemplate, StepDraft } from '@/types/settings'
-import type { IntegrationTrigger } from '@/components/settings-integrations'
-import type { LiveAgentLogEntry } from '@/types/live-agent'
+import {
+  useProjectDataCtx,
+  useTaskActions,
+  useAgentActions,
+  useUiState,
+  useLiveAgentLogs,
+} from './board-context'
+import { statusColumns, priorityColors, tagColors, showDemoSeed } from './board-constants'
+import type { TaskStatus } from '@/types/board'
 
-export type ViewType = 'landing' | 'board' | 'runtime' | 'skills' | 'help'
-export type SettingsTabType = 'general' | 'agents' | 'api' | 'security' | 'activity' | 'modes' | 'runtimes' | 'mcp' | 'templates' | 'analytics' | 'automation' | 'integrations' | null
-
-interface BoardViewProps {
-  // Auth
-  authError: string | null
-  handleAdminLogout: () => void
-  // Project data
-  projects: ProjectListItem[]
-  currentProject: Project | null
-  setCurrentProject: Dispatch<SetStateAction<Project | null>>
-  loading: boolean
-  loadError: string | null
-  seedingDemoData: boolean
-  projectModes: ProjectMode[]
-  setProjectModes: Dispatch<SetStateAction<ProjectMode[]>>
-  projectRuntimes: ProjectRuntime[]
-  setProjectRuntimes: Dispatch<SetStateAction<ProjectRuntime[]>>
-  projectMcpConnections: ProjectMcpConnection[]
-  setProjectMcpConnections: Dispatch<SetStateAction<ProjectMcpConnection[]>>
-  chainTemplates: ChainTemplate[]
-  setChainTemplates: Dispatch<SetStateAction<ChainTemplate[]>>
-  taskTemplates: TaskTemplate[]
-  setTaskTemplates: Dispatch<SetStateAction<TaskTemplate[]>>
-  triggers: IntegrationTrigger[]
-  setTriggers: Dispatch<SetStateAction<IntegrationTrigger[]>>
-  settingsSyncedProjectId: string | null
-  projectApiKey: string | null
-  projectApiPreview: string | null
-  agentApiKeys: Record<string, string>
-  agentApiPreviews: Record<string, string>
-  loadingApiKeys: boolean
-  rotatingKeyId: string | null
-  legacyKeyStatus: { projectsWithPlaintext: number; agentsWithPlaintext: number; totalWithPlaintext: number } | null
-  migratingLegacyKeys: boolean
-  copiedKey: string | null
-  projectDialogOpen: boolean
-  setProjectDialogOpen: Dispatch<SetStateAction<boolean>>
-  projectName: string
-  setProjectName: Dispatch<SetStateAction<string>>
-  projectDescription: string
-  setProjectDescription: Dispatch<SetStateAction<string>>
-  projectColor: string
-  setProjectColor: Dispatch<SetStateAction<string>>
-  createStarterAgents: boolean
-  setCreateStarterAgents: Dispatch<SetStateAction<boolean>>
-  fetchProject: (id: string) => Promise<Project | null>
-  initializeBoard: () => Promise<void>
-  switchProject: (id: string) => Promise<void>
-  handleCreateProject: () => Promise<void>
-  handleSeedDemoData: () => Promise<void>
-  resetProjectForm: () => void
-  copyToClipboard: (text: string, key: string) => Promise<void>
-  rotateProjectApiKey: () => Promise<void>
-  rotateAgentApiKey: (agentId: string) => Promise<void>
-  migrateLegacyKeys: () => Promise<void>
-  // Task manager
-  editingTask: Task | null
-  taskDialogOpen: boolean
-  setTaskDialogOpen: Dispatch<SetStateAction<boolean>>
-  chainDialogOpen: boolean
-  setChainDialogOpen: Dispatch<SetStateAction<boolean>>
-  viewingTaskSteps: { id: string; title: string; steps: TaskStepSummary[] } | null
-  setViewingTaskSteps: Dispatch<SetStateAction<{ id: string; title: string; steps: TaskStepSummary[] } | null>>
-  selectedTask: Task | null
-  setSelectedTask: Dispatch<SetStateAction<Task | null>>
-  mobileColumn: TaskStatus
-  setMobileColumn: Dispatch<SetStateAction<TaskStatus>>
-  taskTitle: string
-  setTaskTitle: Dispatch<SetStateAction<string>>
-  taskDescription: string
-  setTaskDescription: Dispatch<SetStateAction<string>>
-  taskStatus: TaskStatus
-  setTaskStatus: Dispatch<SetStateAction<TaskStatus>>
-  taskPriority: TaskPriority
-  setTaskPriority: Dispatch<SetStateAction<TaskPriority>>
-  taskTag: string
-  setTaskTag: Dispatch<SetStateAction<string>>
-  taskAgentId: string
-  setTaskAgentId: Dispatch<SetStateAction<string>>
-  taskNotes: string
-  setTaskNotes: Dispatch<SetStateAction<string>>
-  taskRuntimeOverride: string
-  setTaskRuntimeOverride: Dispatch<SetStateAction<string>>
-  taskSteps: StepDraft[]
-  setTaskSteps: Dispatch<SetStateAction<StepDraft[]>>
-  handleSaveTask: () => Promise<void>
-  handleCreateChain: () => Promise<void>
-  handleDeleteTask: (id: string) => Promise<void>
-  handleDragStart: (task: Task) => void
-  handleDragOver: (e: React.DragEvent) => void
-  handleDrop: (status: TaskStatus) => Promise<void>
-  openEditTaskDialog: (task: Task) => void
-  openNewTaskDialog: (status?: TaskStatus) => void
-  openNewChainDialog: () => void
-  resetTaskForm: () => void
-  // Agent manager
-  editingAgent: Agent | null
-  setEditingAgent: Dispatch<SetStateAction<Agent | null>>
-  agentDialogOpen: boolean
-  setAgentDialogOpen: Dispatch<SetStateAction<boolean>>
-  wizardOpen: boolean
-  setWizardOpen: Dispatch<SetStateAction<boolean>>
-  expandedAgentStats: string | null
-  setExpandedAgentStats: Dispatch<SetStateAction<string | null>>
-  openEditAgentDialog: (agent: Agent) => Promise<void>
-  resetAgentForm: () => void
-  handleDeleteAgent: (id: string) => Promise<void>
-  // WebSocket
-  wsConnected: boolean
-  realtimeConfigured: boolean
-  liveAgentLogs: LiveAgentLogEntry[]
-  notificationVersion: number
-  // Page-level
-  view: ViewType
-  setView: (v: ViewType) => void
-  sidebarOpen: boolean
-  setSidebarOpen: Dispatch<SetStateAction<boolean>>
-  settingsTab: SettingsTabType
-  setSettingsTab: (tab: SettingsTabType) => void
-  currentWorkspaceId: string | null
-  setCurrentWorkspaceId: (id: string | null) => void
-  // Utilities
-  getTasksByStatus: (status: TaskStatus) => Task[]
-  statusColumns: { id: TaskStatus; label: string; color: string }[]
-  priorityColors: Record<TaskPriority, string>
-  tagColors: Record<string, string>
-  showDemoSeed: boolean
-}
+// Re-exported for compatibility; canonical definitions live in board-context.tsx (E-3).
+export type { ViewType, SettingsTabType } from './board-context'
 
 /** Card-shaped placeholder mirroring BoardTaskCard's box (rounded-lg border bg-card p-3). */
 function BoardCardSkeleton() {
@@ -221,75 +98,38 @@ function BoardSkeleton({ columnCount }: { columnCount: number }) {
   )
 }
 
-export function BoardView({
-  authError, handleAdminLogout,
-  projects, currentProject, setCurrentProject, loading, loadError, seedingDemoData,
-  projectModes, setProjectModes, projectRuntimes, setProjectRuntimes,
-  projectMcpConnections, setProjectMcpConnections, chainTemplates, setChainTemplates,
-  taskTemplates, setTaskTemplates,
-  triggers, setTriggers,
-  settingsSyncedProjectId,
-  projectApiKey, projectApiPreview, agentApiKeys, agentApiPreviews,
-  loadingApiKeys, rotatingKeyId, legacyKeyStatus, migratingLegacyKeys, copiedKey,
-  projectDialogOpen, setProjectDialogOpen, projectName, setProjectName,
-  projectDescription, setProjectDescription, projectColor, setProjectColor,
-  createStarterAgents, setCreateStarterAgents,
-  fetchProject, initializeBoard, switchProject, handleCreateProject, handleSeedDemoData, resetProjectForm,
-  copyToClipboard, rotateProjectApiKey, rotateAgentApiKey, migrateLegacyKeys,
-  editingTask, taskDialogOpen, setTaskDialogOpen, chainDialogOpen, setChainDialogOpen,
-  viewingTaskSteps, setViewingTaskSteps, selectedTask, setSelectedTask,
-  mobileColumn, setMobileColumn,
-  taskTitle, setTaskTitle, taskDescription, setTaskDescription,
-  taskStatus, setTaskStatus, taskPriority, setTaskPriority,
-  taskTag, setTaskTag, taskAgentId, setTaskAgentId,
-  taskNotes, setTaskNotes, taskRuntimeOverride, setTaskRuntimeOverride,
-  taskSteps, setTaskSteps,
-  handleSaveTask, handleCreateChain, handleDeleteTask,
-  handleDragStart, handleDragOver, handleDrop,
-  openEditTaskDialog, openNewTaskDialog, openNewChainDialog, resetTaskForm,
-  editingAgent, setEditingAgent, agentDialogOpen, setAgentDialogOpen,
-  wizardOpen, setWizardOpen, expandedAgentStats, setExpandedAgentStats,
-  openEditAgentDialog, resetAgentForm, handleDeleteAgent,
-  wsConnected, realtimeConfigured, liveAgentLogs, notificationVersion,
-  view, setView, sidebarOpen, setSidebarOpen,
-  settingsTab, setSettingsTab, currentWorkspaceId, setCurrentWorkspaceId,
-  getTasksByStatus, statusColumns, priorityColors, tagColors, showDemoSeed,
-}: BoardViewProps) {
+export function BoardView() {
+  const {
+    currentProject, setCurrentProject,
+    loading, loadError, seedingDemoData,
+    projectModes, projectRuntimes, projectMcpConnections,
+    settingsSyncedProjectId,
+    setProjectDialogOpen,
+    fetchProject, initializeBoard, handleSeedDemoData,
+    getTasksByStatus,
+  } = useProjectDataCtx()
+  const {
+    viewingTaskSteps, setViewingTaskSteps,
+    selectedTask, setSelectedTask,
+    mobileColumn, setMobileColumn,
+    handleDeleteTask,
+    handleDragStart, handleDragOver, handleDrop,
+    openEditTaskDialog, openNewTaskDialog,
+  } = useTaskActions()
+  const {
+    editingAgent, setEditingAgent,
+    agentDialogOpen, setAgentDialogOpen,
+    wizardOpen, setWizardOpen,
+  } = useAgentActions()
+  const { view, setView, setSettingsTab, currentWorkspaceId, authError } = useUiState()
+  const liveAgentLogs = useLiveAgentLogs()
+
   return (
     <div className="min-h-screen bg-background dark">
-      <BoardHeader
-        view={view}
-        setView={setView}
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        projects={projects}
-        currentProject={currentProject}
-        switchProject={switchProject}
-        wsConnected={wsConnected}
-        realtimeConfigured={realtimeConfigured}
-        notificationVersion={notificationVersion}
-        onOpenTask={(taskId) => {
-          const t = currentProject?.tasks.find(task => task.id === taskId)
-          if (t) setSelectedTask(t)
-        }}
-        setProjectDialogOpen={setProjectDialogOpen}
-        setSettingsTab={setSettingsTab}
-        handleAdminLogout={handleAdminLogout}
-        currentWorkspaceId={currentWorkspaceId}
-        setCurrentWorkspaceId={setCurrentWorkspaceId}
-      />
+      <BoardHeader />
 
       <main className="pt-14 flex">
-        <BoardSidebar
-          projects={projects}
-          currentProject={currentProject}
-          switchProject={switchProject}
-          openEditAgentDialog={openEditAgentDialog}
-          setEditingAgent={setEditingAgent}
-          setAgentDialogOpen={setAgentDialogOpen}
-          setWizardOpen={setWizardOpen}
-          openNewChainDialog={openNewChainDialog}
-        />
+        <BoardSidebar />
 
         {/* Board canvas */}
         <div className="flex-1 overflow-hidden">
@@ -488,98 +328,13 @@ export function BoardView({
         </div>
       </main>
 
-      <TaskDialog
-        taskDialogOpen={taskDialogOpen}
-        setTaskDialogOpen={setTaskDialogOpen}
-        editingTask={editingTask}
-        taskTitle={taskTitle} setTaskTitle={setTaskTitle}
-        taskDescription={taskDescription} setTaskDescription={setTaskDescription}
-        taskStatus={taskStatus} setTaskStatus={setTaskStatus}
-        taskPriority={taskPriority} setTaskPriority={setTaskPriority}
-        taskTag={taskTag} setTaskTag={setTaskTag}
-        taskAgentId={taskAgentId} setTaskAgentId={setTaskAgentId}
-        taskNotes={taskNotes} setTaskNotes={setTaskNotes}
-        taskRuntimeOverride={taskRuntimeOverride} setTaskRuntimeOverride={setTaskRuntimeOverride}
-        taskSteps={taskSteps} setTaskSteps={setTaskSteps}
-        handleSaveTask={handleSaveTask}
-        resetTaskForm={resetTaskForm}
-        currentProject={currentProject}
-        projectModes={projectModes}
-        chainTemplates={chainTemplates}
-        taskTemplates={taskTemplates}
-        statusColumns={statusColumns}
-      />
+      <TaskDialog />
 
-      <ChainDialog
-        chainDialogOpen={chainDialogOpen}
-        setChainDialogOpen={setChainDialogOpen}
-        taskTitle={taskTitle} setTaskTitle={setTaskTitle}
-        taskDescription={taskDescription} setTaskDescription={setTaskDescription}
-        taskPriority={taskPriority} setTaskPriority={setTaskPriority}
-        taskSteps={taskSteps} setTaskSteps={setTaskSteps}
-        handleCreateChain={handleCreateChain}
-        resetTaskForm={resetTaskForm}
-        currentProject={currentProject}
-        projectModes={projectModes}
-        chainTemplates={chainTemplates}
-      />
+      <ChainDialog />
 
-      <ProjectDialog
-        projectDialogOpen={projectDialogOpen}
-        setProjectDialogOpen={setProjectDialogOpen}
-        projectName={projectName} setProjectName={setProjectName}
-        projectDescription={projectDescription} setProjectDescription={setProjectDescription}
-        projectColor={projectColor} setProjectColor={setProjectColor}
-        createStarterAgents={createStarterAgents} setCreateStarterAgents={setCreateStarterAgents}
-        handleCreateProject={handleCreateProject}
-        resetProjectForm={resetProjectForm}
-      />
+      <ProjectDialog />
 
-      <SettingsDialog
-        settingsTab={settingsTab}
-        setSettingsTab={setSettingsTab}
-        currentProject={currentProject}
-        getTasksByStatus={getTasksByStatus}
-        statusColumns={statusColumns}
-        projectModes={projectModes} setProjectModes={setProjectModes}
-        projectRuntimes={projectRuntimes} setProjectRuntimes={setProjectRuntimes}
-        projectMcpConnections={projectMcpConnections} setProjectMcpConnections={setProjectMcpConnections}
-        chainTemplates={chainTemplates} setChainTemplates={setChainTemplates}
-        taskTemplates={taskTemplates} setTaskTemplates={setTaskTemplates}
-        triggers={triggers} setTriggers={setTriggers}
-        projectApiKey={projectApiKey}
-        projectApiPreview={projectApiPreview}
-        agentApiKeys={agentApiKeys}
-        agentApiPreviews={agentApiPreviews}
-        loadingApiKeys={loadingApiKeys}
-        rotatingKeyId={rotatingKeyId}
-        legacyKeyStatus={legacyKeyStatus}
-        migratingLegacyKeys={migratingLegacyKeys}
-        copiedKey={copiedKey}
-        copyToClipboard={copyToClipboard}
-        rotateProjectApiKey={rotateProjectApiKey}
-        rotateAgentApiKey={rotateAgentApiKey}
-        migrateLegacyKeys={migrateLegacyKeys}
-        expandedAgentStats={expandedAgentStats}
-        setExpandedAgentStats={setExpandedAgentStats}
-        openEditAgentDialog={openEditAgentDialog}
-        handleDeleteAgent={handleDeleteAgent}
-        resetAgentForm={resetAgentForm}
-        setAgentDialogOpen={setAgentDialogOpen}
-        onProjectUpdated={(patch) =>
-          setCurrentProject(prev => (prev ? { ...prev, ...patch } : prev))
-        }
-        onLibraryImported={() => { if (currentProject) void switchProject(currentProject.id) }}
-        onProjectDeleted={() => {
-          setSettingsTab(null)
-          const survivor = projects.find(p => p.id !== currentProject?.id)
-          if (survivor) {
-            switchProject(survivor.id)
-          } else {
-            setCurrentProject(null)
-          }
-        }}
-      />
+      <SettingsDialog />
 
       <AgentCreationModal
         open={agentDialogOpen}

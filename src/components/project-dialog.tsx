@@ -1,6 +1,5 @@
 'use client'
 
-import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,29 +13,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-interface ProjectDialogProps {
-  projectDialogOpen: boolean
-  setProjectDialogOpen: Dispatch<SetStateAction<boolean>>
-  projectName: string
-  setProjectName: Dispatch<SetStateAction<string>>
-  projectDescription: string
-  setProjectDescription: Dispatch<SetStateAction<string>>
-  projectColor: string
-  setProjectColor: Dispatch<SetStateAction<string>>
-  createStarterAgents: boolean
-  setCreateStarterAgents: Dispatch<SetStateAction<boolean>>
-  handleCreateProject: () => Promise<void>
-  resetProjectForm: () => void
-}
+import { useProjectDataCtx } from '@/app/_views/board-context'
 
-export function ProjectDialog({
-  projectDialogOpen, setProjectDialogOpen,
-  projectName, setProjectName,
-  projectDescription, setProjectDescription,
-  projectColor, setProjectColor,
-  createStarterAgents, setCreateStarterAgents,
-  handleCreateProject, resetProjectForm,
-}: ProjectDialogProps) {
+export function ProjectDialog() {
+  const {
+    projectDialogOpen, setProjectDialogOpen,
+    projectName, setProjectName,
+    projectDescription, setProjectDescription,
+    projectColor, setProjectColor,
+    createStarterAgents, setCreateStarterAgents,
+    handleCreateProject, resetProjectForm,
+  } = useProjectDataCtx()
   return (
     <Dialog
       open={projectDialogOpen}
