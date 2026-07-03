@@ -14,6 +14,10 @@ import { z } from 'zod'
  *   UI surfaces as "not configured"
  * - AGENTBOARD_ADMIN_SESSION_SECRET falls back to the admin password when
  *   unset (see admin-session.ts), but when present it must not be trivially short
+ * - AGENTBOARD_WS_SECRET / AGENTBOARD_WS_INTERNAL_SECRET are required in
+ *   production: realtime.ts silently no-ops token minting and broadcasts
+ *   when they're unset, so the board just stops updating with no error.
+ *   In development they stay optional (realtime is an opt-in feature there).
  */
 const serverEnvSchema = z
   .object({
@@ -32,6 +36,24 @@ const serverEnvSchema = z
         code: 'custom',
         path: ['AGENTBOARD_ADMIN_PASSWORD'],
         message: 'AGENTBOARD_ADMIN_PASSWORD is required in production',
+      })
+    }
+    // Without AGENTBOARD_WS_SECRET, realtime.ts cannot mint or verify client
+    // tokens; without AGENTBOARD_WS_INTERNAL_SECRET, broadcastProjectEvent
+    // silently returns and the board never receives live updates. Fail fast
+    // at boot instead of shipping a silently-frozen board.
+    if (env.NODE_ENV === 'production' && !env.AGENTBOARD_WS_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AGENTBOARD_WS_SECRET'],
+        message: 'AGENTBOARD_WS_SECRET is required in production',
+      })
+    }
+    if (env.NODE_ENV === 'production' && !env.AGENTBOARD_WS_INTERNAL_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AGENTBOARD_WS_INTERNAL_SECRET'],
+        message: 'AGENTBOARD_WS_INTERNAL_SECRET is required in production',
       })
     }
   })

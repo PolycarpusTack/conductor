@@ -8,17 +8,16 @@ interface DaemonMatch {
   workspaceId: string
 }
 
+// SECURITY: daemon selection is always workspace-scoped. Steps carry agent
+// prompts and task context; matching "any online daemon" would lease that
+// data to a host in an unrelated workspace. Callers must resolve a concrete
+// workspaceId first — there is deliberately no any-workspace fallback.
 export async function findAvailableDaemon(
   runtime: string,
-  workspaceId?: string,
+  workspaceId: string,
 ): Promise<DaemonMatch | null> {
-  const where: Record<string, unknown> = { status: 'online' }
-  if (workspaceId) {
-    where.workspaceId = workspaceId
-  }
-
   const daemons = await db.daemon.findMany({
-    where,
+    where: { status: 'online', workspaceId },
     select: {
       id: true,
       hostname: true,
@@ -66,6 +65,13 @@ export async function dispatchTaskToDaemon(opts: {
   workspaceId?: string
 }): Promise<{ dispatched: boolean; daemonId?: string; error?: string }> {
   const { taskId, stepId, agentId, projectId, runtime, workspaceId } = opts
+
+  if (!workspaceId) {
+    return {
+      dispatched: false,
+      error: 'Project has no workspace assigned; daemon dispatch requires a workspace',
+    }
+  }
 
   const daemon = await findAvailableDaemon(runtime, workspaceId)
 
@@ -147,12 +153,31 @@ export async function dispatchStepToDaemon(
   }
   const previousLeaseholder = step.leasedBy ?? null
 
+  // SECURITY: a workspace-less project must never lease to an arbitrary
+  // daemon — the step payload (prompts, context) would leave the project's
+  // trust boundary. Fail the attempt with a durable activity-log entry so
+  // the operator sees why the step is stuck and assigns a workspace.
+  const workspaceId = step.task.project.workspaceId
+  if (!workspaceId) {
+    const error =
+      'Project has no workspace assigned; assign a workspace before daemon dispatch'
+    await db.activityLog.create({
+      data: {
+        action: 'daemon_dispatch_failed',
+        taskId: step.taskId,
+        agentId: step.agentId,
+        projectId: step.task.projectId,
+        details: JSON.stringify({ stepId, reason: 'missing_workspace', error }),
+      },
+    })
+    return { dispatched: false, error }
+  }
+
   const runtime = await resolveRuntime(step.taskId, step.agent?.runtime?.adapter)
   if (!runtime) {
     return { dispatched: false, error: 'Could not resolve runtime for step' }
   }
 
-  const workspaceId = step.task.project.workspaceId ?? undefined
   const daemon = await findAvailableDaemon(runtime, workspaceId)
   if (!daemon) {
     return { dispatched: false, error: `No online daemon with ${runtime} capability` }

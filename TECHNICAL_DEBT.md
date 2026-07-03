@@ -31,6 +31,12 @@
 | TD-009 | Composing step (step 2) is a placeholder — wired in Epic 4 | agent-wizard-modal.tsx | High | Implement compose API call in Epic 4 |
 | TD-010 | Runtimes API returned bare array not wrapped object — wizard adapted with Array.isArray guard | agent-wizard-modal.tsx | Low | Standardize API response shape in API review |
 
+## GPM Plan — EPIC B (2026-07-03)
+
+| ID | Description | File | Severity | Resolution |
+|----|-------------|------|----------|------------|
+| TD-015 | Workspace-less step retries every poll tick and writes one `daemon_dispatch_failed` activity entry per tick — no dedupe in daemon-dispatch | src/lib/server/daemon-dispatch.ts | Low | Dedupe or park the step after N identical failures; revisit in B-3/F-5 |
+
 ## Epic 4 — Wizard LLM Composition (2026-04-29)
 
 | ID | Description | File | Severity | Resolution |

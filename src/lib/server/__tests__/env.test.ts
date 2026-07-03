@@ -22,6 +22,8 @@ describe('validateEnv', () => {
     const env = validateEnv({
       NODE_ENV: 'production',
       AGENTBOARD_ADMIN_PASSWORD: 'long-enough-password',
+      AGENTBOARD_WS_SECRET: 'a-ws-secret-16-chars-long',
+      AGENTBOARD_WS_INTERNAL_SECRET: 'an-internal-secret-16-chars',
     })
     expect(env.AGENTBOARD_ADMIN_PASSWORD).toBe('long-enough-password')
   })
@@ -30,8 +32,45 @@ describe('validateEnv', () => {
     const env = validateEnv({
       NODE_ENV: 'production',
       ADMIN_PASSWORD: 'long-enough-password',
+      AGENTBOARD_WS_SECRET: 'a-ws-secret-16-chars-long',
+      AGENTBOARD_WS_INTERNAL_SECRET: 'an-internal-secret-16-chars',
     })
     expect(env.AGENTBOARD_ADMIN_PASSWORD).toBe('long-enough-password')
+  })
+
+  test('throws in production when AGENTBOARD_WS_SECRET is missing', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        AGENTBOARD_ADMIN_PASSWORD: 'long-enough-password',
+        AGENTBOARD_WS_INTERNAL_SECRET: 'an-internal-secret-16-chars',
+      }),
+    ).toThrow(/AGENTBOARD_WS_SECRET is required in production/)
+  })
+
+  test('throws in production when AGENTBOARD_WS_INTERNAL_SECRET is missing', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        AGENTBOARD_ADMIN_PASSWORD: 'long-enough-password',
+        AGENTBOARD_WS_SECRET: 'a-ws-secret-16-chars-long',
+      }),
+    ).toThrow(/AGENTBOARD_WS_INTERNAL_SECRET is required in production/)
+  })
+
+  test('reports both missing WS secrets at once in production', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        AGENTBOARD_ADMIN_PASSWORD: 'long-enough-password',
+      }),
+    ).toThrow(/AGENTBOARD_WS_SECRET is required in production[\s\S]*AGENTBOARD_WS_INTERNAL_SECRET is required in production/)
+  })
+
+  test('WS secrets stay optional in development', () => {
+    const env = validateEnv({ NODE_ENV: 'development' })
+    expect(env.AGENTBOARD_WS_SECRET).toBeUndefined()
+    expect(env.AGENTBOARD_WS_INTERNAL_SECRET).toBeUndefined()
   })
 
   test('throws for a too-short admin password', () => {
