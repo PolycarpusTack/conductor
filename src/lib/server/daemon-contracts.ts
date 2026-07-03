@@ -22,7 +22,9 @@ export const registerDaemonSchema = z.object({
   hostname: z.string().trim().min(1).max(255),
   platform: z.enum(['darwin', 'linux', 'win32']),
   version: z.string().trim().min(1).max(60),
-  capabilities: z.record(
+  // partialRecord: a daemon registers with the capabilities it has (usually one);
+  // z.record over an enum key requires every key in zod v4
+  capabilities: z.partialRecord(
     z.enum(['claude-code', 'codex', 'copilot']),
     daemonCapabilitySchema,
   ),

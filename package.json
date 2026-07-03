@@ -12,6 +12,7 @@
     "type-check": "tsc --noEmit --incremental false",
     "doctor": "bun scripts/doctor.ts",
     "smoke-test": "bun scripts/doctor.ts --smoke",
+    "smoke:daemon": "bun scripts/doctor.ts --daemon-e2e",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
