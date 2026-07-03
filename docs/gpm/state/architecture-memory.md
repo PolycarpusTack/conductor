@@ -21,7 +21,7 @@ None recorded. (Finding: ADR coverage ABSENT — decisions like SQLite/PG dualit
 ## Domain Glossary (initial, extracted from code)
 
 - **Project**: tenant-like container for tasks, agents, chains; optional workspace
-- **Task**: kanban card (BACKLOG/IN_PROGRESS/WAITING/REVIEW/DONE); may carry workflow steps
+- **Task**: kanban card (BACKLOG/IN_PROGRESS/WAITING/REVIEW/DONE); may carry workflow steps; dueDate + overdue reminders (D-2); soft-delete/archive; bulk ops via /api/tasks/batch (D-3); board filter by text/agent/priority/tag/overdue (D-1)
 - **TaskStep**: one node of a task's chain DAG; leased, retried, dead-lettered
 - **Chain**: ordered/DAG sequence of TaskSteps across agents; advanceChain/rewindChain
 - **Agent**: a configured AI worker (system prompt, runtime, invocationMode HTTP|DAEMON|human)
