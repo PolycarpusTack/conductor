@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { fireProjectEvent as broadcastProjectEvent } from '@/lib/server/project-event'
+import { notifyBudgetExceeded } from '@/lib/server/notifications'
 import { getLogger } from '@/lib/server/logger'
 
 const log = getLogger('budget')
@@ -80,6 +81,9 @@ export async function filterBudgetPausedProjects(projectIds: string[]): Promise<
             },
           })
           broadcastProjectEvent(project.id, 'budget-exceeded', { budgetUsd, spentUsd })
+          // C-4: one notification per pause episode — the same dedupe as the
+          // budget_exceeded activity above (never throws).
+          await notifyBudgetExceeded({ projectId: project.id, budgetUsd, spentUsd })
         }
       } else if (alreadyPaused) {
         log.info(`project ${project.id} resumed: month-to-date spend $${spentUsd} < budget $${budgetUsd}`)

@@ -10,6 +10,7 @@ import { resolveNextSteps, type StepEdge } from '@/lib/server/condition-evaluato
 import { findPreviousAgentStep, normalizeDagEdges, hasDagEdges } from '@/lib/server/dag-edges'
 import { getLogger } from '@/lib/server/logger'
 import { appendStepEvent, computeBackoffMs, moveToDeadLetter } from '@/lib/server/step-events'
+import { notifyDeadLetter, notifyReviewGateWaiting } from '@/lib/server/notifications'
 import { LEASE_TIMEOUT_MS } from '@/lib/server/step-queue'
 import { dispatchWithTelemetry } from '@/lib/server/telemetry'
 import { safeJsonParse } from '@/lib/server/utils'
@@ -591,6 +592,15 @@ async function executeDispatch(stepId: string, prepared: PreparedDispatch) {
           exhaustedRetries: true,
         })
 
+        // C-4: a dead-lettered step needs a human — notify (never throws).
+        await notifyDeadLetter({
+          projectId: step.task.projectId,
+          taskId: step.taskId,
+          taskTitle: step.task.title,
+          stepId,
+          error: message,
+        })
+
         // Use resolveTaskStatus instead of hardcoding WAITING — other parallel
         // branches may still be active and the task should stay IN_PROGRESS.
         await resolveTaskStatus(step.taskId, step.task.projectId)
@@ -772,6 +782,11 @@ async function activateStep(
     fromStepId,
     toStepId: step.id,
   })
+
+  // C-4: an activated human gate is now waiting for sign-off — notify (never throws).
+  if (step.mode === 'human') {
+    await notifyReviewGateWaiting({ projectId, taskId, stepId: step.id, humanLabel: step.humanLabel })
+  }
 
   // Don't set task status here — let the caller resolve it after all activations
 }
@@ -999,6 +1014,11 @@ export async function startChain(taskId: string, projectId: string) {
       taskId,
       stepId: rootStep.id,
     })
+
+    // C-4: a chain can start ON a human gate — notify (never throws).
+    if (rootStep.mode === 'human') {
+      await notifyReviewGateWaiting({ projectId, taskId, stepId: rootStep.id, humanLabel: rootStep.humanLabel })
+    }
   }
 
   // Resolve task status after all root activations

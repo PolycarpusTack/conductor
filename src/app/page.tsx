@@ -140,7 +140,7 @@ export default function Home() {
     handleDeleteAgent,
   } = useAgentManager({ setCurrentProject })
 
-  const { wsConnected, realtimeConfigured, liveAgentLogs } = useWebSocket({
+  const { wsConnected, realtimeConfigured, liveAgentLogs, notificationVersion } = useWebSocket({
     currentProject,
     isAdminAuthenticated,
     view,
@@ -329,6 +329,7 @@ export default function Home() {
       wsConnected={wsConnected}
       realtimeConfigured={realtimeConfigured}
       liveAgentLogs={liveAgentLogs}
+      notificationVersion={notificationVersion}
       view={view}
       setView={setView}
       sidebarOpen={sidebarOpen}

@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer'
+import { createSmtpTransport } from '@/lib/server/email-transport'
 
 export async function executeEmailReaction(config: Record<string, unknown>): Promise<{ sent: true }> {
   const host = process.env[config.smtpHostEnvVar as string]
@@ -8,12 +8,7 @@ export async function executeEmailReaction(config: Record<string, unknown>): Pro
   const user = process.env[config.smtpUserEnvVar as string]
   const pass = process.env[config.smtpPassEnvVar as string]
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: user && pass ? { user, pass } : undefined,
-  })
+  const transporter = createSmtpTransport({ host, port, user, pass })
 
   await transporter.sendMail({
     from:    config.from as string,

@@ -693,6 +693,24 @@ model Reaction {
   @@index([triggerId, order])
 }
 
+// C-4 notification center: an event that needs a human (review gate waiting
+// for sign-off, dead-lettered step, budget exceeded). Deliberately
+// relation-free (like DeadLetterStep) so rows survive project/task deletion;
+// projectId is nullable to allow future instance-wide notices.
+model Notification {
+  id        String    @id @default(cuid())
+  projectId String?
+  type      String // review_gate_waiting | dead_letter | budget_exceeded
+  title     String
+  body      String?
+  taskId    String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([readAt, createdAt])
+  @@index([projectId])
+}
+
 // Scoped API keys for external integrations (CI, scripts, webhooks).
 // The raw key is shown once at issue time; only prefix + SHA-256 hash are stored.
 model ApiKey {

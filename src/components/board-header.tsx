@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { WorkspaceSwitcher } from '@/components/workspace-switcher'
 import { DeadLetterPanel } from '@/components/dead-letter-panel'
+import { NotificationCenter } from '@/components/notification-center'
 import {
   Menu,
   Settings,
@@ -61,6 +62,8 @@ interface BoardHeaderProps {
   handleAdminLogout: () => void
   currentWorkspaceId: string | null
   setCurrentWorkspaceId: (id: string | null) => void
+  notificationVersion?: number
+  onOpenTask?: (taskId: string) => void
 }
 
 export function BoardHeader({
@@ -70,6 +73,7 @@ export function BoardHeader({
   wsConnected, realtimeConfigured,
   setProjectDialogOpen, setSettingsTab, handleAdminLogout,
   currentWorkspaceId, setCurrentWorkspaceId,
+  notificationVersion, onOpenTask,
 }: BoardHeaderProps) {
   // C-5: dead-letter count chip. No polling — refreshed whenever the project
   // payload is refetched (the WS step-failed/chain-* handlers replace
@@ -175,6 +179,14 @@ export function BoardHeader({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* C-4: notification bell — review gates, dead letters, budget pauses */}
+            {currentProject && (
+              <NotificationCenter
+                projectId={currentProject.id}
+                refreshSignal={notificationVersion}
+                onTaskClick={onOpenTask}
+              />
+            )}
             {projects.length > 1 && (
               <Select value={currentProject?.id} onValueChange={switchProject}>
                 <SelectTrigger className="w-[160px] h-8 text-xs">

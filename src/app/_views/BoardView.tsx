@@ -142,6 +142,7 @@ interface BoardViewProps {
   wsConnected: boolean
   realtimeConfigured: boolean
   liveAgentLogs: LiveAgentLogEntry[]
+  notificationVersion: number
   // Page-level
   view: ViewType
   setView: (v: ViewType) => void
@@ -249,7 +250,7 @@ export function BoardView({
   editingAgent, setEditingAgent, agentDialogOpen, setAgentDialogOpen,
   wizardOpen, setWizardOpen, expandedAgentStats, setExpandedAgentStats,
   openEditAgentDialog, resetAgentForm, handleDeleteAgent,
-  wsConnected, realtimeConfigured, liveAgentLogs,
+  wsConnected, realtimeConfigured, liveAgentLogs, notificationVersion,
   view, setView, sidebarOpen, setSidebarOpen,
   settingsTab, setSettingsTab, currentWorkspaceId, setCurrentWorkspaceId,
   getTasksByStatus, statusColumns, priorityColors, tagColors, showDemoSeed,
@@ -266,6 +267,11 @@ export function BoardView({
         switchProject={switchProject}
         wsConnected={wsConnected}
         realtimeConfigured={realtimeConfigured}
+        notificationVersion={notificationVersion}
+        onOpenTask={(taskId) => {
+          const t = currentProject?.tasks.find(task => task.id === taskId)
+          if (t) setSelectedTask(t)
+        }}
         setProjectDialogOpen={setProjectDialogOpen}
         setSettingsTab={setSettingsTab}
         handleAdminLogout={handleAdminLogout}

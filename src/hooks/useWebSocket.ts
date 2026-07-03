@@ -30,6 +30,8 @@ export function useWebSocket({
   const [wsConnected, setWsConnected] = useState(false)
   const [realtimeConfigured, setRealtimeConfigured] = useState(true)
   const [liveAgentLogs, setLiveAgentLogs] = useState<LiveAgentLogEntry[]>([])
+  // C-4: bumped on every 'notification-created' broadcast so the bell refetches
+  const [notificationVersion, setNotificationVersion] = useState(0)
 
   useEffect(() => {
     if (view !== 'board' || !currentProject || !isAdminAuthenticated) return
@@ -135,6 +137,10 @@ export function useWebSocket({
         activeSocket.on('chain-completed', refetchCurrentProject)
         activeSocket.on('chain-rewound', refetchCurrentProject)
 
+        activeSocket.on('notification-created', () => {
+          if (!isCancelled) setNotificationVersion(v => v + 1)
+        })
+
         activeSocket.on('reaction-failed', (data: { taskId: string; reactionName: string; error: string }) => {
           toast({
             title: `Reaction failed: ${data.reactionName}`,
@@ -157,5 +163,5 @@ export function useWebSocket({
     }
   }, [currentProject?.id, isAdminAuthenticated, view, fetchProject, setCurrentProject, setActivities, toast])
 
-  return { wsConnected, realtimeConfigured, liveAgentLogs, socketRef }
+  return { wsConnected, realtimeConfigured, liveAgentLogs, notificationVersion, socketRef }
 }
