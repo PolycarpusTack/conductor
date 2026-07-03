@@ -221,13 +221,26 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
       return
     }
 
+    // Optimistic move: snapshot the dragged task, apply the status locally, roll back on failure.
+    const movedTask = draggedTask
+    setDraggedTask(null)
+    setCurrentProject(prev => prev ? {
+      ...prev,
+      tasks: prev.tasks.map(t => t.id === movedTask.id ? { ...t, status } : t),
+    } : null)
+    const rollback = () => setCurrentProject(prev => prev ? {
+      ...prev,
+      tasks: prev.tasks.map(t => t.id === movedTask.id ? movedTask : t),
+    } : null)
+
     try {
-      const res = await fetch(`/api/tasks/${draggedTask.id}`, {
+      const res = await fetch(`/api/tasks/${movedTask.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
       if (!res.ok) {
+        rollback()
         toast({ title: await readApiError(res, 'Failed to update task status'), variant: 'destructive' })
         return
       }
@@ -238,9 +251,8 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
       } : null)
     } catch (error) {
       console.error('Error updating task status:', error)
+      rollback()
       toast({ title: 'Failed to update task status', variant: 'destructive' })
-    } finally {
-      setDraggedTask(null)
     }
   }, [draggedTask, setCurrentProject, readApiError, toast])
 

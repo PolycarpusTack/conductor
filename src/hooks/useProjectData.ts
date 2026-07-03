@@ -13,6 +13,7 @@ export function useProjectData() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [seedingDemoData, setSeedingDemoData] = useState(false)
 
   // Project settings
@@ -63,26 +64,37 @@ export function useProjectData() {
   const fetchProjects = useCallback(async () => {
     try {
       const res = await fetch('/api/projects')
-      if (!res.ok) return []
+      if (!res.ok) {
+        setLoadError(await readApiError(res, 'Failed to load projects'))
+        return []
+      }
       const data: ProjectListItem[] = await res.json()
       setProjects(data)
+      setLoadError(null)
       return data
     } catch (error) {
       console.error('Error fetching projects:', error)
+      setLoadError('Failed to load projects. Check your connection and try again.')
       return []
     }
-  }, [])
+  }, [readApiError])
 
   const fetchProject = useCallback(async (projectId: string) => {
     try {
       const res = await fetch(`/api/projects/${projectId}`)
-      if (!res.ok) return null
-      return await res.json() as Project
+      if (!res.ok) {
+        setLoadError(await readApiError(res, 'Failed to load project'))
+        return null
+      }
+      const project = await res.json() as Project
+      setLoadError(null)
+      return project
     } catch (error) {
       console.error('Error fetching project:', error)
+      setLoadError('Failed to load project. Check your connection and try again.')
       return null
     }
-  }, [])
+  }, [readApiError])
 
   const fetchActivities = useCallback(async (projectId: string) => {
     const actRes = await fetch(`/api/activity?projectId=${projectId}&limit=20`)
@@ -140,11 +152,14 @@ export function useProjectData() {
 
   const switchProject = useCallback(async (projectId: string) => {
     const project = await fetchProject(projectId)
-    if (!project) return
+    if (!project) {
+      toast({ title: 'Failed to switch project', description: 'The project could not be loaded. Try again.', variant: 'destructive' })
+      return
+    }
     setCurrentProject(project)
     await fetchActivities(project.id)
     await fetchProjectSettings(project.id)
-  }, [fetchProject, fetchActivities, fetchProjectSettings])
+  }, [fetchProject, fetchActivities, fetchProjectSettings, toast])
 
   const resetProjectForm = useCallback(() => {
     setProjectName('')
@@ -325,6 +340,7 @@ export function useProjectData() {
     activities,
     setActivities,
     loading,
+    loadError,
     seedingDemoData,
 
     // Project settings

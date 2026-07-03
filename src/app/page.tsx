@@ -65,6 +65,7 @@ export default function Home() {
     currentProject, setCurrentProject,
     setActivities,
     loading,
+    loadError,
     seedingDemoData,
     projectModes, setProjectModes,
     projectRuntimes, setProjectRuntimes,
@@ -230,6 +231,7 @@ export default function Home() {
       currentProject={currentProject}
       setCurrentProject={setCurrentProject}
       loading={loading}
+      loadError={loadError}
       seedingDemoData={seedingDemoData}
       projectModes={projectModes}
       setProjectModes={setProjectModes}
@@ -263,6 +265,7 @@ export default function Home() {
       createStarterAgents={createStarterAgents}
       setCreateStarterAgents={setCreateStarterAgents}
       fetchProject={fetchProject}
+      initializeBoard={initializeBoard}
       switchProject={switchProject}
       handleCreateProject={handleCreateProject}
       handleSeedDemoData={handleSeedDemoData}

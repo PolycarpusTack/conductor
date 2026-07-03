@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Markdown } from '@/components/ui/markdown'
 import {
   X, Pencil, CheckCircle, RotateCcw,
   ChevronDown, ChevronUp,
@@ -74,8 +76,11 @@ const STEP_STATUS_CONFIG: Record<string, { color: string; label: string }> = {
 }
 
 export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh }: TaskDetailDrawerProps) {
+  const { toast } = useToast()
   const [fullSteps, setFullSteps] = useState<TaskStep[]>(task.steps || [])
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
+  const [stepsError, setStepsError] = useState<string | null>(null)
+  const [stepsFetchNonce, setStepsFetchNonce] = useState(0)
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null)
   const [rejectionNote, setRejectionNote] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
@@ -86,23 +91,28 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
     const fetchSteps = async () => {
       try {
         const res = await fetch(`/api/tasks/${task.id}/steps`, { cache: 'no-store', signal: abortController.signal })
-        if (res.ok && !abortController.signal.aborted) {
-          const data = await res.json()
-          setFullSteps(data)
-          const autoExpand = new Set<string>()
-          data.forEach((s: TaskStep) => {
-            if (s.status === 'active' || s.status === 'failed') autoExpand.add(s.id)
-          })
-          setExpandedSteps(autoExpand)
+        if (abortController.signal.aborted) return
+        if (!res.ok) {
+          setStepsError(`Couldn't load step details (${res.status})`)
+          return
         }
+        const data = await res.json()
+        setStepsError(null)
+        setFullSteps(data)
+        const autoExpand = new Set<string>()
+        data.forEach((s: TaskStep) => {
+          if (s.status === 'active' || s.status === 'failed') autoExpand.add(s.id)
+        })
+        setExpandedSteps(autoExpand)
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Error fetching steps:', err)
+        setStepsError("Couldn't load step details. Check your connection.")
       }
     }
     fetchSteps()
     return () => abortController.abort()
-  }, [task.id, task.steps])
+  }, [task.id, task.steps, stepsFetchNonce])
 
   const toggleStep = (stepId: string) => {
     setExpandedSteps(prev => {
@@ -132,6 +142,11 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
       onRefresh()
     } catch (err) {
       console.error('Step action error:', err)
+      toast({
+        title: 'Step action failed',
+        description: err instanceof Error ? err.message : 'Unexpected error — try again.',
+        variant: 'destructive',
+      })
     } finally {
       setActionLoading(false)
     }
@@ -180,7 +195,7 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
           {task.description && (
             <div>
               <div className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Description</div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{task.description}</p>
+              <Markdown>{task.description}</Markdown>
             </div>
           )}
 
@@ -188,7 +203,7 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
           {task.notes && (
             <div>
               <div className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Notes</div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{task.notes}</p>
+              <Markdown>{task.notes}</Markdown>
             </div>
           )}
 
@@ -196,8 +211,8 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
           {task.output && (!task.steps || task.steps.length === 0) && (
             <div>
               <div className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Output</div>
-              <div className="text-sm text-muted-foreground whitespace-pre-wrap rounded-md border border-border/20 bg-card/30 p-3">
-                {task.output}
+              <div className="rounded-md border border-border/20 bg-card/30 p-3">
+                <Markdown>{task.output}</Markdown>
               </div>
             </div>
           )}
@@ -213,6 +228,20 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
                   {doneCount}/{fullSteps.length} steps
                 </div>
               </div>
+
+              {stepsError && (
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+                  <span className="text-xs text-destructive">{stepsError}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 flex-shrink-0 text-xs border-destructive/30 text-destructive"
+                    onClick={() => setStepsFetchNonce(n => n + 1)}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" /> Retry
+                  </Button>
+                </div>
+              )}
 
               {/* Progress bar */}
               <div className="h-1.5 rounded-full bg-muted/30 mb-4 overflow-hidden">
@@ -292,8 +321,8 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
                           {step.output && (
                             <div className="rounded-md border border-border/20 bg-card/30 p-3">
                               <div className="text-[10px] font-mono font-semibold text-muted-foreground mb-1">OUTPUT</div>
-                              <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto">
-                                {step.output}
+                              <div className="max-h-[300px] overflow-y-auto">
+                                <Markdown className="text-xs">{step.output}</Markdown>
                               </div>
                             </div>
                           )}

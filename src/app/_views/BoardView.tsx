@@ -4,6 +4,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
+  AlertTriangle,
   FolderPlus,
   Plus,
   RefreshCw,
@@ -40,6 +41,7 @@ interface BoardViewProps {
   currentProject: Project | null
   setCurrentProject: Dispatch<SetStateAction<Project | null>>
   loading: boolean
+  loadError: string | null
   seedingDemoData: boolean
   projectModes: ProjectMode[]
   setProjectModes: Dispatch<SetStateAction<ProjectMode[]>>
@@ -73,6 +75,7 @@ interface BoardViewProps {
   createStarterAgents: boolean
   setCreateStarterAgents: Dispatch<SetStateAction<boolean>>
   fetchProject: (id: string) => Promise<Project | null>
+  initializeBoard: () => Promise<void>
   switchProject: (id: string) => Promise<void>
   handleCreateProject: () => Promise<void>
   handleSeedDemoData: () => Promise<void>
@@ -156,7 +159,7 @@ interface BoardViewProps {
 
 export function BoardView({
   authError, handleAdminLogout,
-  projects, currentProject, setCurrentProject, loading, seedingDemoData,
+  projects, currentProject, setCurrentProject, loading, loadError, seedingDemoData,
   projectModes, setProjectModes, projectRuntimes, setProjectRuntimes,
   projectMcpConnections, setProjectMcpConnections, chainTemplates, setChainTemplates,
   taskTemplates, setTaskTemplates,
@@ -166,7 +169,7 @@ export function BoardView({
   projectDialogOpen, setProjectDialogOpen, projectName, setProjectName,
   projectDescription, setProjectDescription, projectColor, setProjectColor,
   createStarterAgents, setCreateStarterAgents,
-  fetchProject, switchProject, handleCreateProject, handleSeedDemoData, resetProjectForm,
+  fetchProject, initializeBoard, switchProject, handleCreateProject, handleSeedDemoData, resetProjectForm,
   copyToClipboard, rotateProjectApiKey, rotateAgentApiKey, migrateLegacyKeys,
   editingTask, taskDialogOpen, setTaskDialogOpen, chainDialogOpen, setChainDialogOpen,
   viewingTaskSteps, setViewingTaskSteps, selectedTask, setSelectedTask,
@@ -248,6 +251,22 @@ export function BoardView({
               <div className="flex flex-col items-center gap-3">
                 <Sparkles className="h-8 w-8 text-muted-foreground/30 animate-pulse" />
                 <span className="text-sm text-muted-foreground">Loading board...</span>
+              </div>
+            </div>
+          ) : !currentProject && loadError ? (
+            <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center px-6">
+              <div className="max-w-md rounded-2xl border border-destructive/30 bg-card p-6 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-destructive/10">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
+                <h2 className="text-lg font-semibold">Couldn&apos;t load the board</h2>
+                <p className="mt-2 text-sm text-muted-foreground">{loadError}</p>
+                <div className="mt-5 flex justify-center">
+                  <Button variant="outline" onClick={() => initializeBoard()}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Retry
+                  </Button>
+                </div>
               </div>
             </div>
           ) : !currentProject ? (
