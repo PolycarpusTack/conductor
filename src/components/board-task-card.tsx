@@ -1,14 +1,32 @@
 'use client'
 
+import { memo } from 'react'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Eye, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentBadge } from '@/components/agent-badge'
 import { ActivityTail } from '@/components/activity-tail'
+import { useLiveAgentLogs } from '@/app/_views/board-context'
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core'
 import type { Task, TaskPriority, TaskStepSummary } from '@/types/board'
-import type { LiveAgentLogEntry } from '@/types/live-agent'
+
+/**
+ * E-5: the ONLY subscriber to the high-frequency live-logs context on the
+ * board render path. Mounted per in-progress card, so an `agent-live-event`
+ * re-renders just these leaves — never `BoardPage`, the columns, or the card
+ * bodies (which no longer read the context at all).
+ *
+ * The filtered slice is a fresh array each event, but `ActivityTail` is
+ * memoized with an element-wise `events` comparator, so an event for a
+ * *different* task yields an equal slice here and the tail bails: only the
+ * tail whose task actually got the event re-renders its DOM.
+ */
+function CardActivityTail({ taskId }: { taskId: string }) {
+  const liveAgentLogs = useLiveAgentLogs()
+  const events = liveAgentLogs.filter((l) => l.taskId === taskId)
+  return <ActivityTail taskId={taskId} events={events} />
+}
 
 /**
  * dnd-kit wiring supplied by the sortable wrapper on the desktop board (E-4).
@@ -32,14 +50,21 @@ interface BoardTaskCardProps {
   onViewSteps: (viewing: { id: string; title: string; steps: TaskStepSummary[] }) => void
   onEdit?: (task: Task) => void
   onDelete?: (id: string) => void
-  liveAgentLogs?: LiveAgentLogEntry[]
+  /**
+   * E-5: opt-in flag (not the log array). When true, an in-progress card
+   * mounts `CardActivityTail`, which subscribes to the live-logs context on
+   * its own — so the card body never re-renders on `agent-live-event`. A
+   * boolean literal is referentially stable, so `memo(BoardTaskCard)` holds.
+   * Omitted on the mobile view (no tail there — unchanged behaviour).
+   */
+  liveActivity?: boolean
   /** dnd-kit sortable wiring (desktop only). */
   sortable?: CardSortable
   /** Rendered inside the DragOverlay: static lifted appearance, no interaction. */
   overlay?: boolean
 }
 
-export function BoardTaskCard({
+export const BoardTaskCard = memo(function BoardTaskCard({
   task,
   priorityColors,
   tagColors,
@@ -47,7 +72,7 @@ export function BoardTaskCard({
   onViewSteps,
   onEdit,
   onDelete,
-  liveAgentLogs,
+  liveActivity = false,
   sortable,
   overlay = false,
 }: BoardTaskCardProps) {
@@ -138,11 +163,8 @@ export function BoardTaskCard({
             </div>
           )}
 
-          {liveAgentLogs && task.status === 'IN_PROGRESS' && (
-            <ActivityTail
-              taskId={task.id}
-              events={liveAgentLogs.filter((l) => l.taskId === task.id)}
-            />
+          {liveActivity && task.status === 'IN_PROGRESS' && (
+            <CardActivityTail taskId={task.id} />
           )}
 
           <div className="mt-2 flex items-center justify-between">
@@ -180,4 +202,4 @@ export function BoardTaskCard({
       </div>
     </div>
   )
-}
+})

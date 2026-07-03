@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   DndContext,
@@ -39,7 +39,6 @@ import {
   useProjectDataCtx,
   useTaskActions,
   useUiState,
-  useLiveAgentLogs,
 } from '@/app/_views/board-context'
 import { statusColumns, priorityColors, tagColors, showDemoSeed } from '@/app/_views/board-constants'
 import type { Task, TaskStatus } from '@/types/board'
@@ -51,8 +50,17 @@ interface DndData {
   title?: string
 }
 
-/** Sortable wrapper: makes a BoardTaskCard a keyboard/pointer draggable whose grip is the drag handle. */
-function SortableTaskCard(props: Omit<React.ComponentProps<typeof BoardTaskCard>, 'sortable' | 'overlay'>) {
+/**
+ * Sortable wrapper: makes a BoardTaskCard a keyboard/pointer draggable whose
+ * grip is the drag handle. `memo`-wrapped (E-5): BoardPage re-renders for
+ * reasons unrelated to a given card (drag pick-up/drop toggling `activeTask`,
+ * a single other task updating) pass identical props here — task identity is
+ * preserved for unchanged tasks, the callbacks are useCallback/setter-stable,
+ * and priorityColors/tagColors are module constants — so this bails and the
+ * `useSortable` subtree is untouched. dnd-kit's own context changes still
+ * re-render it during an active drag (memo only blocks parent-prop churn).
+ */
+const SortableTaskCard = memo(function SortableTaskCard(props: Omit<React.ComponentProps<typeof BoardTaskCard>, 'sortable' | 'overlay'>) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.task.id,
     data: { status: props.task.status, title: props.task.title } satisfies DndData,
@@ -67,7 +75,7 @@ function SortableTaskCard(props: Omit<React.ComponentProps<typeof BoardTaskCard>
       sortable={{ setNodeRef, style, attributes, listeners, isDragging }}
     />
   )
-}
+})
 
 /** A status column that accepts drops even when empty (SortableContext alone can't). */
 function DroppableColumn({ status, className, children }: { status: TaskStatus; className?: string; children: React.ReactNode }) {
@@ -192,7 +200,6 @@ export default function BoardPage() {
     settingsSyncedProjectId,
     setProjectDialogOpen,
     initializeBoard, handleSeedDemoData,
-    getTasksByStatus,
   } = useProjectDataCtx()
   const {
     setViewingTaskSteps,
@@ -203,7 +210,26 @@ export default function BoardPage() {
     openEditTaskDialog, openNewTaskDialog,
   } = useTaskActions()
   const { setSettingsTab } = useUiState()
-  const liveAgentLogs = useLiveAgentLogs()
+
+  // E-5: group tasks into per-column arrays ONCE per tasks-change instead of
+  // running getTasksByStatus (filter+sort over all tasks) five separate times
+  // on every render. Keyed on the tasks array identity, so a re-render that
+  // doesn't touch tasks (e.g. drag `activeTask` toggling) reuses the same map
+  // and the same per-column array references — feeding stable `items`/props to
+  // the memoized columns and cards. Mirrors getTasksByStatus exactly (status
+  // filter + order sort); the context method stays for other consumers.
+  const tasksByStatus = useMemo(() => {
+    const grouped = Object.fromEntries(
+      statusColumns.map((c) => [c.id, [] as Task[]]),
+    ) as Record<TaskStatus, Task[]>
+    for (const task of currentProject?.tasks ?? []) {
+      grouped[task.status]?.push(task)
+    }
+    for (const status of Object.keys(grouped) as TaskStatus[]) {
+      grouped[status].sort((a, b) => a.order - b.order)
+    }
+    return grouped
+  }, [currentProject?.tasks])
 
   // The card currently lifted, mirrored into a DragOverlay so the pointer/
   // keyboard drag has a visible, detached representation.
@@ -339,7 +365,7 @@ export default function BoardPage() {
                   }`}
                 >
                   {col.label}
-                  <span className="ml-1.5 text-[10px] opacity-60">{getTasksByStatus(col.id).length}</span>
+                  <span className="ml-1.5 text-[10px] opacity-60">{tasksByStatus[col.id].length}</span>
                 </button>
               ))}
             </div>
@@ -347,7 +373,7 @@ export default function BoardPage() {
             {/* Desktop / tablet board grid */}
             <div className="hidden xs:flex md:grid md:grid-cols-5 xs:flex-nowrap gap-4 overflow-x-auto">
               {statusColumns.map((column) => {
-                const tasks = getTasksByStatus(column.id)
+                const tasks = tasksByStatus[column.id]
                 return (
                   <DroppableColumn key={column.id} status={column.id} className="min-w-[280px] md:min-w-0">
                     <div className="mb-3 flex items-center justify-between px-1">
@@ -379,7 +405,7 @@ export default function BoardPage() {
                             onViewSteps={setViewingTaskSteps}
                             onEdit={openEditTaskDialog}
                             onDelete={handleDeleteTask}
-                            liveAgentLogs={liveAgentLogs}
+                            liveActivity
                           />
                         ))}
 
@@ -402,7 +428,7 @@ export default function BoardPage() {
               {statusColumns
                 .filter((col) => col.id === mobileColumn)
                 .map((column) => {
-                  const columnTasks = getTasksByStatus(column.id)
+                  const columnTasks = tasksByStatus[column.id]
                   return (
                     <div key={column.id} className="space-y-2">
                       <div className={`text-sm font-medium ${column.color} mb-2`}>
@@ -446,7 +472,7 @@ export default function BoardPage() {
                 tagColors={tagColors}
                 onOpen={setSelectedTask}
                 onViewSteps={setViewingTaskSteps}
-                liveAgentLogs={liveAgentLogs}
+                liveActivity
                 overlay
               />
             ) : null}

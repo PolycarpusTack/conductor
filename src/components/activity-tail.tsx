@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 
 import type { LiveAgentLogEntry } from '@/types/live-agent'
@@ -17,8 +17,14 @@ type ActivityTailProps = {
  * events for this task with consecutive `text` events coalesced into one
  * ticker row. Pure presentation — filtering by taskId happens at the call
  * site.
+ *
+ * E-5: `memo`-wrapped. The call site (`CardActivityTail` in board-task-card)
+ * keeps the `events` array referentially stable while this task's slice is
+ * unchanged, so an `agent-live-event` for a *different* task re-renders that
+ * card's subscriber but bails here — only the tail whose task got the event
+ * actually re-renders. `taskId` is a string and stable per card.
  */
-export function ActivityTail({ taskId, events }: ActivityTailProps) {
+export const ActivityTail = memo(function ActivityTail({ taskId, events }: ActivityTailProps) {
   const [expanded, setExpanded] = useState(false)
 
   // Ignore the `taskId` prop at runtime — it's only there so the component
@@ -67,6 +73,25 @@ export function ActivityTail({ taskId, events }: ActivityTailProps) {
       ) : null}
     </div>
   )
+}, areEqual)
+
+/**
+ * E-5 memo comparator. The live-log array only appends (and front-drops past
+ * 500), so each `LiveAgentLogEntry` keeps its identity — an element-wise
+ * reference check tells a real change to *this* task's slice apart from a
+ * fresh-but-equal array produced by an event for a different task. `taskId` is
+ * a stable string per card. Returning true here means "props equal → skip".
+ */
+function areEqual(prev: ActivityTailProps, next: ActivityTailProps): boolean {
+  if (prev.taskId !== next.taskId) return false
+  const a = prev.events
+  const b = next.events
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
 }
 
 /**
