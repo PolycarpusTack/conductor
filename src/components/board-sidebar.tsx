@@ -5,8 +5,10 @@ import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { ChevronDown, Plus } from 'lucide-react'
+import { ChevronDown, Pause, Play, Plus } from 'lucide-react'
 import { APP_VERSION_SHORT } from '@/lib/version'
+import { useToast } from '@/hooks/use-toast'
+import { toggleAgentActive } from '@/hooks/useAgentManager'
 import { useProjectDataCtx, useTaskActions, useAgentActions, useUiState } from '@/app/_views/board-context'
 
 /**
@@ -17,9 +19,10 @@ import { useProjectDataCtx, useTaskActions, useAgentActions, useUiState } from '
  * tap; at md+ it is undefined (no-op) so the static layout is unchanged.
  */
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
-  const { projects, currentProject, switchProject } = useProjectDataCtx()
+  const { projects, currentProject, setCurrentProject, switchProject } = useProjectDataCtx()
   const { openNewChainDialog } = useTaskActions()
   const { openEditAgentDialog, setEditingAgent, setAgentDialogOpen, setWizardOpen } = useAgentActions()
+  const { toast } = useToast()
 
   const close = () => onNavigate?.()
 
@@ -77,17 +80,31 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
                   return (
                     <div
                       key={agent.id}
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md hover:bg-surface/40 transition-colors cursor-pointer ${!agent.isActive && taskCount === 0 ? 'opacity-40' : ''}`}
+                      className={`group/agent flex items-center gap-2 px-2 py-1 rounded-md hover:bg-surface/40 transition-colors cursor-pointer ${!agent.isActive && taskCount === 0 ? 'opacity-40' : ''}`}
                       onClick={() => { void openEditAgentDialog(agent); close() }}
                     >
                       <span className="text-sm">{agent.emoji}</span>
                       <span className="text-[11px] text-foreground/70 flex-1 truncate">{agent.name}</span>
+                      {!agent.isActive && (
+                        <span className="shrink-0 rounded px-1 py-0.5 text-[8px] font-medium uppercase tracking-wide border border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)] text-[var(--op-amber)]">
+                          Paused
+                        </span>
+                      )}
                       {agent.isActive && (
                         <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                       )}
                       {taskCount > 0 && (
                         <span className="text-[9px] text-muted-foreground/50 shrink-0">{taskCount}</span>
                       )}
+                      <button
+                        type="button"
+                        title={agent.isActive ? `Pause ${agent.name} (stop dispatching)` : `Resume ${agent.name}`}
+                        aria-label={agent.isActive ? `Pause ${agent.name}` : `Resume ${agent.name}`}
+                        onClick={(e) => { e.stopPropagation(); void toggleAgentActive(agent, { setCurrentProject, toast }) }}
+                        className={`shrink-0 rounded p-0.5 hover:text-foreground/70 hover:bg-surface/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring transition-opacity ${agent.isActive ? 'text-muted-foreground/40 opacity-0 group-hover/agent:opacity-100' : 'text-[var(--op-amber)] opacity-100'}`}
+                      >
+                        {agent.isActive ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                      </button>
                     </div>
                   )
                 })}

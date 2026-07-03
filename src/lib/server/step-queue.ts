@@ -32,7 +32,10 @@ export async function pollAndDispatch(projectId?: string) {
   const steps = await db.taskStep.findMany({
     where: {
       status: 'active',
-      agent: { runtimeId: { not: null } },
+      // D-4: paused agents (isActive=false) must not dispatch. This is the
+      // teeth behind the pause toggle — without it, pausing an agent changed
+      // only the UI while the dispatcher kept leasing and running its steps.
+      agent: { runtimeId: { not: null }, isActive: true },
       mode: { not: 'human' },
       ...projectFilter,
       OR: [
@@ -63,7 +66,9 @@ export async function pollAndDispatch(projectId?: string) {
   const throttledSteps = await db.taskStep.findMany({
     where: {
       status: 'pending',
-      agent: { runtimeId: { not: null } },
+      // D-4: a paused agent's throttled steps stay parked too — don't
+      // re-activate work we're then obligated to skip.
+      agent: { runtimeId: { not: null }, isActive: true },
       mode: { not: 'human' },
       task: { status: 'IN_PROGRESS', deletedAt: null, ...(projectId ? { projectId } : {}) },
     },

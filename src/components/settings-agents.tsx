@@ -7,9 +7,12 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Activity, ChevronDown, ChevronRight, CopyPlus, Library,
-  Pencil, Plus, Search, Trash2,
+  Pause, Pencil, Play, Plus, Search, Trash2,
 } from 'lucide-react'
 import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
+import { useToast } from '@/hooks/use-toast'
+import { toggleAgentActive } from '@/hooks/useAgentManager'
+import { useProjectDataCtx } from '@/app/_views/board-context'
 import type { Agent } from '@/types/board'
 
 interface LibraryCategory {
@@ -40,6 +43,8 @@ export function SettingsAgents({
   projectId, agents, hasRuntimes,
   onAddAgent, onEditAgent, onDeleteAgent, onDuplicateAgent, onImported,
 }: SettingsAgentsProps) {
+  const { setCurrentProject } = useProjectDataCtx()
+  const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [expandedStats, setExpandedStats] = useState<string | null>(null)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
@@ -129,9 +134,13 @@ export function SettingsAgents({
           <div className="min-w-0">
             <div className="text-sm font-medium flex items-center gap-2">
               <span className="truncate">{agent.name}</span>
-              {agent.isActive && (
+              {agent.isActive ? (
                 <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shrink-0">
                   Active
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[9px] shrink-0 border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)] text-[var(--op-amber)]">
+                  Paused
                 </Badge>
               )}
             </div>
@@ -139,6 +148,17 @@ export function SettingsAgents({
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            title={agent.isActive ? 'Pause agent (stop dispatching)' : 'Resume agent'}
+            aria-label={agent.isActive ? `Pause ${agent.name}` : `Resume ${agent.name}`}
+            onClick={() => void toggleAgentActive(agent, { setCurrentProject, toast })}
+          >
+            {agent.isActive
+              ? <Pause className="h-3 w-3" />
+              : <Play className="h-3 w-3 text-[var(--op-amber)]" />}
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => setExpandedStats(expandedStats === agent.id ? null : agent.id)}>
             <Activity className="h-3 w-3" />
           </Button>

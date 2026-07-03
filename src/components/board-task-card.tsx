@@ -138,7 +138,17 @@ export const BoardTaskCard = memo(function BoardTaskCard({
               <span className="text-[13px] font-medium leading-tight text-foreground/90">{task.title}</span>
             </div>
             {task.agent && (
-              <AgentBadge agent={task.agent} size="compact" className="shrink-0" />
+              <div className="flex items-center gap-1 shrink-0">
+                {task.agent.isActive === false && (
+                  <span
+                    title="Agent paused — this task won't be picked up until the agent is resumed"
+                    className="rounded px-1 py-0.5 text-[8px] font-medium uppercase tracking-wide border border-[var(--op-amber-dim)] bg-[var(--op-amber-bg)] text-[var(--op-amber)]"
+                  >
+                    Paused
+                  </span>
+                )}
+                <AgentBadge agent={task.agent} size="compact" />
+              </div>
             )}
           </div>
 

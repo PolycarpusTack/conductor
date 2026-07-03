@@ -85,6 +85,11 @@ export const agentsApi = {
   get: (agentId: string, opts?: ApiCallOptions) =>
     apiFetch<Agent>(`/api/agents/${agentId}`, { cache: 'no-store', ...opts }),
 
+  // D-4: partial agent update. Currently used for the pause/resume toggle
+  // (`{ isActive }`); the PUT contract (updateAgentSchema) accepts any subset.
+  update: (agentId: string, body: Partial<Agent>, opts?: ApiCallOptions) =>
+    apiFetch<Agent>(`/api/agents/${agentId}`, { method: 'PUT', body, ...opts }),
+
   delete: (agentId: string, opts?: ApiCallOptions) =>
     apiFetch<ApiSuccessResponse>(`/api/agents/${agentId}`, { method: 'DELETE', ...opts }),
 

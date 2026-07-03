@@ -6,6 +6,7 @@ import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateAgentSchema } from '@/lib/server/contracts'
 import { projectSummarySelect } from '@/lib/server/selects'
+import { broadcastProjectEvent } from '@/lib/server/realtime'
 
 export const GET = withErrorHandling(
   'api/agents/[id]',
@@ -107,6 +108,14 @@ export const PUT = withErrorHandling(
         },
       },
     })
+
+    // D-4: a manual pause/resume toggle should reach other clients too
+    if (data.isActive !== undefined && agent.project) {
+      await broadcastProjectEvent(agent.project.id, 'agent-status', {
+        agentId: agent.id,
+        isActive: agent.isActive,
+      })
+    }
 
     return NextResponse.json(agent)
   },

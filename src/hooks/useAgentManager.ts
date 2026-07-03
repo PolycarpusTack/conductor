@@ -10,6 +10,52 @@ interface UseAgentManagerParams {
   setCurrentProject: React.Dispatch<React.SetStateAction<Project | null>>
 }
 
+type ToastFn = (opts: { title: string; description?: string; variant?: 'destructive' | 'default' }) => void
+
+/**
+ * D-4: pause/resume an agent by flipping `isActive` via PUT /api/agents/[id].
+ * A paused agent is skipped by the dispatcher (see step-queue.ts), so this is
+ * how an operator stops an agent claiming work without deleting it.
+ *
+ * Optimistic: flips the local copy immediately, reconciles with the server's
+ * authoritative `isActive`, and rolls back + toasts on failure — mirroring
+ * useTaskManager.moveTaskToStatus. Kept as a free function (not part of the
+ * hook's returned handlers) so both the sidebar list and the settings list can
+ * call it directly with their own context-sourced setCurrentProject + toast,
+ * without threading a new value through the board context providers.
+ */
+export async function toggleAgentActive(
+  agent: Pick<Agent, 'id' | 'name' | 'isActive'>,
+  deps: {
+    setCurrentProject: React.Dispatch<React.SetStateAction<Project | null>>
+    toast: ToastFn
+  },
+): Promise<void> {
+  const { setCurrentProject, toast } = deps
+  const next = !agent.isActive
+
+  const applyActive = (isActive: boolean) => setCurrentProject(prev => prev ? {
+    ...prev,
+    agents: prev.agents.map(a => a.id === agent.id ? { ...a, isActive } : a),
+  } : null)
+
+  applyActive(next) // optimistic
+
+  try {
+    const updated = await agentsApi.update(agent.id, { isActive: next }, { errorFallback: 'Failed to update agent' })
+    applyActive(updated.isActive) // reconcile with the authoritative value
+    toast({ title: next ? `${agent.name} resumed` : `${agent.name} paused` })
+  } catch (error) {
+    applyActive(agent.isActive) // rollback
+    if (error instanceof ApiClientError) {
+      toast({ title: error.message, variant: 'destructive' })
+      return
+    }
+    console.error('Error toggling agent:', error)
+    toast({ title: 'Failed to update agent', variant: 'destructive' })
+  }
+}
+
 export function useAgentManager({ setCurrentProject }: UseAgentManagerParams) {
   const { toast } = useToast()
 
