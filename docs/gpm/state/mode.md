@@ -1,0 +1,1 @@
+DELIVERY — all lanes. The daemon-execution PROTOTYPE exception ended 2026-07-03: the EPIC A tracer bullet passed its e2e gate (bun run smoke:daemon, 13/13) and the runner code carries tests, so daemon work now meets full DELIVERY governance too. Declared 2026-07-03 post EPICs A+B (see phase-summaries/phase-summary-epics-A-B.md).
