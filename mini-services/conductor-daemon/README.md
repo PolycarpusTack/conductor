@@ -40,6 +40,38 @@ config, e.g.:
 Template tokens (whitelist — anything else fails the step):
 `{{agent.runtimeModel}}`, `{{task.id}}`, `{{step.id}}`, `{{step.mode}}`.
 
+## Workspace directory (cwd) — SECURITY
+
+Headless `claude -p` **skips the interactive workspace-trust dialog**
+(SPIKE A-0 §2.6), so whatever directory the runner spawns in is implicitly
+trusted by the CLI. The daemon therefore treats the working directory as a
+security control:
+
+- **`DAEMON_WORKSPACE_ROOT`** maps the daemon's workspace to a local absolute
+  path. A daemon is registered into exactly one workspace (the server only
+  leases steps from that workspace to it), so the registry is this single
+  root. Validated at startup: must be absolute, must exist, must be a
+  directory — anything else aborts the daemon.
+- Every child process (claude, template, **and** echo) spawns with
+  `cwd = <resolved workspace path>`. There is **no fallback to the daemon's
+  own cwd** — if `DAEMON_WORKSPACE_ROOT` is unset, every step fails durably
+  with `workspace_unmapped` before anything spawns (the server sees the
+  failure via the normal fail path).
+- The payload's `session.workingDirectoryPolicy` maps as:
+  `project-root` / `daemon-default` (and anything unknown) → the workspace
+  root; `task-dir` → `<root>/<taskId>` (created on demand), with a traversal
+  guard — a task id that resolves outside the root fails the step
+  (`workspace_unmapped`), so server-sent ids can never escape the workspace.
+- **Symlink caution:** the root is normalized but symlinks are *not* chased.
+  Point `DAEMON_WORKSPACE_ROOT` at the real checkout path; symlinks inside
+  the workspace can still lead the CLI outside it — don't rely on the cwd
+  guard to contain a workspace built from symlink indirection.
+
+Additionally, read-only steps are policy-guarded: the claude runner maps any
+step mode other than `develop`/`draft` to `--permission-mode plan` (never a
+write-capable mode), and the template runner exports
+`CONDUCTOR_STEP_POLICY=readOnly|write` so custom CLIs can honor it.
+
 ## Setup
 
 1. **Register** (one-time; registration is admin-session-gated by design):
@@ -73,6 +105,7 @@ Template tokens (whitelist — anything else fails the step):
 | `DAEMON_POLL_INTERVAL_MS` | `5000` | Step poll cadence |
 | `CONDUCTOR_ADMIN_COOKIE` | — | Only for `--register` |
 | `DAEMON_RUNNER` | — | `claude` opts into the claude runner; `echo` forces the no-op; unset → template if configured, else echo. Unknown values abort startup. |
+| `DAEMON_WORKSPACE_ROOT` | — | Absolute path of the workspace directory steps execute in (see "Workspace directory"). Invalid values abort startup; unset → every step fails `workspace_unmapped`. |
 | `DAEMON_CLAUDE_BIN` | `claude` | Claude CLI binary (claude runner) |
 | `DAEMON_CLAUDE_MAX_TURNS` | `30` | `--max-turns` ceiling per invocation |
 | `DAEMON_SYSTEM_PROMPT_MODE` | `file` | `arg` inlines system prompts < 8KB via `--append-system-prompt` instead of the temp file |

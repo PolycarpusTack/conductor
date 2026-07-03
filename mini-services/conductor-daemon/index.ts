@@ -30,6 +30,7 @@ import {
   type ExecutionPayload,
   type RunnerKind,
 } from './runner'
+import { resolveStepCwd, resolveWorkspaceRoot } from './workspace'
 
 const BASE_URL = (process.env.CONDUCTOR_URL || 'http://localhost:3000').replace(/\/$/, '')
 const TOKEN = process.env.CONDUCTOR_DAEMON_TOKEN || ''
@@ -44,6 +45,11 @@ const CLAUDE_OPTS: ClaudeRunnerOptions = {
   maxTurns: Number(process.env.DAEMON_CLAUDE_MAX_TURNS || 30),
   systemPromptMode: process.env.DAEMON_SYSTEM_PROMPT_MODE === 'arg' ? 'arg' : 'file',
 }
+
+// Workspace mapping (A-2, SECURITY): the one directory steps may execute in.
+// Validated in main() — invalid config aborts startup; unset means every
+// step fails `workspace_unmapped` (never the daemon's own cwd).
+let workspaceRoot: string | null = null
 
 // ---------------------------------------------------------------------------
 // Installation identity — survives hostname changes (roadmap decision D1)
@@ -230,6 +236,21 @@ async function executeStep(step: ExecutionPayload): Promise<void> {
       return
     }
 
+    // SECURITY (A-2): headless CLIs skip the workspace trust dialog, so the
+    // child may only ever run inside the configured workspace directory. An
+    // unresolvable workspace fails the step BEFORE anything spawns.
+    const cwdResolution = resolveStepCwd(workspaceRoot, {
+      taskId: step.taskId,
+      workingDirectoryPolicy: step.session.workingDirectoryPolicy,
+    })
+    if (!cwdResolution.ok) {
+      await reportStep(step, { ok: false, output: '', error: cwdResolution.error }, sessionId)
+      return
+    }
+    if (step.session.workingDirectoryPolicy === 'task-dir') {
+      mkdirSync(cwdResolution.cwd, { recursive: true })
+    }
+
     const kind: RunnerKind = resolveRunnerKind(RUNNER_ENV, Boolean(step.session.command))
     let spec
     try {
@@ -252,6 +273,7 @@ async function executeStep(step: ExecutionPayload): Promise<void> {
 
     const proc = await runSpawnSpec(spec, {
       timeoutMs: step.timeoutMs ?? 300_000,
+      cwd: cwdResolution.cwd,
       onStdout: streamTo('stdout'),
       onStderr: streamTo('stderr'),
     })
@@ -319,19 +341,32 @@ async function main() {
     process.exit(1)
   }
 
-  // Fail loudly at startup on a misconfigured runner — not mid-step.
+  // Fail loudly at startup on a misconfigured runner or workspace — not
+  // mid-step. A relative, missing, or non-directory DAEMON_WORKSPACE_ROOT
+  // aborts here (workspace.ts validation).
   try {
     resolveRunnerKind(RUNNER_ENV, false)
+    workspaceRoot = resolveWorkspaceRoot(process.env.DAEMON_WORKSPACE_ROOT)
   } catch (err) {
     console.error(String(err instanceof Error ? err.message : err))
     process.exit(1)
+  }
+  if (!workspaceRoot) {
+    console.warn(
+      '[startup] DAEMON_WORKSPACE_ROOT is not set — every step will fail with ' +
+        'workspace_unmapped. The runner never executes in the daemon\'s own cwd ' +
+        '(headless CLIs skip the workspace trust dialog — SPIKE A-0).',
+    )
   }
   const runnerLabel =
     (RUNNER_ENV ?? '').trim() === 'claude'
       ? `claude (${CLAUDE_OPTS.binArgv?.join(' ')})`
       : 'echo/template (server commandTemplate decides; set DAEMON_RUNNER=claude for the claude runner)'
 
-  console.log(`conductor-daemon → ${BASE_URL} (capability: ${CAPABILITY}, runner: ${runnerLabel})`)
+  console.log(
+    `conductor-daemon → ${BASE_URL} (capability: ${CAPABILITY}, runner: ${runnerLabel}, ` +
+      `workspace: ${workspaceRoot ?? 'UNMAPPED'})`,
+  )
   await heartbeat()
   setInterval(heartbeat, HEARTBEAT_INTERVAL_MS)
   setInterval(poll, POLL_INTERVAL_MS)

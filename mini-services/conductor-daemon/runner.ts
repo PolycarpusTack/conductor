@@ -19,7 +19,7 @@ import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 
 // ---------------------------------------------------------------------------
 // Execution Payload (payloadVersion 1) — mirrors GET /api/daemon/steps/next
@@ -33,6 +33,8 @@ export interface SessionBlock {
   command: string | null
   /** Loud server-side rejection (e.g. unknown template tokens). Never run when set. */
   commandError?: string | null
+  /** 'project-root' | 'task-dir' | 'daemon-default' — resolved by workspace.ts. */
+  workingDirectoryPolicy?: string | null
   maxOutputPreviewChars: number
 }
 
@@ -203,9 +205,29 @@ export interface SpawnSpec {
   cleanup: () => void
 }
 
-/** step.mode → CLI permission mode. Anything not explicitly write-capable stays read-only. */
+/**
+ * Effective execution policy of a step, derived from its mode (A-2 policy
+ * guard). Only the explicitly write-capable modes get `write`; anything
+ * unknown or custom stays `readOnly` — deny by default.
+ */
+export type StepPolicy = 'readOnly' | 'write'
+
+const WRITE_CAPABLE_STEP_MODES = new Set(['develop', 'draft'])
+
+export function stepPolicyForMode(mode: string): StepPolicy {
+  return WRITE_CAPABLE_STEP_MODES.has(mode) ? 'write' : 'readOnly'
+}
+
+/**
+ * Claude CLI permission modes that can mutate the workspace. A readOnly step
+ * policy must never produce one of these (AC: "Given a policy readOnly, the
+ * runner refuses write-mode invocation").
+ */
+const WRITE_CAPABLE_PERMISSION_MODES = new Set(['acceptEdits', 'auto', 'bypassPermissions', 'dontAsk'])
+
+/** step.mode → CLI permission mode, derived from the step policy. */
 export function mapStepModeToPermissionMode(mode: string): 'acceptEdits' | 'plan' {
-  return mode === 'develop' || mode === 'draft' ? 'acceptEdits' : 'plan'
+  return stepPolicyForMode(mode) === 'write' ? 'acceptEdits' : 'plan'
 }
 
 export interface ClaudeRunnerOptions {
@@ -255,7 +277,17 @@ export function buildClaudeSpawnSpec(payload: ExecutionPayload, opts: ClaudeRunn
 
   if (payload.agent?.runtimeModel) args.push('--model', payload.agent.runtimeModel)
   args.push('--max-turns', String(maxTurns))
-  args.push('--permission-mode', mapStepModeToPermissionMode(payload.mode))
+
+  // Policy guard (A-2): the mapping above keeps readOnly → 'plan' by
+  // construction; this refusal is belt-and-braces so a future mapping edit
+  // can never silently hand a read-only step a write-capable CLI.
+  const permissionMode = mapStepModeToPermissionMode(payload.mode)
+  if (stepPolicyForMode(payload.mode) === 'readOnly' && WRITE_CAPABLE_PERMISSION_MODES.has(permissionMode)) {
+    throw new Error(
+      `policy violation: readOnly step mode "${payload.mode}" mapped to write-capable permission mode "${permissionMode}"`,
+    )
+  }
+  args.push('--permission-mode', permissionMode)
 
   const argv = [...binArgv, ...args]
   return {
@@ -292,6 +324,9 @@ export function buildTemplateSpawnSpec(payload: ExecutionPayload): SpawnSpec {
     kind: 'template',
     argv,
     stdin,
+    // Generic CLIs have no --permission-mode; expose the step policy as an
+    // env var so custom CLIs can honor readOnly steps (A-2 policy guard).
+    env: { CONDUCTOR_STEP_POLICY: stepPolicyForMode(payload.mode) },
     summary: argv.join(' ').slice(0, 500),
     cleanup: () => {},
   }
@@ -344,19 +379,33 @@ export interface ProcessResult {
 export interface RunOptions {
   timeoutMs: number
   env?: Record<string, string>
-  cwd?: string
+  /**
+   * REQUIRED, absolute — the step's resolved workspace directory (A-2).
+   * There is deliberately no default: falling back to the daemon's own
+   * process.cwd() would execute a headless CLI (which skips the trust
+   * dialog) in an unintended directory.
+   */
+  cwd: string
   onStdout?: (chunk: string) => void
   onStderr?: (chunk: string) => void
 }
 
 /**
- * Spawns the spec (argument array, shell: false), writes the prompt to stdin
- * in a single write, closes stdin, and captures output. Daemon-side timeout
- * kills the child and reports the existing 124 convention; spawn errors
- * report 127. Temp files are cleaned up in finally.
+ * Spawns the spec (argument array, shell: false) in the resolved workspace
+ * cwd, writes the prompt to stdin in a single write, closes stdin, and
+ * captures output. Daemon-side timeout kills the child and reports the
+ * existing 124 convention; spawn errors report 127. Temp files are cleaned
+ * up in finally.
  */
 export async function runSpawnSpec(spec: SpawnSpec, opts: RunOptions): Promise<ProcessResult> {
   try {
+    // SECURITY (A-2): never spawn without an explicit absolute workspace cwd.
+    if (!opts.cwd || !isAbsolute(opts.cwd)) {
+      throw new Error(
+        `runSpawnSpec requires an absolute cwd (got ${JSON.stringify(opts.cwd || null)}) — ` +
+          `the runner never executes in the daemon's own working directory`,
+      )
+    }
     const child = spawn(spec.argv[0], spec.argv.slice(1), {
       shell: false,
       cwd: opts.cwd,

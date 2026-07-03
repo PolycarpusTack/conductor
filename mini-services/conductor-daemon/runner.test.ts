@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'bun:test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
@@ -15,6 +16,7 @@ import {
   parseClaudeResultLine,
   resolveRunnerKind,
   runSpawnSpec,
+  stepPolicyForMode,
   validateExecutionPayload,
   type ExecutionPayload,
   type SpawnSpec,
@@ -23,6 +25,11 @@ import {
 const FAKE_CLI = join(import.meta.dir, 'test-fixtures', 'fake-cli.ts')
 // process.execPath is the bun binary that runs this test — no shell involved.
 const FAKE_BIN = [process.execPath, FAKE_CLI]
+
+// Every spawn needs an explicit workspace cwd (A-2) — a real directory the
+// fake CLI can start in, standing in for the daemon's mapped workspace.
+const TEST_WORKSPACE = mkdtempSync(join(tmpdir(), 'conductor-runner-ws-'))
+process.on('exit', () => rmSync(TEST_WORKSPACE, { recursive: true, force: true }))
 
 function payload(overrides: Partial<ExecutionPayload> = {}): ExecutionPayload {
   return {
@@ -59,13 +66,17 @@ function argAfter(spec: SpawnSpec, flag: string): string | undefined {
 
 async function runClaude(
   p: ExecutionPayload,
-  opts: { env?: Record<string, string>; timeoutMs?: number; systemPromptMode?: 'file' | 'arg' } = {},
+  opts: { env?: Record<string, string>; timeoutMs?: number; systemPromptMode?: 'file' | 'arg'; cwd?: string } = {},
 ) {
   const spec = buildClaudeSpawnSpec(p, {
     binArgv: FAKE_BIN,
     systemPromptMode: opts.systemPromptMode ?? 'file',
   })
-  const proc = await runSpawnSpec(spec, { timeoutMs: opts.timeoutMs ?? 20_000, env: opts.env })
+  const proc = await runSpawnSpec(spec, {
+    timeoutMs: opts.timeoutMs ?? 20_000,
+    env: opts.env,
+    cwd: opts.cwd ?? TEST_WORKSPACE,
+  })
   return { spec, proc, outcome: interpretResult('claude', proc) }
 }
 
@@ -77,6 +88,7 @@ function fakeReport(outcome: { output: string }) {
     stdinFirst: string
     stdinLast: string
     systemPrompt: string | null
+    cwd: string
   }
 }
 
@@ -106,7 +118,16 @@ describe('commandToArgv', () => {
   })
 })
 
-describe('mapStepModeToPermissionMode', () => {
+describe('step policy (A-2 AC: readOnly refuses write-mode invocation)', () => {
+  const WRITE_MODES = ['develop', 'draft']
+  const READ_ONLY_MODES = ['analyze', 'verify', 'review', 'human', 'custom', 'some-custom-mode', '']
+  const WRITE_CAPABLE_PERMISSION_MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'dontAsk']
+
+  test('only develop/draft carry a write policy; everything else is readOnly', () => {
+    for (const mode of WRITE_MODES) expect(stepPolicyForMode(mode)).toBe('write')
+    for (const mode of READ_ONLY_MODES) expect(stepPolicyForMode(mode)).toBe('readOnly')
+  })
+
   test('write modes get acceptEdits, everything else gets plan', () => {
     expect(mapStepModeToPermissionMode('develop')).toBe('acceptEdits')
     expect(mapStepModeToPermissionMode('draft')).toBe('acceptEdits')
@@ -114,6 +135,36 @@ describe('mapStepModeToPermissionMode', () => {
     expect(mapStepModeToPermissionMode('verify')).toBe('plan')
     expect(mapStepModeToPermissionMode('review')).toBe('plan')
     expect(mapStepModeToPermissionMode('some-custom-mode')).toBe('plan')
+  })
+
+  test('a readOnly policy NEVER maps to a write-capable permission mode', () => {
+    for (const mode of READ_ONLY_MODES) {
+      expect(WRITE_CAPABLE_PERMISSION_MODES).not.toContain(mapStepModeToPermissionMode(mode))
+    }
+  })
+
+  test('the claude spawn spec never carries a write-capable --permission-mode for a readOnly step', () => {
+    for (const mode of READ_ONLY_MODES) {
+      const spec = buildClaudeSpawnSpec(payload({ mode }), { binArgv: ['claude'] })
+      try {
+        expect(argAfter(spec, '--permission-mode')).toBe('plan')
+      } finally {
+        spec.cleanup()
+      }
+    }
+  })
+
+  test('the template runner exposes the policy to custom CLIs via CONDUCTOR_STEP_POLICY', () => {
+    const session = {
+      policy: 'ephemeral',
+      backend: 'process',
+      sessionKey: 'k',
+      command: FAKE_BIN.join(' '),
+      commandError: null,
+      maxOutputPreviewChars: 5000,
+    }
+    expect(buildTemplateSpawnSpec(payload({ session })).env?.CONDUCTOR_STEP_POLICY).toBe('write')
+    expect(buildTemplateSpawnSpec(payload({ session, mode: 'verify' })).env?.CONDUCTOR_STEP_POLICY).toBe('readOnly')
   })
 })
 
@@ -291,7 +342,7 @@ describe('claude runner against the fake CLI', () => {
     const spec = buildClaudeSpawnSpec(p, { binArgv: FAKE_BIN })
     const file = argAfter(spec, '--append-system-prompt-file')!
     expect(existsSync(file)).toBe(true)
-    const proc = await runSpawnSpec(spec, { timeoutMs: 20_000 })
+    const proc = await runSpawnSpec(spec, { timeoutMs: 20_000, cwd: TEST_WORKSPACE })
     const outcome = interpretResult('claude', proc)
     expect(outcome.ok).toBe(true)
     expect(fakeReport(outcome).systemPrompt).toBe(composeSystemPrompt(p))
@@ -327,6 +378,27 @@ describe('claude runner against the fake CLI', () => {
     expect(outcome.claude?.numTurns).toBe(1)
   })
 
+  test('the child spawns in the mapped workspace cwd, not the daemon cwd (A-2 SECURITY)', async () => {
+    const { outcome } = await runClaude(payload(), { cwd: TEST_WORKSPACE })
+    expect(outcome.ok).toBe(true)
+    const report = fakeReport(outcome)
+    // Case-insensitive compare — Windows may report a different path casing.
+    expect(report.cwd.toLowerCase()).toBe(TEST_WORKSPACE.toLowerCase())
+    expect(report.cwd.toLowerCase()).not.toBe(process.cwd().toLowerCase())
+  })
+
+  test('runSpawnSpec refuses to run without an absolute cwd — no process.cwd() fallback', async () => {
+    for (const cwd of [undefined, '', 'relative/workspace']) {
+      const spec = buildClaudeSpawnSpec(payload(), { binArgv: FAKE_BIN })
+      // @ts-expect-error — cwd is required; the runtime guard must also hold
+      const attempt = runSpawnSpec(spec, { timeoutMs: 20_000, cwd })
+      await expect(attempt).rejects.toThrow(/absolute cwd/)
+      // temp system-prompt files must still be cleaned up on refusal
+      const file = argAfter(spec, '--append-system-prompt-file')
+      expect(existsSync(file!)).toBe(false)
+    }
+  })
+
   test('the daemon-side timeout kills the child and yields exit 124', async () => {
     const { outcome } = await runClaude(payload(), {
       env: { FAKE_SLEEP_MS: '30000' },
@@ -352,7 +424,7 @@ describe('template (generic) runner', () => {
     })
     const spec = buildTemplateSpawnSpec(p)
     expect(spec.argv).toEqual(FAKE_BIN)
-    const proc = await runSpawnSpec(spec, { timeoutMs: 20_000 })
+    const proc = await runSpawnSpec(spec, { timeoutMs: 20_000, cwd: TEST_WORKSPACE })
     const outcome = interpretResult('template', proc)
     expect(outcome.ok).toBe(true)
     // Generic CLIs have no system-prompt channel: it rides stdin too.
@@ -383,7 +455,7 @@ describe('echo runner (safety default)', () => {
   test('spawns without any shell and mentions the step', async () => {
     const spec = buildEchoSpawnSpec(payload())
     expect(spec.argv[0]).not.toMatch(/cmd(\.exe)?$|^sh$/)
-    const proc = await runSpawnSpec(spec, { timeoutMs: 20_000 })
+    const proc = await runSpawnSpec(spec, { timeoutMs: 20_000, cwd: TEST_WORKSPACE })
     const outcome = interpretResult('echo', proc)
     expect(outcome.ok).toBe(true)
     expect(outcome.output).toContain('step-1')

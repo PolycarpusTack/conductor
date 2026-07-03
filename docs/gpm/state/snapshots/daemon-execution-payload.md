@@ -1,7 +1,7 @@
 # CONTRACT SNAPSHOT: Daemon Execution Payload
 
 Version: 1 (`payloadVersion: 1`)
-Date: 2026-07-03 (A-1)
+Date: 2026-07-03 (A-1; daemon-side cwd/policy semantics added in A-2 — payload shape unchanged)
 
 ## Public Interface
 
@@ -68,6 +68,11 @@ The daemon reports back via `POST /api/daemon/steps`
   spike A-0 finding #8)
 - `session.commandError` set, invalid payload, or residual `{{token}}` in
   `session.command` → fail loudly before spawning anything
+- `workspace_unmapped` (A-2): the daemon has no `DAEMON_WORKSPACE_ROOT`
+  configured, or a `task-dir` working-directory resolution escapes the
+  configured root → fail loudly BEFORE spawning. The runner never falls back
+  to the daemon's own cwd (SECURITY — headless CLIs skip the workspace trust
+  dialog, spike A-0 §2.6)
 
 On success: claude runner reports the result line's `result` string as step
 output (cost/session metadata logged; evidence capture is A-3); generic and
@@ -84,6 +89,15 @@ echo runners report raw stdout.
   (`DAEMON_SYSTEM_PROMPT_MODE=arg` inlines prompts < 8KB)
 - generic runner: whole composed prompt (system prompt + instructions) rides
   stdin; `session.command` is whitespace-split into argv
+- cwd (A-2): every child spawns with `cwd` = the daemon's configured
+  workspace path (`DAEMON_WORKSPACE_ROOT`, validated at startup: absolute,
+  exists, directory). `session.workingDirectoryPolicy` maps daemon-side:
+  `project-root`/`daemon-default`/unknown → workspace root; `task-dir` →
+  `<root>/<taskId>` (created on demand, traversal-guarded to the root)
+- step policy (A-2): step `mode` derives `readOnly | write` (only
+  `develop`/`draft` are write). Claude runner: readOnly →
+  `--permission-mode plan`, never a write-capable mode. Generic runner:
+  policy exported to the child as `CONDUCTOR_STEP_POLICY=readOnly|write`
 
 ## Error Shapes (HTTP)
 
@@ -97,6 +111,10 @@ echo runners report raw stdout.
 - Daemon: opt-in runner config (`DAEMON_RUNNER=claude`, `DAEMON_CLAUDE_BIN`,
   `DAEMON_CLAUDE_MAX_TURNS`, `DAEMON_SYSTEM_PROMPT_MODE`); default is the
   no-op echo runner
+- Daemon: `DAEMON_WORKSPACE_ROOT` — workspaceId → path registry (a daemon is
+  registered into exactly one workspace and the server only leases
+  workspace-matched steps, so a single root suffices; no workspaceId field in
+  the payload was needed). Unset → every step fails `workspace_unmapped`
 
 ## Domain Terms Used
 

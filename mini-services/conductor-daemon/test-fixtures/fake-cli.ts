@@ -57,6 +57,7 @@ if (process.env.FAKE_NO_RESULT !== '1') {
         stdinFirst: stdin.slice(0, 40),
         stdinLast: stdin.slice(-40),
         systemPrompt,
+        cwd: process.cwd(),
       }),
       total_cost_usd: 0.0123,
       session_id: 'fake-session',
