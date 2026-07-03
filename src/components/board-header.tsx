@@ -48,7 +48,7 @@ export function BoardHeader() {
   const { setSelectedTask } = useTaskActions()
   const {
     view, setView,
-    sidebarOpen, setSidebarOpen,
+    setSidebarOpen,
     setSettingsTab,
     currentWorkspaceId, setCurrentWorkspaceId,
     handleAdminLogout,
@@ -100,6 +100,7 @@ export function BoardHeader() {
               variant="ghost"
               size="icon"
               className="md:hidden"
+              aria-label="Open menu"
               onClick={() => setSidebarOpen(v => !v)}
             >
               <Menu className="h-4 w-4" />
@@ -317,27 +318,6 @@ export function BoardHeader() {
             </div>
           </DialogContent>
         </Dialog>
-      )}
-
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-background/95 backdrop-blur-sm md:hidden pt-14">
-          <div className="p-4">
-            <div className="mb-4">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground/50 mb-2">Projects</h3>
-              <div className="space-y-1">
-                {projects.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => { switchProject(p.id); setSidebarOpen(false) }}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm ${p.id === currentProject?.id ? 'bg-surface/60' : 'hover:bg-surface/40'}`}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </>
   )
