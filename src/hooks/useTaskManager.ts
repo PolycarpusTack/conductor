@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { ApiClientError } from '@/lib/api/client'
+import { tasksApi } from '@/lib/api/endpoints'
 import type { Task, TaskStatus, TaskPriority, TaskStepSummary, Project } from '@/types/board'
 import type { StepDraft } from '@/types/settings'
 
@@ -31,15 +33,6 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
   const [taskNotes, setTaskNotes] = useState('')
   const [taskRuntimeOverride, setTaskRuntimeOverride] = useState<string>('')
   const [taskSteps, setTaskSteps] = useState<StepDraft[]>([])
-
-  const readApiError = useCallback(async (response: Response, fallback: string) => {
-    try {
-      const payload = await response.json()
-      return payload?.error || fallback
-    } catch {
-      return fallback
-    }
-  }, [])
 
   const resetTaskForm = useCallback(() => {
     setTaskTitle('')
@@ -92,10 +85,9 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
 
     try {
       if (editingTask) {
-        const res = await fetch(`/api/tasks/${editingTask.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const updatedTask = await tasksApi.update(
+          editingTask.id,
+          {
             title: taskTitle,
             description: taskDescription,
             status: taskStatus,
@@ -104,22 +96,16 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
             agentId: taskAgentId || null,
             notes: taskNotes || undefined,
             runtimeOverride: taskRuntimeOverride && taskRuntimeOverride !== 'none' ? taskRuntimeOverride : null,
-          }),
-        })
-        if (!res.ok) {
-          toast({ title: await readApiError(res, 'Failed to update task'), variant: 'destructive' })
-          return
-        }
-        const updatedTask = await res.json()
+          },
+          { errorFallback: 'Failed to update task' },
+        )
         setCurrentProject(prev => prev ? {
           ...prev,
           tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
         } : null)
       } else {
-        const res = await fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const newTask = await tasksApi.create(
+          {
             title: taskTitle,
             description: taskDescription,
             status: taskStatus,
@@ -130,13 +116,9 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
             runtimeOverride: taskRuntimeOverride || undefined,
             projectId: currentProject.id,
             steps: taskSteps.length > 0 ? taskSteps : undefined,
-          }),
-        })
-        if (!res.ok) {
-          toast({ title: await readApiError(res, 'Failed to create task'), variant: 'destructive' })
-          return
-        }
-        const newTask = await res.json()
+          },
+          { errorFallback: 'Failed to create task' },
+        )
         setCurrentProject(prev => prev ? {
           ...prev,
           tasks: [...prev.tasks, newTask],
@@ -146,36 +128,34 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
       resetTaskForm()
       setTaskDialogOpen(false)
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+        return
+      }
       console.error('Error saving task:', error)
       toast({ title: 'Failed to save task', variant: 'destructive' })
     }
   }, [
     taskTitle, taskDescription, taskStatus, taskPriority, taskTag, taskAgentId,
     taskNotes, taskRuntimeOverride, taskSteps, currentProject, editingTask,
-    setCurrentProject, readApiError, resetTaskForm, toast,
+    setCurrentProject, resetTaskForm, toast,
   ])
 
   const handleCreateChain = useCallback(async () => {
     if (!currentProject || !taskTitle.trim() || taskSteps.length === 0) return
 
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const newTask = await tasksApi.create(
+        {
           title: taskTitle,
           description: taskDescription || undefined,
           status: 'BACKLOG',
           priority: taskPriority,
           projectId: currentProject.id,
           steps: taskSteps,
-        }),
-      })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to create chain'), variant: 'destructive' })
-        return
-      }
-      const newTask = await res.json()
+        },
+        { errorFallback: 'Failed to create chain' },
+      )
       setCurrentProject(prev => prev ? {
         ...prev,
         tasks: [...prev.tasks, newTask],
@@ -183,29 +163,33 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
       resetTaskForm()
       setChainDialogOpen(false)
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+        return
+      }
       console.error('Error creating chain:', error)
       toast({ title: 'Failed to create chain', variant: 'destructive' })
     }
-  }, [currentProject, taskTitle, taskDescription, taskPriority, taskSteps, setCurrentProject, readApiError, resetTaskForm, toast])
+  }, [currentProject, taskTitle, taskDescription, taskPriority, taskSteps, setCurrentProject, resetTaskForm, toast])
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
     // Permanent — steps, executions, and artifacts go with the task.
     if (!window.confirm('Delete this task? Its steps, executions, and artifacts are removed too.')) return
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to delete task'), variant: 'destructive' })
-        return
-      }
+      await tasksApi.delete(taskId, { errorFallback: 'Failed to delete task' })
       setCurrentProject(prev => prev ? {
         ...prev,
         tasks: prev.tasks.filter(t => t.id !== taskId),
       } : null)
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+        return
+      }
       console.error('Error deleting task:', error)
       toast({ title: 'Failed to delete task', variant: 'destructive' })
     }
-  }, [setCurrentProject, readApiError, toast])
+  }, [setCurrentProject, toast])
 
   const handleDragStart = useCallback((task: Task) => {
     setDraggedTask(task)
@@ -234,27 +218,22 @@ export function useTaskManager({ currentProject, setCurrentProject }: UseTaskMan
     } : null)
 
     try {
-      const res = await fetch(`/api/tasks/${movedTask.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-      if (!res.ok) {
-        rollback()
-        toast({ title: await readApiError(res, 'Failed to update task status'), variant: 'destructive' })
-        return
-      }
-      const updatedTask = await res.json()
+      const updatedTask = await tasksApi.update(movedTask.id, { status }, { errorFallback: 'Failed to update task status' })
       setCurrentProject(prev => prev ? {
         ...prev,
         tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
       } : null)
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        rollback()
+        toast({ title: error.message, variant: 'destructive' })
+        return
+      }
       console.error('Error updating task status:', error)
       rollback()
       toast({ title: 'Failed to update task status', variant: 'destructive' })
     }
-  }, [draggedTask, setCurrentProject, readApiError, toast])
+  }, [draggedTask, setCurrentProject, toast])
 
   return {
     editingTask,

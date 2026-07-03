@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
+import { ApiClientError } from '@/lib/api/client'
+import { realtimeApi } from '@/lib/api/endpoints'
+import type { RealtimeTokenResponse } from '@/types/api'
 import type { Project, Activity } from '@/types/board'
 import type { LiveAgentLogEntry } from '@/types/live-agent'
 
@@ -41,14 +44,20 @@ export function useWebSocket({
 
     const connectRealtime = async () => {
       try {
-        const res = await fetch(`/api/realtime/token?projectId=${currentProject.id}`, { cache: 'no-store' })
-        if (!res.ok) {
-          setRealtimeConfigured(false)
-          setWsConnected(false)
-          return
+        let data: RealtimeTokenResponse
+        try {
+          data = await realtimeApi.token(currentProject.id)
+        } catch (error) {
+          // API error (e.g. 503 when realtime is unconfigured) → not configured;
+          // network errors fall through to the outer catch as before.
+          if (error instanceof ApiClientError) {
+            setRealtimeConfigured(false)
+            setWsConnected(false)
+            return
+          }
+          throw error
         }
 
-        const data = await res.json()
         if (!data.token) {
           setRealtimeConfigured(Boolean(data.configured))
           setWsConnected(false)

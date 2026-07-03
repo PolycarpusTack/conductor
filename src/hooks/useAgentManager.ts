@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { ApiClientError } from '@/lib/api/client'
+import { agentsApi } from '@/lib/api/endpoints'
 import type { Agent, Project } from '@/types/board'
 
 interface UseAgentManagerParams {
@@ -16,15 +18,6 @@ export function useAgentManager({ setCurrentProject }: UseAgentManagerParams) {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [expandedAgentStats, setExpandedAgentStats] = useState<string | null>(null)
 
-  const readApiError = useCallback(async (response: Response, fallback: string) => {
-    try {
-      const payload = await response.json()
-      return payload?.error || fallback
-    } catch {
-      return fallback
-    }
-  }, [])
-
   const openEditAgentDialog = useCallback(async (agent: Agent) => {
     // Board-level agent objects come from taskBoardInclude's summary select
     // (missing maxConcurrent, invocationMode, capabilities, supportedModes,
@@ -32,13 +25,9 @@ export function useAgentManager({ setCurrentProject }: UseAgentManagerParams) {
     // Fetch the full record so the edit form doesn't silently overwrite them.
     setAgentDialogOpen(true)
     try {
-      const res = await fetch(`/api/agents/${agent.id}`, { cache: 'no-store' })
-      if (res.ok) {
-        setEditingAgent(await res.json())
-      } else {
-        setEditingAgent(agent)
-      }
+      setEditingAgent(await agentsApi.get(agent.id))
     } catch {
+      // Any failure (API error or network) falls back to the summary object.
       setEditingAgent(agent)
     }
   }, [])
@@ -51,20 +40,20 @@ export function useAgentManager({ setCurrentProject }: UseAgentManagerParams) {
     // Deletion is permanent and wipes the agent's API key — confirm first.
     if (!window.confirm('Delete this agent? This is permanent and invalidates its API key.')) return
     try {
-      const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to delete agent'), variant: 'destructive' })
-        return
-      }
+      await agentsApi.delete(agentId, { errorFallback: 'Failed to delete agent' })
       setCurrentProject(prev => prev ? {
         ...prev,
         agents: prev.agents.filter(a => a.id !== agentId),
       } : null)
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+        return
+      }
       console.error('Error deleting agent:', error)
       toast({ title: 'Failed to delete agent', variant: 'destructive' })
     }
-  }, [setCurrentProject, readApiError, toast])
+  }, [setCurrentProject, toast])
 
   return {
     editingAgent,

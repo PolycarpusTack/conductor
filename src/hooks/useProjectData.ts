@@ -2,7 +2,10 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
+import { ApiClientError, swallowApiClientError } from '@/lib/api/client'
+import { activityApi, adminApi, agentsApi, projectsApi, seedApi } from '@/lib/api/endpoints'
 import type { Project, ProjectListItem, Activity } from '@/types/board'
+import type { LegacyApiKeyStatus } from '@/types/api'
 import type { ProjectMode, ProjectRuntime, ProjectMcpConnection, ChainTemplate, TaskTemplate } from '@/types/settings'
 import type { IntegrationTrigger } from '@/components/settings-integrations'
 
@@ -34,7 +37,7 @@ export function useProjectData() {
   const [agentApiPreviews, setAgentApiPreviews] = useState<Record<string, string>>({})
   const [loadingApiKeys, setLoadingApiKeys] = useState(false)
   const [rotatingKeyId, setRotatingKeyId] = useState<string | null>(null)
-  const [legacyKeyStatus, setLegacyKeyStatus] = useState<{ projectsWithPlaintext: number; agentsWithPlaintext: number; totalWithPlaintext: number } | null>(null)
+  const [legacyKeyStatus, setLegacyKeyStatus] = useState<LegacyApiKeyStatus | null>(null)
   const [migratingLegacyKeys, setMigratingLegacyKeys] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
@@ -55,76 +58,73 @@ export function useProjectData() {
     setTriggers([])
   }, [currentProject?.id])
 
-  const readApiError = useCallback(async (response: Response, fallback: string) => {
-    try {
-      const payload = await response.json()
-      return payload?.error || fallback
-    } catch {
-      return fallback
-    }
-  }, [])
-
   const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch('/api/projects')
-      if (!res.ok) {
-        setLoadError(await readApiError(res, 'Failed to load projects'))
-        return []
-      }
-      const data: ProjectListItem[] = await res.json()
+      const data = await projectsApi.list({ errorFallback: 'Failed to load projects' })
       setProjects(data)
       setLoadError(null)
       return data
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        setLoadError(error.message)
+        return []
+      }
       console.error('Error fetching projects:', error)
       setLoadError('Failed to load projects. Check your connection and try again.')
       return []
     }
-  }, [readApiError])
+  }, [])
 
   const fetchProject = useCallback(async (projectId: string) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}`)
-      if (!res.ok) {
-        setLoadError(await readApiError(res, 'Failed to load project'))
-        return null
-      }
-      const project = await res.json() as Project
+      const project = await projectsApi.get(projectId, { errorFallback: 'Failed to load project' })
       setLoadError(null)
       return project
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        setLoadError(error.message)
+        return null
+      }
       console.error('Error fetching project:', error)
       setLoadError('Failed to load project. Check your connection and try again.')
       return null
     }
-  }, [readApiError])
+  }, [])
 
   const fetchActivities = useCallback(async (projectId: string) => {
-    const actRes = await fetch(`/api/activity?projectId=${projectId}&limit=20`)
-    if (!actRes.ok) {
-      setActivities([])
-      toast({ title: 'Failed to load activity', variant: 'destructive' })
-      return
+    let data: Activity[]
+    try {
+      data = await activityApi.list(projectId, 20)
+    } catch (error) {
+      // API error → empty list + toast (as before); network errors propagate.
+      if (error instanceof ApiClientError) {
+        setActivities([])
+        toast({ title: 'Failed to load activity', variant: 'destructive' })
+        return
+      }
+      throw error
     }
-    setActivities(await actRes.json())
+    setActivities(data)
   }, [toast])
 
   const fetchProjectSettings = useCallback(async (projectId: string) => {
     try {
-      const [modesRes, runtimesRes, mcpRes, templatesRes, taskTemplatesRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}/modes`, { cache: 'no-store' }),
-        fetch(`/api/projects/${projectId}/runtimes`, { cache: 'no-store' }),
-        fetch(`/api/projects/${projectId}/mcp-connections`, { cache: 'no-store' }),
-        fetch(`/api/projects/${projectId}/chain-templates`, { cache: 'no-store' }),
-        fetch(`/api/projects/${projectId}/task-templates`, { cache: 'no-store' }),
+      // API errors on individual collections are skipped silently (matching
+      // the old `if (res.ok)` guards); network errors fall through to catch.
+      const [modes, runtimes, mcpConnections, templates, fetchedTaskTemplates] = await Promise.all([
+        swallowApiClientError(projectsApi.modes(projectId)),
+        swallowApiClientError(projectsApi.runtimes(projectId)),
+        swallowApiClientError(projectsApi.mcpConnections(projectId)),
+        swallowApiClientError(projectsApi.chainTemplates(projectId)),
+        swallowApiClientError(projectsApi.taskTemplates(projectId)),
       ])
-      if (modesRes.ok) setProjectModes(await modesRes.json())
-      if (runtimesRes.ok) setProjectRuntimes(await runtimesRes.json())
-      if (mcpRes.ok) setProjectMcpConnections(await mcpRes.json())
-      if (templatesRes.ok) setChainTemplates(await templatesRes.json())
-      if (taskTemplatesRes.ok) setTaskTemplates(await taskTemplatesRes.json())
-      const triggersRes = await fetch(`/api/projects/${projectId}/triggers`)
-      if (triggersRes.ok) setTriggers(await triggersRes.json())
+      if (modes) setProjectModes(modes)
+      if (runtimes) setProjectRuntimes(runtimes)
+      if (mcpConnections) setProjectMcpConnections(mcpConnections)
+      if (templates) setChainTemplates(templates)
+      if (fetchedTaskTemplates) setTaskTemplates(fetchedTaskTemplates)
+      const fetchedTriggers = await swallowApiClientError(projectsApi.triggers(projectId))
+      if (fetchedTriggers) setTriggers(fetchedTriggers)
       setSettingsSyncedProjectId(projectId)
     } catch (error) {
       console.error('Error fetching project settings:', error)
@@ -175,16 +175,10 @@ export function useProjectData() {
   const handleCreateProject = useCallback(async () => {
     if (!projectName.trim()) return
     try {
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: projectName, description: projectDescription, color: projectColor }),
-      })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to create project'), variant: 'destructive' })
-        return
-      }
-      const newProject: ProjectListItem = await res.json()
+      const newProject: ProjectListItem = await projectsApi.create(
+        { name: projectName, description: projectDescription, color: projectColor },
+        { errorFallback: 'Failed to create project' },
+      )
       setProjects(prev => [newProject, ...prev])
       resetProjectForm()
       setProjectDialogOpen(false)
@@ -197,64 +191,69 @@ export function useProjectData() {
         await fetchProjectSettings(updated.id)
       }
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+        return
+      }
       console.error('Error creating project:', error)
       toast({ title: 'Failed to create project', variant: 'destructive' })
     }
-  }, [projectName, projectDescription, projectColor, fetchProject, fetchActivities, fetchProjectSettings, readApiError, resetProjectForm, toast])
+  }, [projectName, projectDescription, projectColor, fetchProject, fetchActivities, fetchProjectSettings, resetProjectForm, toast])
 
   const handleSeedDemoData = useCallback(async () => {
     setSeedingDemoData(true)
     try {
-      const res = await fetch('/api/seed', { method: 'POST' })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to load demo data'), variant: 'destructive' })
-        return
-      }
+      await seedApi.run({ errorFallback: 'Failed to load demo data' })
       await initializeBoard()
     } catch (error) {
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+        return
+      }
       console.error('Error loading demo data:', error)
       toast({ title: 'Failed to load demo data', variant: 'destructive' })
     } finally {
       setSeedingDemoData(false)
     }
-  }, [initializeBoard, readApiError, toast])
+  }, [initializeBoard, toast])
 
   // --- API Key management ---
 
   const fetchLegacyKeyStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/security/keys', { cache: 'no-store' })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to load API key security status'), variant: 'destructive' })
+      setLegacyKeyStatus(await adminApi.legacyKeyStatus({ errorFallback: 'Failed to load API key security status' }))
+    } catch (error) {
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
         return
       }
-      setLegacyKeyStatus(await res.json())
-    } catch (error) {
       console.error('Error loading API key security status:', error)
       toast({ title: 'Failed to load API key security status', variant: 'destructive' })
     }
-  }, [readApiError, toast])
+  }, [toast])
 
   const loadApiKeys = useCallback(async (project: Project) => {
     setLoadingApiKeys(true)
     setCopiedKey(null)
     try {
-      const projectRes = await fetch(`/api/projects/${project.id}/key`, { cache: 'no-store' })
-      if (!projectRes.ok) {
-        toast({ title: await readApiError(projectRes, 'Failed to load project API key'), variant: 'destructive' })
-        return
+      let projectPayload
+      try {
+        projectPayload = await projectsApi.key.get(project.id, { errorFallback: 'Failed to load project API key' })
+      } catch (error) {
+        // API errors on the project key toast without the console noise the
+        // outer catch adds (matching the old early-return on !res.ok).
+        if (error instanceof ApiClientError) {
+          toast({ title: error.message, variant: 'destructive' })
+          return
+        }
+        throw error
       }
-      const projectPayload = await projectRes.json()
       setProjectApiKey(null)
       setProjectApiPreview(projectPayload.preview || null)
 
       const keyEntries = await Promise.all(
         project.agents.map(async (agent) => {
-          const res = await fetch(`/api/agents/${agent.id}/key`, { cache: 'no-store' })
-          if (!res.ok) {
-            throw new Error(await readApiError(res, `Failed to load API key for ${agent.name}`))
-          }
-          const payload = await res.json()
+          const payload = await agentsApi.key.get(agent.id, { errorFallback: `Failed to load API key for ${agent.name}` })
           return [agent.id, payload.preview || ''] as const
         }),
       )
@@ -266,68 +265,66 @@ export function useProjectData() {
     } finally {
       setLoadingApiKeys(false)
     }
-  }, [readApiError, toast])
+  }, [toast])
 
   const rotateProjectApiKey = useCallback(async () => {
     if (!currentProject) return
     setRotatingKeyId('project')
     try {
-      const res = await fetch(`/api/projects/${currentProject.id}/key`, { method: 'POST' })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to rotate project API key'), variant: 'destructive' })
-        return
-      }
-      const payload = await res.json()
+      const payload = await projectsApi.key.rotate(currentProject.id, { errorFallback: 'Failed to rotate project API key' })
       setProjectApiKey(payload.apiKey || null)
       setProjectApiPreview(payload.preview || null)
       setCopiedKey((current) => (current === 'project' ? null : current))
       await fetchLegacyKeyStatus()
     } catch (error) {
-      console.error('Error rotating project API key:', error)
-      toast({ title: 'Failed to rotate project API key', variant: 'destructive' })
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+      } else {
+        console.error('Error rotating project API key:', error)
+        toast({ title: 'Failed to rotate project API key', variant: 'destructive' })
+      }
     } finally {
       setRotatingKeyId(null)
     }
-  }, [currentProject, fetchLegacyKeyStatus, readApiError, toast])
+  }, [currentProject, fetchLegacyKeyStatus, toast])
 
   const rotateAgentApiKey = useCallback(async (agentId: string) => {
     setRotatingKeyId(agentId)
     try {
-      const res = await fetch(`/api/agents/${agentId}/key`, { method: 'POST' })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to rotate agent API key'), variant: 'destructive' })
-        return
-      }
-      const payload = await res.json()
+      const payload = await agentsApi.key.rotate(agentId, { errorFallback: 'Failed to rotate agent API key' })
       setAgentApiKeys((prev) => ({ ...prev, [agentId]: payload.apiKey || '' }))
       setAgentApiPreviews((prev) => ({ ...prev, [agentId]: payload.preview || prev[agentId] || '' }))
       setCopiedKey((current) => (current === agentId ? null : current))
       await fetchLegacyKeyStatus()
     } catch (error) {
-      console.error('Error rotating agent API key:', error)
-      toast({ title: 'Failed to rotate agent API key', variant: 'destructive' })
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+      } else {
+        console.error('Error rotating agent API key:', error)
+        toast({ title: 'Failed to rotate agent API key', variant: 'destructive' })
+      }
     } finally {
       setRotatingKeyId(null)
     }
-  }, [fetchLegacyKeyStatus, readApiError, toast])
+  }, [fetchLegacyKeyStatus, toast])
 
   const migrateLegacyKeys = useCallback(async () => {
     if (!currentProject) return
     setMigratingLegacyKeys(true)
     try {
-      const res = await fetch('/api/admin/security/keys', { method: 'POST' })
-      if (!res.ok) {
-        toast({ title: await readApiError(res, 'Failed to migrate legacy API keys'), variant: 'destructive' })
-        return
-      }
+      await adminApi.migrateLegacyKeys({ errorFallback: 'Failed to migrate legacy API keys' })
       await Promise.all([loadApiKeys(currentProject), fetchLegacyKeyStatus()])
     } catch (error) {
-      console.error('Error migrating legacy API keys:', error)
-      toast({ title: 'Failed to migrate legacy API keys', variant: 'destructive' })
+      if (error instanceof ApiClientError) {
+        toast({ title: error.message, variant: 'destructive' })
+      } else {
+        console.error('Error migrating legacy API keys:', error)
+        toast({ title: 'Failed to migrate legacy API keys', variant: 'destructive' })
+      }
     } finally {
       setMigratingLegacyKeys(false)
     }
-  }, [currentProject, fetchLegacyKeyStatus, loadApiKeys, readApiError, toast])
+  }, [currentProject, fetchLegacyKeyStatus, loadApiKeys, toast])
 
   const copyToClipboard = useCallback(async (text: string, key: string) => {
     await navigator.clipboard.writeText(text)
