@@ -171,7 +171,8 @@ Mode DELIVERY. Objective: table-stakes task-management features on the refactore
 
 Mode DELIVERY. Objective: URL-addressable app, one data layer, accessible board. ADR-5 "Frontend data & routing architecture". Assumption A4 governs adopt-vs-remove.
 - E-1: Routes for views (board/runtime/skills/help + task deep-links); help page → server-rendered. (L)
-- E-2: TanStack Query adoption for reads + mutations; delete hand-rolled fetch/refetch web; typed API client module. (XL — split at story refinement)
+- E-2a: typed API client module; migrate the four hooks off raw fetch. (M) ✅ DONE (c0a1c33)
+- E-2b: TanStack Query adoption for reads + mutations. **DEFERRED (2026-07-03, owner decision).** Rationale: after E-2a (typed client) + E-3 (grouped contexts), the remaining payoff — cache-invalidation discipline — is largely covered, while the cost is a rewrite of the central `currentProject` state that every mutation and WS event updates, partly duplicating the WS reconciliation that already works. Not worth the risk now. Tracked as TD-023; revisit only if manual cache management becomes a demonstrated pain. (XL)
 - E-3: Project context/store kills BoardView prop drilling (110 → <15 props). (L)
 - E-4: dnd-kit with KeyboardSensor replaces native DnD; cards keyboard-reachable (role, tabIndex, Enter opens drawer). (M)
 - E-5: Memoization pass: memoized cards/columns; liveAgentLogs isolated from board re-render. (M)

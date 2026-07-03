@@ -48,6 +48,7 @@
 | ID | Description | File | Severity | Resolution |
 |----|-------------|------|----------|------------|
 | TD-022 | `agent-memory-panel.tsx` load/delete error toasts use sonner, whose `<Toaster>` is never mounted (only `ui/toaster` + use-toast is) — those errors render nowhere | src/components/agent-memory-panel.tsx | Low | Migrate to use-toast or mount sonner; fold into a toast-system consolidation |
+| TD-023 | Data layer is hand-rolled: reads/mutations patch a central `currentProject` object, reconciled by WS events. @tanstack/react-query is installed but unused (kept for a future E-2b). Deliberately DEFERRED — works today; migration is XL and partly duplicates WS reconciliation | src/hooks/*, src/app/_views/board-context.tsx | Low | Adopt react-query only if manual cache management becomes a demonstrated pain; else drop the dep in a later cleanup |
 
 ## Epic 4 — Wizard LLM Composition (2026-04-29)
 
