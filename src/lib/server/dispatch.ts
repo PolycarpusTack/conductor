@@ -20,6 +20,32 @@ export { findPreviousAgentStep, normalizeDagEdges }
 const log = getLogger('dispatch')
 const WORKER_ID = `worker-${randomBytes(4).toString('hex')}`
 
+// ---------------------------------------------------------------------------
+// Test seams (B-6-T1). Bun's module registry is shared across test files, so
+// mock.module'ing collaborators that have their own real-module test suites
+// (adapters/registry, memory, mcp-resolver) would leak the mock into those
+// suites. dispatchStep resolves these collaborators through this mutable
+// indirection instead. Production defaults are the real implementations —
+// behaviour is unchanged unless a test overrides them.
+// ---------------------------------------------------------------------------
+export const dispatchDeps = {
+  getAdapter,
+  buildWorkingMemory,
+  buildRelevantMemoryWithHits,
+  resolveMcpTools,
+}
+
+export function setDispatchDeps(overrides: Partial<typeof dispatchDeps>): void {
+  Object.assign(dispatchDeps, overrides)
+}
+
+export function resetDispatchDeps(): void {
+  dispatchDeps.getAdapter = getAdapter
+  dispatchDeps.buildWorkingMemory = buildWorkingMemory
+  dispatchDeps.buildRelevantMemoryWithHits = buildRelevantMemoryWithHits
+  dispatchDeps.resolveMcpTools = resolveMcpTools
+}
+
 // Exported for direct unit testing — see lease-step.test.ts. Callers should
 // normally go through dispatchStep(); leaseStep on its own doesn't run the
 // step, just marks it.
@@ -59,7 +85,66 @@ export async function leaseStep(stepId: string): Promise<{ taken: boolean; evict
   return { taken: true, evictedFrom }
 }
 
+// ---------------------------------------------------------------------------
+// In-process re-entry guard (B-1). leaseStep deliberately lets a worker
+// re-take its own lease (that is how a live worker's retries proceed), which
+// means the DB lease alone cannot stop the SAME process from dispatching a
+// step twice when poll cycles overlap. Steps this process is currently
+// dispatching are tracked here; re-entry exits silently.
+// ---------------------------------------------------------------------------
+const inFlightSteps = new Set<string>()
+
 export async function dispatchStep(stepId: string) {
+  if (inFlightSteps.has(stepId)) return
+  inFlightSteps.add(stepId)
+  try {
+    // B-1: take the lease FIRST, before the step load and the expensive
+    // prelude (memory build, embeddings, MCP resolution). pollAndDispatch
+    // selects steps before they are leased — if the prelude outlasts the poll
+    // interval, the next cycle re-selects the still-unleased step. Leasing up
+    // front makes that second selection lose here instead of after both have
+    // paid for the prelude (and dispatched to the LLM).
+    const leased = await leaseStep(stepId)
+    if (!leased.taken) return
+
+    await appendStepEvent(stepId, 'leased', {
+      worker: WORKER_ID,
+      ...(leased.evictedFrom ? { evictedFrom: leased.evictedFrom } : {}),
+    })
+
+    // Any unexpected throw while we hold the lease but haven't recorded an
+    // execution yet must give the lease back — otherwise the step is stuck
+    // until the lease-timeout sweep.
+    let prepared: Awaited<ReturnType<typeof prepareDispatch>>
+    try {
+      prepared = await prepareDispatch(stepId, leased.evictedFrom)
+    } catch (err) {
+      await releaseLease(stepId)
+      throw err
+    }
+    if (!prepared) return
+
+    await executeDispatch(stepId, prepared)
+  } finally {
+    inFlightSteps.delete(stepId)
+  }
+}
+
+/** Clears this worker's lease without touching step status. */
+async function releaseLease(stepId: string) {
+  await db.taskStep.updateMany({
+    where: { id: stepId, leasedBy: WORKER_ID },
+    data: { leasedBy: null, leasedAt: null },
+  })
+}
+
+/**
+ * Loads the step and assembles everything the adapter call needs (prompt,
+ * memory, tools, runtime config). Returns null on a handled early exit —
+ * every such path either releases the lease or clears it as part of a status
+ * change, so the caller doesn't have to.
+ */
+async function prepareDispatch(stepId: string, evictedFrom: string | null) {
   const step = await db.taskStep.findUnique({
     where: { id: stepId },
     include: {
@@ -68,14 +153,36 @@ export async function dispatchStep(stepId: string) {
     },
   })
 
-  if (!step || !step.agent || step.status !== 'active') return
+  if (!step || !step.agent || step.status !== 'active') {
+    // leaseStep only succeeds on an active step, but the state may have moved
+    // between the lease and this read — give the lease back and bail.
+    await releaseLease(stepId)
+    return null
+  }
+
+  if (evictedFrom) {
+    log.warn(`reclaimed expired lease from ${evictedFrom} on step ${stepId}`)
+    await db.activityLog.create({
+      data: {
+        action: 'lease_reclaimed',
+        taskId: step.taskId,
+        agentId: step.agentId,
+        projectId: step.task.projectId,
+        details: JSON.stringify({ stepId, previousLeaseholder: evictedFrom, newLeaseholder: WORKER_ID }),
+      },
+    })
+  }
 
   const agent = step.agent
   if (agent.projectId !== step.task.projectId) {
+    // failStep clears the lease along with the status change.
     await failStep(stepId, step.task.projectId, 'Agent does not belong to this project')
-    return
+    return null
   }
-  if (!agent.runtimeId) return
+  if (!agent.runtimeId) {
+    await releaseLease(stepId)
+    return null
+  }
 
   const runtime = await db.projectRuntime.findUnique({
     where: { id: agent.runtimeId },
@@ -83,21 +190,26 @@ export async function dispatchStep(stepId: string) {
 
   if (!runtime) {
     await failStep(stepId, step.task.projectId, 'Runtime not found')
-    return
+    return null
   }
 
-  const adapter = getAdapter(runtime.adapter)
+  const adapter = dispatchDeps.getAdapter(runtime.adapter)
   if (!adapter || !adapter.available) {
     await failStep(stepId, step.task.projectId, `Adapter "${runtime.adapter}" not available`)
-    return
+    return null
   }
 
   const activeCount = await db.taskStep.count({
     where: { agentId: agent.id, status: 'active', id: { not: stepId } },
   })
   if (activeCount >= agent.maxConcurrent) {
-    await db.taskStep.update({ where: { id: stepId }, data: { status: 'pending' } })
-    return
+    // Demote AND clear the lease we now hold — a pending step carrying a
+    // stale lease would be skipped by the poller once it is re-activated.
+    await db.taskStep.update({
+      where: { id: stepId },
+      data: { status: 'pending', leasedBy: null, leasedAt: null },
+    })
+    return null
   }
 
   // Find predecessor step: use prevSteps edges for DAG, order-1 for linear
@@ -152,11 +264,11 @@ export async function dispatchStep(stepId: string) {
     .join('\n')
 
   const [workingMemory, relevantMemoryResult] = await Promise.all([
-    buildWorkingMemory({
+    dispatchDeps.buildWorkingMemory({
       agentId: agent.id,
       projectId: step.task.projectId,
     }),
-    buildRelevantMemoryWithHits({
+    dispatchDeps.buildRelevantMemoryWithHits({
       agentId: agent.id,
       projectId: step.task.projectId,
       query: memoryQuery,
@@ -192,7 +304,7 @@ export async function dispatchStep(stepId: string) {
   // Mode policy (Epic S4): the mode's explicit allowlist narrows the
   // built-in heuristics further (layers compose).
   const modeToolAllowlist = safeJsonParse<string[] | null>(projectMode?.toolAllowlist ?? null, null)
-  const tools = await resolveMcpTools(mcpConnectionIds, step.mode, modeToolAllowlist)
+  const tools = await dispatchDeps.resolveMcpTools(mcpConnectionIds, step.mode, modeToolAllowlist)
 
   const runtimeConfig: Record<string, unknown> = {
     ...safeJsonParse<Record<string, unknown>>(runtime.config, {}),
@@ -200,44 +312,75 @@ export async function dispatchStep(stepId: string) {
     endpoint: runtime.endpoint,
   }
 
-  // Lease the step for idempotent execution
-  const leased = await leaseStep(stepId)
-  if (!leased.taken) return
-  if (leased.evictedFrom) {
-    log.warn(`reclaimed expired lease from ${leased.evictedFrom} on step ${stepId}`)
-    await db.activityLog.create({
-      data: {
-        action: 'lease_reclaimed',
-        taskId: step.taskId,
-        agentId: step.agentId,
-        projectId: step.task.projectId,
-        details: JSON.stringify({ stepId, previousLeaseholder: leased.evictedFrom, newLeaseholder: WORKER_ID }),
-      },
-    })
+  return {
+    step,
+    agent,
+    adapter,
+    systemPrompt,
+    fullTaskContext,
+    previousStep,
+    tools,
+    runtimeConfig,
+    mcpConnectionIds,
+    workingMemory,
+    relevantMemoryResult,
   }
+}
 
-  await appendStepEvent(stepId, 'leased', {
-    worker: WORKER_ID,
-    ...(leased.evictedFrom ? { evictedFrom: leased.evictedFrom } : {}),
+type PreparedDispatch = NonNullable<Awaited<ReturnType<typeof prepareDispatch>>>
+
+// B-1: attempt numbers are allocated by inserting against the
+// (stepId, attempt) unique constraint and advancing on conflict — never from
+// count(), whose racy read let two staggered dispatchers derive DIFFERENT
+// attempt numbers and both insert (double dispatch). The lease is the mutual
+// exclusion; this loop only guarantees a fresh, correct number.
+const ATTEMPT_ALLOCATION_RETRIES = 5
+
+async function allocateExecution(stepId: string) {
+  const latest = await db.stepExecution.findFirst({
+    where: { stepId },
+    orderBy: { attempt: 'desc' },
+    select: { attempt: true },
   })
+  let attempt = (latest?.attempt ?? 0) + 1
 
-  // Determine attempt number
-  const previousExecutions = await db.stepExecution.count({ where: { stepId } })
-  const attemptNumber = previousExecutions + 1
-
-  // The unique (stepId, attempt) constraint on StepExecution is the
-  // idempotency key: if two workers race past the lease check with the same
-  // attempt number, exactly one insert wins and the loser aborts here.
-  let execution: Awaited<ReturnType<typeof createExecution>>
-  try {
-    execution = await createExecution(stepId, attemptNumber)
-  } catch (err) {
-    if ((err as { code?: string })?.code === 'P2002') {
-      log.warn(`attempt ${attemptNumber} of step ${stepId} already claimed by another worker`)
-      return
+  for (let i = 0; i < ATTEMPT_ALLOCATION_RETRIES; i++) {
+    try {
+      return { execution: await createExecution(stepId, attempt), attempt }
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'P2002') {
+        log.warn(`attempt ${attempt} of step ${stepId} already exists — advancing to ${attempt + 1}`)
+        attempt += 1
+        continue
+      }
+      throw err
     }
-    throw err
   }
+  return null
+}
+
+async function executeDispatch(stepId: string, prepared: PreparedDispatch) {
+  const {
+    step,
+    agent,
+    adapter,
+    systemPrompt,
+    fullTaskContext,
+    previousStep,
+    tools,
+    runtimeConfig,
+    mcpConnectionIds,
+    workingMemory,
+    relevantMemoryResult,
+  } = prepared
+
+  const allocated = await allocateExecution(stepId)
+  if (!allocated) {
+    log.error(`could not allocate an execution attempt for step ${stepId} after ${ATTEMPT_ALLOCATION_RETRIES} conflicts`)
+    await releaseLease(stepId)
+    return
+  }
+  const { execution, attempt: attemptNumber } = allocated
 
   await appendStepEvent(stepId, 'started', { attempt: attemptNumber, executionId: execution.id })
 
