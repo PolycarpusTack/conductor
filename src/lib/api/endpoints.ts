@@ -20,6 +20,8 @@ import type {
   ApiKeyPreviewResponse,
   ApiKeyRotationResponse,
   ApiSuccessResponse,
+  BatchTaskBody,
+  BatchTaskResponse,
   CreateProjectBody,
   CreateProjectResponse,
   CreateTaskBody,
@@ -79,6 +81,17 @@ export const tasksApi = {
 
   delete: (taskId: string, opts?: ApiCallOptions) =>
     apiFetch<ApiSuccessResponse>(`/api/tasks/${taskId}`, { method: 'DELETE', ...opts }),
+
+  // D-3: bulk move/archive/delete in one call.
+  batch: (body: BatchTaskBody, opts?: ApiCallOptions) =>
+    apiFetch<BatchTaskResponse>('/api/tasks/batch', { method: 'POST', body, ...opts }),
+
+  // D-3 undo helpers: reverse a bulk delete/archive via the existing routes.
+  restore: (taskId: string, opts?: ApiCallOptions) =>
+    apiFetch<{ success: boolean; taskId: string }>(`/api/tasks/${taskId}/restore`, { method: 'POST', ...opts }),
+
+  unarchive: (taskId: string, opts?: ApiCallOptions) =>
+    apiFetch<{ success: boolean; taskId: string }>(`/api/tasks/${taskId}/unarchive`, { method: 'POST', ...opts }),
 }
 
 export const agentsApi = {

@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   DndContext,
@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils'
 import { NoRuntimeBanner } from '@/components/no-runtime-banner'
 import { BoardTaskCard } from '@/components/board-task-card'
 import { BoardFilterBar } from '@/components/board-filter-bar'
+import { BulkActionBar } from '@/components/bulk-action-bar'
 import {
   useProjectDataCtx,
   useTaskActions,
@@ -214,9 +215,50 @@ export default function BoardPage() {
     mobileColumn, setMobileColumn,
     handleDeleteTask,
     handleDragStart, handleDrop,
+    bulkMoveTasks, bulkArchiveTasks, bulkDeleteTasks,
     openEditTaskDialog, openNewTaskDialog,
   } = useTaskActions()
   const { setSettingsTab, boardFilter, clearBoardFilter } = useUiState()
+
+  // D-3: multi-select lives in board-page local state — selection is ephemeral
+  // (no need to survive view switches, unlike the D-1 filter slice), so keeping
+  // it here is simpler and avoids invalidating unrelated context consumers.
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+
+  // Stable callbacks (functional updaters, empty deps) so toggling one card's
+  // selection doesn't change the callback identity and re-render every card —
+  // only the card whose `selected` boolean flipped re-renders (preserves E-5).
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode((on) => {
+      if (on) setSelectedIds(new Set()) // leaving select mode drops the selection
+      return !on
+    })
+  }, [])
+
+  // Bulk actions run over the current selection, then clear it (the undo lives
+  // on the toast raised by the handler). Selection stays until the batch fires.
+  const handleBulkMove = useCallback((status: TaskStatus) => {
+    void bulkMoveTasks(Array.from(selectedIds), status)
+    setSelectedIds(new Set())
+  }, [bulkMoveTasks, selectedIds])
+  const handleBulkArchive = useCallback(() => {
+    void bulkArchiveTasks(Array.from(selectedIds))
+    setSelectedIds(new Set())
+  }, [bulkArchiveTasks, selectedIds])
+  const handleBulkDelete = useCallback(() => {
+    void bulkDeleteTasks(Array.from(selectedIds))
+    setSelectedIds(new Set())
+  }, [bulkDeleteTasks, selectedIds])
 
   // D-1: apply the board filter client-side over the full loaded task set.
   // Inactive filter returns the same array reference, so tasksByStatus below
@@ -368,13 +410,26 @@ export default function BoardPage() {
       ) : (
         <ScrollArea className="h-[calc(100vh-3.5rem)] custom-scrollbar">
           <div className="p-4">
-            {/* D-1: search + filter controls above the board */}
+            {/* D-1: search + filter controls above the board (D-3: + Select toggle) */}
             <BoardFilterBar
               agents={currentProject.agents}
               tags={filterTags}
               filteredCount={filteredCount}
               totalCount={totalCount}
+              selectionMode={selectionMode}
+              onToggleSelectionMode={toggleSelectionMode}
             />
+
+            {/* D-3: bulk action bar — only while at least one task is selected */}
+            {selectedIds.size > 0 && (
+              <BulkActionBar
+                count={selectedIds.size}
+                onMove={handleBulkMove}
+                onArchive={handleBulkArchive}
+                onDelete={handleBulkDelete}
+                onClear={clearSelection}
+              />
+            )}
 
             {/* D-1: no-filter-match state — distinct from the empty-board (no
                 projects) and error states above; only shown when a filter is
@@ -461,6 +516,9 @@ export default function BoardPage() {
                             onEdit={openEditTaskDialog}
                             onDelete={handleDeleteTask}
                             liveActivity
+                            selectable={selectionMode}
+                            selected={selectedIds.has(task.id)}
+                            onToggleSelect={toggleSelect}
                           />
                         ))}
 
@@ -498,6 +556,9 @@ export default function BoardPage() {
                           tagColors={tagColors}
                           onOpen={setSelectedTask}
                           onViewSteps={setViewingTaskSteps}
+                          selectable={selectionMode}
+                          selected={selectedIds.has(task.id)}
+                          onToggleSelect={toggleSelect}
                         />
                       ))}
 

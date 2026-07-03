@@ -1,9 +1,9 @@
 'use client'
 
 import { memo } from 'react'
-import type { CSSProperties, KeyboardEvent } from 'react'
+import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 import { Button } from '@/components/ui/button'
-import { CalendarClock, Eye, GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { CalendarClock, Check, Eye, GripVertical, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentBadge } from '@/components/agent-badge'
 import { ActivityTail } from '@/components/activity-tail'
@@ -99,6 +99,15 @@ interface BoardTaskCardProps {
   sortable?: CardSortable
   /** Rendered inside the DragOverlay: static lifted appearance, no interaction. */
   overlay?: boolean
+  /**
+   * D-3: when true, a selection checkbox is shown at the card's leading edge.
+   * `selected` reflects its state; `onToggleSelect(task.id)` flips it. These are
+   * a self-contained control (own click/keydown, propagation stopped) so they
+   * never trigger the card's click-to-open or the grip's drag activation.
+   */
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelect?: (id: string) => void
 }
 
 export const BoardTaskCard = memo(function BoardTaskCard({
@@ -112,6 +121,9 @@ export const BoardTaskCard = memo(function BoardTaskCard({
   liveActivity = false,
   sortable,
   overlay = false,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: BoardTaskCardProps) {
   const steps = task.steps ?? []
   const activeStep = steps.find((s) => s.status === 'active')
@@ -136,6 +148,20 @@ export const BoardTaskCard = memo(function BoardTaskCard({
     }
   }
 
+  // D-3: the checkbox is its own control. Stop propagation so a click/Space on
+  // it toggles selection without opening the drawer (card onClick/onKeyDown) or
+  // lifting the card (the grip owns drag — the checkbox is a separate node).
+  const toggleSelect = (e: MouseEvent | KeyboardEvent) => {
+    e.stopPropagation()
+    onToggleSelect?.(task.id)
+  }
+  const handleCheckboxKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      toggleSelect(e)
+    }
+  }
+
   return (
     <div
       ref={sortable?.setNodeRef}
@@ -151,9 +177,29 @@ export const BoardTaskCard = memo(function BoardTaskCard({
         !overlay && 'cursor-pointer',
         sortable?.isDragging && 'opacity-40',
         overlay && 'cursor-grabbing shadow-lg ring-1 ring-border/60',
+        selected && 'border-[var(--op-blue-dim)] ring-1 ring-[var(--op-blue)]',
       )}
     >
       <div className="flex items-start gap-2">
+        {selectable && (
+          <div
+            role="checkbox"
+            aria-checked={selected}
+            aria-label={`Select task: ${task.title}`}
+            tabIndex={0}
+            onClick={toggleSelect}
+            onKeyDown={handleCheckboxKeyDown}
+            className={cn(
+              'mt-0.5 flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded border transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              selected
+                ? 'border-[var(--op-blue)] bg-[var(--op-blue)] text-white'
+                : 'border-border/60 bg-card hover:border-[var(--op-blue-dim)]',
+            )}
+          >
+            {selected && <Check className="h-3 w-3" strokeWidth={3} />}
+          </div>
+        )}
         {showGrip && (
           sortable ? (
             <button

@@ -5,7 +5,7 @@
  */
 
 import type { StepDraft } from '@/types/settings'
-import type { ProjectListItem, TaskPriority, TaskStatus } from '@/types/board'
+import type { ProjectListItem, Task, TaskPriority, TaskStatus } from '@/types/board'
 
 // --- Generic ---
 
@@ -53,6 +53,30 @@ export interface UpdateTaskBody {
   /** D-2: ISO datetime string to set, or null to clear the due date. */
   dueDate?: string | null
   runtimeOverride?: string | null
+}
+
+// --- Bulk task operations (D-3) ---
+
+export type BatchTaskAction = 'move' | 'archive' | 'delete'
+
+/** POST /api/tasks/batch — all ids must belong to one project. */
+export interface BatchTaskBody {
+  action: BatchTaskAction
+  taskIds: string[]
+  /** Required when action === 'move'. */
+  status?: TaskStatus
+}
+
+export interface BatchTaskResponse {
+  success: boolean
+  action: BatchTaskAction
+  status?: TaskStatus
+  /** Ids actually mutated. */
+  affected: string[]
+  /** Ids that were a no-op (already deleted/archived, already at status, unknown). */
+  skipped: string[]
+  /** Refreshed task objects for a move (empty for archive/delete). */
+  tasks: Task[]
 }
 
 // --- API keys ---

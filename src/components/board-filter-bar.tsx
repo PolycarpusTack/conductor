@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { ListChecks, Search, SlidersHorizontal, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useUiState } from '@/app/_views/board-context'
 import { isBoardFilterActive, type BoardFilter } from '@/app/_views/use-filtered-tasks'
 import type { Agent, TaskPriority } from '@/types/board'
@@ -38,6 +39,9 @@ interface BoardFilterBarProps {
   tags: string[]
   filteredCount: number
   totalCount: number
+  /** D-3: multi-select mode toggle. Selection state itself lives in BoardPage. */
+  selectionMode?: boolean
+  onToggleSelectionMode?: () => void
 }
 
 /**
@@ -47,7 +51,14 @@ interface BoardFilterBarProps {
  * + Radix Select/Popover keep it keyboard-accessible; the row wraps and the
  * controls stay reachable below md.
  */
-export function BoardFilterBar({ agents, tags, filteredCount, totalCount }: BoardFilterBarProps) {
+export function BoardFilterBar({
+  agents,
+  tags,
+  filteredCount,
+  totalCount,
+  selectionMode = false,
+  onToggleSelectionMode,
+}: BoardFilterBarProps) {
   const { boardFilter, setBoardFilter, clearBoardFilter } = useUiState()
   const active = isBoardFilterActive(boardFilter)
   const dimensions = activeDimensionCount(boardFilter)
@@ -159,6 +170,21 @@ export function BoardFilterBar({ agents, tags, filteredCount, totalCount }: Boar
           </label>
         </PopoverContent>
       </Popover>
+
+      {/* D-3: enter/exit multi-select mode */}
+      {onToggleSelectionMode && (
+        <Button
+          variant={selectionMode ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 gap-1.5 text-xs', selectionMode && 'bg-[var(--op-blue)] hover:bg-[var(--op-blue)]/90')}
+          onClick={onToggleSelectionMode}
+          aria-pressed={selectionMode}
+          aria-label={selectionMode ? 'Exit select mode' : 'Select tasks'}
+        >
+          <ListChecks className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">{selectionMode ? 'Done' : 'Select'}</span>
+        </Button>
+      )}
 
       {/* Result count */}
       <span className="text-[11px] text-muted-foreground/70" aria-live="polite">

@@ -141,6 +141,10 @@ export interface TaskActionsContextValue {
   handleDragStart: (task: Task) => void
   handleDragOver: (e: DragEvent) => void
   handleDrop: (status: TaskStatus) => Promise<void>
+  // D-3: bulk operations over a multi-selection (move / archive / delete + undo).
+  bulkMoveTasks: (taskIds: string[], status: TaskStatus) => Promise<void>
+  bulkArchiveTasks: (taskIds: string[]) => Promise<void>
+  bulkDeleteTasks: (taskIds: string[]) => Promise<void>
   openEditTaskDialog: (task: Task) => void
   openNewTaskDialog: (status?: TaskStatus) => void
   openNewChainDialog: () => void
