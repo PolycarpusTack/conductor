@@ -1,211 +1,20 @@
-'use client'
-
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Search, ChevronRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Fragment } from 'react'
 import { APP_VERSION_SHORT } from '@/lib/version'
+import { HelpTocNav } from './help-toc-nav'
+import { HelpBackButton } from './help-back-button'
 
 type Tone = 'cobalt' | 'teal' | 'amber' | 'purple' | 'neon'
 
 // =============================================================================
-// Help & User Guide
+// Help & User Guide (E-1: server-rendered)
 // A comprehensive in-app guide for Conductor.
-// Organised into a sticky left-hand Table of Contents and right-hand content.
-// Every anchor-linkable section is registered in TOC below so the sidebar,
+// This module is a SERVER component: the ~3k lines of guide content are
+// rendered on the server (RSC) and never enter the client JS bundle. The two
+// interactive pieces — the back button and the TOC filter/scroll-spy — are
+// thin client islands (help-back-button.tsx, help-toc-nav.tsx).
+// Every anchor-linkable section is registered in ./toc.ts so the sidebar,
 // search filter and scroll-spy stay in sync.
 // =============================================================================
-
-type TocItem = { id: string; title: string }
-type TocGroup = { label: string; items: TocItem[] }
-
-const TOC: TocGroup[] = [
-  {
-    label: 'Release notes',
-    items: [
-      { id: 'help-release-0-4-0', title: "What's new in 0.4.0" },
-      { id: 'help-release-0-3-0', title: "What's new in 0.3.0" },
-      { id: 'help-release-0-2-0', title: "What's new in 0.2.0" },
-      { id: 'help-release-0-1-0', title: "What's new in 0.1.0" },
-      { id: 'help-release-0-6', title: "What's new in 0.6" },
-      { id: 'help-release-0-5', title: "What's new in 0.5" },
-      { id: 'help-release-0-4', title: "What's new in 0.4" },
-      { id: 'help-release-0-3', title: "What's new in 0.3" },
-      { id: 'help-release-0-2', title: "What's new in 0.2" },
-      { id: 'help-release-0-1', title: "What's new in 0.1" },
-    ],
-  },
-  {
-    label: 'Getting Started',
-    items: [
-      { id: 'help-overview', title: 'What is Conductor?' },
-      { id: 'help-audience', title: 'Who is this for?' },
-      { id: 'help-concepts', title: 'Core concepts' },
-      { id: 'help-quickstart', title: '10-minute quick start' },
-      { id: 'help-first-project', title: 'Your first project, step by step' },
-      { id: 'help-anatomy', title: 'Anatomy of the app' },
-    ],
-  },
-  {
-    label: 'The Board',
-    items: [
-      { id: 'help-board', title: 'The Kanban board' },
-      { id: 'help-tasks', title: 'Creating and editing tasks' },
-      { id: 'help-task-states', title: 'Task state machine' },
-      { id: 'help-task-drawer', title: 'Task detail drawer' },
-      { id: 'help-review-gates', title: 'Human review gates' },
-    ],
-  },
-  {
-    label: 'Agents',
-    items: [
-      { id: 'help-agents', title: 'What is an agent?' },
-      { id: 'help-agent-create', title: 'Creating an agent' },
-      { id: 'help-agent-roles', title: 'Agent roles' },
-      { id: 'help-agent-invocation', title: 'HTTP vs. Daemon' },
-      { id: 'help-agent-keys', title: 'Agent API keys' },
-      { id: 'help-agent-status', title: 'Active, idle, and muted' },
-    ],
-  },
-  {
-    label: 'Modes',
-    items: [
-      { id: 'help-modes', title: 'What are modes?' },
-      { id: 'help-modes-builtin', title: 'Built-in modes' },
-      { id: 'help-modes-custom', title: 'Custom modes' },
-      { id: 'help-modes-permissions', title: 'Scoped tool permissions' },
-    ],
-  },
-  {
-    label: 'Chains & Workflows',
-    items: [
-      { id: 'help-chains', title: 'What is a chain?' },
-      { id: 'help-chain-templates', title: 'Chain templates' },
-      { id: 'help-chain-builder', title: 'Using the chain builder' },
-      { id: 'help-workflow-editor', title: 'Workflow editor' },
-      { id: 'help-handoffs', title: 'Automatic handoffs' },
-    ],
-  },
-  {
-    label: 'Skills Library',
-    items: [
-      { id: 'help-skills', title: 'Skills overview' },
-      { id: 'help-skills-search', title: 'Semantic search' },
-      { id: 'help-skills-create', title: 'Creating skills' },
-    ],
-  },
-  {
-    label: 'MCP Connections',
-    items: [
-      { id: 'help-mcp', title: 'What is MCP?' },
-      { id: 'help-mcp-connect', title: 'Connecting a server' },
-      { id: 'help-mcp-tools', title: 'Tool execution loop' },
-    ],
-  },
-  {
-    label: 'Runtimes',
-    items: [
-      { id: 'help-runtimes', title: 'What is a runtime?' },
-      { id: 'help-runtimes-add', title: 'Adding a runtime' },
-    ],
-  },
-  {
-    label: 'Templates',
-    items: [
-      { id: 'help-templates', title: 'Task templates' },
-      { id: 'help-chain-templates-ref', title: 'Chain templates reference' },
-    ],
-  },
-  {
-    label: 'Automation',
-    items: [
-      { id: 'help-automation', title: 'Automation overview' },
-      { id: 'help-automation-dispatch', title: 'Auto-dispatch rules' },
-    ],
-  },
-  {
-    label: 'Integrations',
-    items: [
-      { id: 'help-integrations', title: 'Triggers & Reactions overview' },
-      { id: 'help-integrations-triggers', title: 'Triggers' },
-      { id: 'help-integrations-reactions', title: 'Reactions' },
-      { id: 'help-integrations-templates', title: 'Mustache templates' },
-      { id: 'help-integrations-failures', title: 'Failure handling' },
-    ],
-  },
-  {
-    label: 'Observability',
-    items: [
-      { id: 'help-obs-runtime', title: 'Runtime dashboard' },
-      { id: 'help-obs-agent', title: 'Agent activity dashboard' },
-      { id: 'help-obs-overview', title: 'Observability dashboard' },
-      { id: 'help-obs-daemon-log', title: 'Daemon log viewer' },
-      { id: 'help-obs-step-output', title: 'Step output viewer' },
-      { id: 'help-obs-attempts', title: 'Attempt comparison' },
-      { id: 'help-obs-artifacts', title: 'Artifacts' },
-    ],
-  },
-  {
-    label: 'Settings',
-    items: [
-      { id: 'help-settings-general', title: 'General' },
-      { id: 'help-settings-agents', title: 'Agents' },
-      { id: 'help-settings-api', title: 'API keys' },
-      { id: 'help-settings-activity', title: 'Activity log' },
-      { id: 'help-settings-modes', title: 'Modes' },
-      { id: 'help-settings-runtimes', title: 'Runtimes' },
-      { id: 'help-settings-mcp', title: 'MCP' },
-      { id: 'help-settings-templates', title: 'Templates' },
-      { id: 'help-settings-analytics', title: 'Analytics' },
-      { id: 'help-settings-automation', title: 'Automation' },
-      { id: 'help-settings-integrations', title: 'Integrations' },
-    ],
-  },
-  {
-    label: 'Daemon mode',
-    items: [
-      { id: 'help-daemon', title: 'Daemon mode overview' },
-      { id: 'help-daemon-setup', title: 'Setting up the daemon' },
-      { id: 'help-daemon-heartbeat', title: 'Heartbeat & registration' },
-      { id: 'help-daemon-steps', title: 'Claiming steps' },
-    ],
-  },
-  {
-    label: 'APIs (advanced)',
-    items: [
-      { id: 'help-api-cli', title: 'CLI-style API' },
-      { id: 'help-api-http', title: 'HTTP agent API' },
-      { id: 'help-api-auth', title: 'Authentication' },
-    ],
-  },
-  {
-    label: 'Security',
-    items: [
-      { id: 'help-security', title: 'Admin login & session' },
-      { id: 'help-security-keys', title: 'Key storage' },
-      { id: 'help-security-rotation', title: 'Key rotation' },
-    ],
-  },
-  {
-    label: 'Troubleshooting',
-    items: [
-      { id: 'help-trouble-ws', title: 'WebSocket shows Offline' },
-      { id: 'help-trouble-stuck', title: 'A task is stuck' },
-      { id: 'help-trouble-agent', title: "An agent won't claim" },
-      { id: 'help-trouble-daemon', title: 'Daemon keeps disconnecting' },
-      { id: 'help-trouble-clear', title: 'Clearing data & reset' },
-    ],
-  },
-  {
-    label: 'Reference',
-    items: [
-      { id: 'help-faq', title: 'FAQ' },
-      { id: 'help-glossary', title: 'Glossary' },
-      { id: 'help-shortcuts', title: 'Keyboard shortcuts' },
-      { id: 'help-storage', title: 'Where data is stored' },
-    ],
-  },
-]
 
 // =============================================================================
 // Primitive building blocks
@@ -366,69 +175,12 @@ function Table({ head, rows }: { head: React.ReactNode[]; rows: React.ReactNode[
 }
 
 // =============================================================================
-// Main component
+// Main content (server-rendered)
 // =============================================================================
 
-export function HelpPage({ onBack }: { onBack: () => void }) {
-  const [query, setQuery] = useState('')
-  const [activeId, setActiveId] = useState<string>(() => TOC[0]?.items[0]?.id ?? '')
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const filterRef = useRef<HTMLInputElement>(null)
-
-  // Scroll-spy via IntersectionObserver, scoped to this page's scroll container.
-  // rootMargin puts the active zone at the top ~140px of the container and
-  // ignores the lower 60%, so the "active" item is whichever section has just
-  // crossed the top of the visible area.
-  useEffect(() => {
-    const root = scrollRef.current
-    if (!root) return
-    const allIds = TOC.flatMap((g) => g.items.map((it) => it.id))
-    const elements = allIds
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => el !== null)
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Pick the topmost intersecting section each tick. If nothing is
-        // intersecting (e.g. a very long section that fills the viewport),
-        // keep the previous activeId.
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
-        if (visible[0]) setActiveId(visible[0].target.id)
-      },
-      { root, rootMargin: '-140px 0px -60% 0px', threshold: 0 }
-    )
-
-    elements.forEach((el) => observer.observe(el))
-    return () => observer.disconnect()
-  }, [])
-
-  // `/` focuses the filter input when the help page has focus (ignored inside
-  // text fields so users can type slashes in search itself).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== '/') return
-      const target = e.target as HTMLElement | null
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
-      e.preventDefault()
-      filterRef.current?.focus()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
-  const visibleTOC = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return TOC
-    return TOC.map((g) => ({
-      ...g,
-      items: g.items.filter((it) => it.title.toLowerCase().includes(q) || g.label.toLowerCase().includes(q)),
-    })).filter((g) => g.items.length > 0)
-  }, [query])
-
+export function HelpContent() {
   return (
-    <div ref={scrollRef} className="h-[calc(100vh-3.5rem)] overflow-auto">
+    <div id="help-scroll-root" className="h-[calc(100vh-3.5rem)] overflow-auto">
       <div className="mx-auto max-w-[1400px] px-6 py-8">
         {/* Page header */}
         <header className="mb-8 flex items-start justify-between gap-6 flex-wrap">
@@ -446,61 +198,13 @@ export function HelpPage({ onBack }: { onBack: () => void }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onBack} className="h-8">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-              Back to Board
-            </Button>
+            <HelpBackButton />
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-10">
-          {/* Sticky TOC */}
-          <aside className="lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-auto pr-2 -mr-2">
-            <div className="relative mb-4">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-              <Input
-                ref={filterRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter topics... (/)"
-                aria-label="Filter help topics"
-                className="h-8 pl-8 text-xs bg-surface/40 border-border/30"
-              />
-            </div>
-            <nav aria-label="Help contents" className="space-y-5">
-              {visibleTOC.length === 0 && (
-                <p className="text-xs text-muted-foreground/60 italic">No topics match &ldquo;{query}&rdquo;.</p>
-              )}
-              {visibleTOC.map((group) => (
-                <div key={group.label}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50 mb-1.5 px-2">
-                    {group.label}
-                  </div>
-                  <ul className="space-y-0.5">
-                    {group.items.map((item) => {
-                      const active = activeId === item.id
-                      return (
-                        <li key={item.id}>
-                          <a
-                            href={`#${item.id}`}
-                            aria-current={active ? 'location' : undefined}
-                            className={`group flex items-center gap-1.5 px-2 py-1 rounded text-[12px] leading-tight transition-colors ${
-                              active
-                                ? 'bg-[var(--cobalt)]/10 text-foreground'
-                                : 'text-muted-foreground/75 hover:text-foreground hover:bg-surface/40'
-                            }`}
-                          >
-                            <ChevronRight className={`h-3 w-3 shrink-0 transition-opacity ${active ? 'opacity-100 text-[var(--cobalt-mid)]' : 'opacity-0 group-hover:opacity-40'}`} />
-                            <span className="truncate">{item.title}</span>
-                          </a>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </nav>
-          </aside>
+          {/* Sticky TOC (client island: filter + scroll-spy) */}
+          <HelpTocNav />
 
           {/* Content */}
           <article className="min-w-0 max-w-3xl">
