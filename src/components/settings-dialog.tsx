@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingsModes } from '@/components/settings-modes'
 import { SettingsRuntimes } from '@/components/settings-runtimes'
@@ -425,9 +426,15 @@ export function SettingsDialog({
                   </h4>
                   <p className="text-xs text-muted-foreground mb-2">Loaded on demand and managed separately from general project data. Raw keys are shown only immediately after rotation.</p>
                   <div className="flex items-center gap-2">
+                    {loadingApiKeys ? (
+                      <div className="flex-1 bg-muted/30 px-3 py-2 rounded">
+                        <Skeleton className="h-4 w-48 max-w-full" />
+                      </div>
+                    ) : (
                     <code className="flex-1 text-xs bg-muted/30 px-3 py-2 rounded font-mono">
-                      {loadingApiKeys ? 'Loading...' : projectApiKey || projectApiPreview || 'Rotate to generate a new key'}
+                      {projectApiKey || projectApiPreview || 'Rotate to generate a new key'}
                     </code>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -454,11 +461,13 @@ export function SettingsDialog({
                     {currentProject?.agents.map((agent) => (
                       <div key={agent.id} className="flex items-center gap-2 p-2 rounded bg-muted/20">
                         <span>{agent.emoji}</span>
+                        {loadingApiKeys ? (
+                          <Skeleton className="h-4 flex-1" />
+                        ) : (
                         <span className="text-xs flex-1 font-mono truncate">
-                          {loadingApiKeys
-                            ? 'Loading...'
-                            : agentApiKeys[agent.id] || agentApiPreviews[agent.id] || 'Rotate to generate a new key'}
+                          {agentApiKeys[agent.id] || agentApiPreviews[agent.id] || 'Rotate to generate a new key'}
                         </span>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"

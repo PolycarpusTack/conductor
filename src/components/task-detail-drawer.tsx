@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Markdown } from '@/components/ui/markdown'
 import {
   X, Pencil, CheckCircle, RotateCcw,
@@ -81,6 +82,9 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set())
   const [stepsError, setStepsError] = useState<string | null>(null)
   const [stepsFetchNonce, setStepsFetchNonce] = useState(0)
+  // Loading presentation: skeleton rows until full step details for THIS task have arrived once.
+  const [stepsLoading, setStepsLoading] = useState(false)
+  const [loadedStepsTaskId, setLoadedStepsTaskId] = useState<string | null>(null)
   const [rejectingStepId, setRejectingStepId] = useState<string | null>(null)
   const [rejectionNote, setRejectionNote] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
@@ -88,6 +92,7 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
   useEffect(() => {
     if (!task.steps || task.steps.length === 0) return
     const abortController = new AbortController()
+    setStepsLoading(true)
     const fetchSteps = async () => {
       try {
         const res = await fetch(`/api/tasks/${task.id}/steps`, { cache: 'no-store', signal: abortController.signal })
@@ -99,6 +104,7 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
         const data = await res.json()
         setStepsError(null)
         setFullSteps(data)
+        setLoadedStepsTaskId(task.id)
         const autoExpand = new Set<string>()
         data.forEach((s: TaskStep) => {
           if (s.status === 'active' || s.status === 'failed') autoExpand.add(s.id)
@@ -108,6 +114,8 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
         if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Error fetching steps:', err)
         setStepsError("Couldn't load step details. Check your connection.")
+      } finally {
+        if (!abortController.signal.aborted) setStepsLoading(false)
       }
     }
     fetchSteps()
@@ -251,7 +259,21 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
                 />
               </div>
 
-              {/* Steps */}
+              {/* Steps — skeleton rows (matching the timeline row footprint: 30px node + two
+                  text lines inside p-2) while full details fetch, so rows don't jump on arrival */}
+              {stepsLoading && loadedStepsTaskId !== task.id && !stepsError ? (
+                <div className="space-y-1" aria-busy="true" aria-label="Loading step details">
+                  {fullSteps.map((step) => (
+                    <div key={step.id} className="flex items-center gap-3 p-2">
+                      <Skeleton className="h-[30px] w-[30px] flex-shrink-0 rounded-full" />
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Skeleton className="h-3.5 w-2/3" />
+                        <Skeleton className="h-2.5 w-1/3" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
               <div className="space-y-1">
                 {fullSteps.map((step, index) => {
                   const isExpanded = expandedSteps.has(step.id)
@@ -395,6 +417,7 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
                   )
                 })}
               </div>
+              )}
             </div>
           )}
 

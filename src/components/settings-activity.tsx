@@ -5,6 +5,7 @@ import { Trash2, Download, RefreshCw, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { DeadLetterPanel } from '@/components/dead-letter-panel'
 import {
   Select,
@@ -388,7 +389,18 @@ export function SettingsActivity({ projectId }: SettingsActivityProps) {
 
         <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
           {loading ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+            // Row skeletons matching LogRow's footprint (px-3 py-2: timestamp, level badge, message)
+            <div aria-busy="true" aria-label="Loading activity log">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-3 w-[90px] shrink-0" />
+                    <Skeleton className="h-3 w-10 shrink-0" />
+                    <Skeleton className="h-3 flex-1" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : entries.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">No entries match the current filters</div>
           ) : (

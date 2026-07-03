@@ -3,12 +3,12 @@
 import type { Dispatch, SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   AlertTriangle,
   FolderPlus,
   Plus,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react'
 import { RuntimeDashboard } from '@/components/runtime-dashboard'
 import { SkillsPage } from '@/components/skills-page'
@@ -157,6 +157,67 @@ interface BoardViewProps {
   showDemoSeed: boolean
 }
 
+/** Card-shaped placeholder mirroring BoardTaskCard's box (rounded-lg border bg-card p-3). */
+function BoardCardSkeleton() {
+  return (
+    <div className="rounded-lg border border-border/40 bg-card p-3">
+      <div className="flex items-start gap-1.5">
+        <Skeleton className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" />
+        <Skeleton className="h-3.5 w-3/4" />
+      </div>
+      <Skeleton className="mt-2 h-2.5 w-1/2" />
+    </div>
+  )
+}
+
+/**
+ * Skeleton board shown during the initial project load. Mirrors the loaded
+ * board's containers exactly (p-4 wrapper, mobile tab row, `md:grid-cols-5`
+ * desktop grid, per-column header row) so content arriving causes no layout shift.
+ */
+function BoardSkeleton({ columnCount }: { columnCount: number }) {
+  const columns = Array.from({ length: columnCount }, (_, i) => i)
+  return (
+    <div className="h-[calc(100vh-3.5rem)] overflow-hidden" aria-busy="true" aria-label="Loading board">
+      <div className="p-4">
+        {/* Mobile column tabs */}
+        <div className="flex xs:hidden gap-1 mb-3 overflow-x-auto pb-1">
+          {columns.map((i) => (
+            <Skeleton key={i} className="h-7 w-20 flex-shrink-0 rounded-md" />
+          ))}
+        </div>
+
+        {/* Desktop / tablet board grid */}
+        <div className="hidden xs:flex md:grid md:grid-cols-5 xs:flex-nowrap gap-4 overflow-x-auto">
+          {columns.map((col) => (
+            <div key={col} className="min-w-[280px] md:min-w-0">
+              <div className="mb-3 flex h-5 items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-3 w-4" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: col % 2 === 0 ? 3 : 2 }, (_, i) => (
+                  <BoardCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mobile: single column */}
+        <div className="xs:hidden space-y-2">
+          <Skeleton className="mb-2 h-5 w-24" />
+          {[0, 1, 2].map((i) => (
+            <BoardCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function BoardView({
   authError, handleAdminLogout,
   projects, currentProject, setCurrentProject, loading, loadError, seedingDemoData,
@@ -247,12 +308,7 @@ export function BoardView({
           ) : view === 'help' ? (
             <HelpPage onBack={() => setView('board')} />
           ) : loading ? (
-            <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
-              <div className="flex flex-col items-center gap-3">
-                <Sparkles className="h-8 w-8 text-muted-foreground/30 animate-pulse" />
-                <span className="text-sm text-muted-foreground">Loading board...</span>
-              </div>
-            </div>
+            <BoardSkeleton columnCount={statusColumns.length} />
           ) : !currentProject && loadError ? (
             <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center px-6">
               <div className="max-w-md rounded-2xl border border-destructive/30 bg-card p-6 text-center">

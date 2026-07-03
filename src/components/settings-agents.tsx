@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Activity, ChevronDown, ChevronRight, CopyPlus, Library,
   Pencil, Plus, Search, Trash2,
@@ -231,7 +232,16 @@ export function SettingsAgents({
             </p>
           </div>
           {libraryCategories.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Loading catalog…</p>
+            // Category-row skeletons matching the loaded checkbox grid (grid-cols-2, p-1.5 rows)
+            <div className="grid grid-cols-2 gap-1.5" aria-busy="true" aria-label="Loading agent catalog">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-2 p-1.5">
+                  <Skeleton className="h-3.5 w-3.5 shrink-0 rounded-sm" />
+                  <Skeleton className="h-3 flex-1" />
+                  <Skeleton className="h-3 w-5 shrink-0" />
+                </div>
+              ))}
+            </div>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-1.5">

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -289,7 +290,22 @@ export function SettingsAutomation({ projectId }: SettingsAutomationProps) {
   }
 
   if (loading) {
-    return <div className="text-sm text-muted-foreground py-4">Loading automation settings...</div>
+    // Skeletons matching the loaded layout: status bar (p-3 rounded-lg) + option rows
+    return (
+      <div className="space-y-6" aria-busy="true" aria-label="Loading automation settings">
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-border/30 bg-muted/20">
+          <Skeleton className="h-2.5 w-2.5 rounded-full" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-64" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-10 rounded-lg" />
+          <Skeleton className="h-10 rounded-lg" />
+        </div>
+      </div>
+    )
   }
 
   const isRunning = config?.running ?? false
