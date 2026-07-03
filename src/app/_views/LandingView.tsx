@@ -44,17 +44,10 @@ export function LandingView({ setView, sidebarOpen, setSidebarOpen }: LandingVie
           </nav>
           <div className="hidden items-center gap-4 md:flex">
             <Button
-              variant="ghost"
-              className="text-[13px] text-muted-foreground/60 hover:text-foreground"
-              onClick={() => setView('board')}
-            >
-              Sign in
-            </Button>
-            <Button
               className="rounded-lg gradient-cobalt px-3.5 py-1.5 text-[13px] font-medium text-white hover:shadow-glow-cobalt transition-shadow"
               onClick={() => setView('board')}
             >
-              Get Started
+              Launch Board
             </Button>
           </div>
           <Button
@@ -82,7 +75,7 @@ export function LandingView({ setView, sidebarOpen, setSidebarOpen }: LandingVie
               className="w-full rounded-lg gradient-cobalt text-white"
               onClick={() => { setSidebarOpen(false); setView('board') }}
             >
-              Get Started
+              Launch Board
             </Button>
           </nav>
         </div>
@@ -329,14 +322,15 @@ export function LandingView({ setView, sidebarOpen, setSidebarOpen }: LandingVie
                 </h3>
                 <div className="space-y-4">
                   <div className="rounded-lg bg-muted/30 p-3 font-mono text-xs">
-                    <div className="text-muted-foreground"># Advance chain step</div>
-                    <div>POST /api/chain/:id/advance</div>
-                    <div className="text-blue-400">Authorization: Bearer ADMIN_KEY</div>
+                    <div className="text-muted-foreground"># Create a task with a chain</div>
+                    <div>POST /api/tasks</div>
+                    <div className="text-blue-400">Authorization: Bearer SCOPED_KEY</div>
+                    <div className="text-foreground/70">{"{"} &quot;title&quot;: &quot;...&quot;, &quot;projectId&quot;: &quot;...&quot;, &quot;steps&quot;: [{"{"} &quot;mode&quot;: &quot;develop&quot;, &quot;agentId&quot;: &quot;...&quot; {"}"}] {"}"}</div>
                   </div>
                   <div className="rounded-lg bg-muted/30 p-3 font-mono text-xs">
-                    <div className="text-muted-foreground"># Approve human gate</div>
-                    <div>POST /api/chain/:id/approve</div>
-                    <div className="text-foreground/70">{"{"} &quot;step&quot;: 3, &quot;approved&quot;: true {"}"}</div>
+                    <div className="text-muted-foreground"># Approve a human review gate</div>
+                    <div>PUT /api/tasks/:id/steps/:stepId</div>
+                    <div className="text-foreground/70">{"{"} &quot;action&quot;: &quot;review&quot;, &quot;decision&quot;: &quot;approved&quot; {"}"}</div>
                   </div>
                 </div>
               </div>

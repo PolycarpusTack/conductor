@@ -4,17 +4,27 @@ A professional-grade orchestration platform for AI agents with workflow chains, 
 
 ## Features
 
-- **Kanban Board**: 4-column board (Backlog, In Progress, Review, Done) with drag-and-drop
+- **Kanban Board**: 5-column board (Backlog, In Progress, Waiting, Review, Done) with drag-and-drop
+- **Workflow Chains**: Multi-step chains with human review gates, DAG edges, and reusable chain templates
 - **Agent HTTP API**: Real REST endpoints for AI agents to claim, start, and complete tasks
 - **CLI-Style API**: Simple text-based API for shell script integration
 - **WebSocket Updates**: Real-time board updates across all connected clients
 - **Multi-Project Support**: Create and manage multiple projects
+- **Multi-User Accounts**: Named owner/admin/member accounts with role-gated settings and revocable sessions
 - **Agent Management**: Create agents with unique API keys
-- **Activity Logging**: Full audit trail of agent actions
+- **Agent Library & Wizard**: Import curated agents, or compose an agent from natural-language requirements via LLM
+- **Recurring Tasks**: Instantiate task templates on a daily/weekly/monthly schedule, chains included
+- **Triggers & Reactions**: Internal events and Sentry alerts fire Slack, Jira, HTTP, and email reactions
+- **MCP Connections**: Per-project MCP servers with tool allowlists and per-tool usage stats
+- **Skills Library**: Reusable, versioned knowledge agents can pull in, with semantic search on pgvector
+- **Runtime Dashboard**: Live view of daemon hosts, execution sessions, and the step queue
+- **Observability & Analytics**: Cross-project KPIs, per-agent dashboards, and per-project cost analytics
+- **Dead-Letter Recovery**: Steps that exhaust retries are snapshotted for review and requeue
+- **Activity Logging**: Full audit trail of agent actions with level/component filters and JSONL/CSV export
 
 ## Requirements
 
-- Node.js 18+ or Bun
+- Bun 1.3+ and Node.js 20+ (Node is used by the Next.js build)
 - Optional: Docker (for PostgreSQL + pgvector — enables semantic skill search)
 
 ## Quick Start
@@ -39,7 +49,7 @@ docker compose up -d
 bun run db:push
 ```
 
-### 4. Start Development Server
+### 3. Start Development Server
 
 ```bash
 bun run dev
@@ -47,11 +57,11 @@ bun run dev
 npm run dev
 ```
 
-### 5. Open in Browser
+### 4. Open in Browser
 
 Navigate to `http://localhost:3000`
 
-### 6. Create Your First Project
+### 5. Create Your First Project
 
 > 📖 **Full walkthrough:** [docs/walkthroughs/first-project-calendar-app.md](docs/walkthroughs/first-project-calendar-app.md)
 > takes you from a fresh install to agents building a small calendar app —
@@ -190,7 +200,7 @@ EMBEDDING_MODEL="text-embedding-3-small"
 PROMPT_LIBRARY_PATH="/path/to/system_prompts_leaks"
 ```
 
-The board UI now requires the admin password before it can access project management routes.
+The board UI requires sign-in before it can access project management routes. The first login with `AGENTBOARD_ADMIN_PASSWORD` creates the owner account; after that, sign in with account email + password.
 API keys are now managed as previews plus rotation:
 - Existing legacy plaintext keys can be migrated to hash-only storage from the API Keys tab without changing the secrets agents already use.
 - The settings UI shows only a preview for stored keys.
@@ -198,7 +208,7 @@ API keys are now managed as previews plus rotation:
 
 ## WebSocket Service (Optional)
 
-Solo local dev works fine without this — the board falls back to polling.
+Solo local dev works fine without this — the board falls back to manual refresh.
 Recommended for shared deployments (live cursors + multi-client board updates).
 
 To start the WebSocket service:
