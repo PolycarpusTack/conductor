@@ -4,6 +4,7 @@ import { reapExpiredClaims } from '@/lib/server/claim-reaper'
 import { runOverdueReminders } from '@/lib/server/overdue-reminders'
 import { runRecurringTasks } from '@/lib/server/recurring-tasks'
 import { getLogger } from '@/lib/server/logger'
+import { startSchedulerOwnership, type SchedulerOwnership } from '@/lib/server/scheduler-lock'
 import { pollAndDispatch } from '@/lib/server/step-queue'
 
 const log = getLogger('scheduler')
@@ -25,6 +26,9 @@ interface ProjectScheduler {
 const schedulers = new Map<string, ProjectScheduler>()
 let globalCheckInterval: ReturnType<typeof setInterval> | null = null
 let checkInProgress = false
+// F-3 single-instance guard (ADR-0006): dispatch only runs while this instance
+// owns the scheduler lock. Null until initializeScheduler() runs.
+let ownership: SchedulerOwnership | null = null
 
 function isWithinSchedule(schedule: ScheduleWindow): boolean {
   const now = new Date()
@@ -205,13 +209,13 @@ async function checkScheduledProjects() {
 }
 
 /**
- * Initialize the scheduler system on application startup.
- * Starts automation for projects configured with 'startup' or 'always' mode,
- * and begins the schedule checker for 'scheduled' projects.
+ * Start the actual dispatch loops (auto-start pollers + 60s global tick).
+ * Called only when this instance OWNS the scheduler lock (F-3, ADR-0006).
+ * Idempotent — a re-acquisition after takeover is a no-op if already running.
  */
-export async function initializeScheduler() {
+async function startDispatchLoops() {
   if (globalCheckInterval) return
-  log.info('initializing automation scheduler')
+  log.info('starting dispatch loops (scheduler ownership held)')
 
   // Start projects with 'startup' or 'always' mode
   const autoStartProjects = await db.project.findMany({
@@ -229,13 +233,14 @@ export async function initializeScheduler() {
   // Check scheduled projects every 60 seconds
   globalCheckInterval = setInterval(checkScheduledProjects, 60000)
 
-  log.info('initialized', { autoStartProjects: autoStartProjects.length })
+  log.info('dispatch loops started', { autoStartProjects: autoStartProjects.length })
 }
 
 /**
- * Cleanup all schedulers (for graceful shutdown).
+ * Stop the dispatch loops without releasing the lock (used on relinquish when
+ * another instance took over, and as the teardown half of shutdown).
  */
-export function shutdownScheduler() {
+function stopDispatchLoops() {
   if (globalCheckInterval) {
     clearInterval(globalCheckInterval)
     globalCheckInterval = null
@@ -244,5 +249,39 @@ export function shutdownScheduler() {
     stopPolling(projectId)
   }
   schedulers.clear()
+}
+
+/**
+ * Initialize the scheduler system on application startup.
+ *
+ * F-3 (ADR-0006): dispatch is gated behind a coarse advisory "scheduler owner"
+ * lock so a second app instance against the same DB does not double-dispatch.
+ * The winning instance starts the dispatch loops and heartbeats the lock; a
+ * losing instance stands by and takes over only if the owner dies. If the lock
+ * table is not present yet (schema pending), the guard fails open and the loops
+ * start as before.
+ */
+export async function initializeScheduler() {
+  if (ownership) return
+  log.info('initializing automation scheduler')
+
+  ownership = await startSchedulerOwnership({
+    onAcquire: startDispatchLoops,
+    onRelinquish: () => {
+      log.warn('relinquishing dispatch — another scheduler instance owns the lock')
+      stopDispatchLoops()
+    },
+  })
+}
+
+/**
+ * Cleanup all schedulers (for graceful shutdown).
+ */
+export function shutdownScheduler() {
+  if (ownership) {
+    ownership.stop()
+    ownership = null
+  }
+  stopDispatchLoops()
   log.info('all schedulers stopped')
 }

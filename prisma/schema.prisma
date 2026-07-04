@@ -524,6 +524,17 @@ model AdminConfig {
   updatedAt       DateTime @updatedAt
 }
 
+// Single-instance dispatch guard (ADR-0006 / F-3). A singleton row whose owner
+// runs the schedulers; a second app instance against the same DB sees a live
+// owner and stands by rather than double-dispatching. Leases remain the real
+// mutual exclusion — this only avoids wasteful duplicate polling.
+model SchedulerLock {
+  id          String   @id @default("singleton")
+  ownerId     String
+  heartbeatAt DateTime
+  acquiredAt  DateTime @default(now())
+}
+
 // Per-user accounts (Phase 1): named users replace the shared admin password.
 // The owner bootstraps from the legacy credential on first login.
 model User {
