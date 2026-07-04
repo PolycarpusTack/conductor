@@ -117,10 +117,8 @@ function ConditionEditor({
 function StepNode({
   step,
   agents,
-  modes,
   isSelected,
   onSelect,
-  onUpdate,
   onDelete,
   onStartConnect,
 }: {

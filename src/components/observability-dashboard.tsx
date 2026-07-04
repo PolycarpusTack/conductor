@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, AlertTriangle, Clock, DollarSign, Zap, TrendingUp } from 'lucide-react'
+import { BarChart3, AlertTriangle, Clock, Zap, TrendingUp } from 'lucide-react'
 
 interface ProjectOverview {
   totalTasks: number

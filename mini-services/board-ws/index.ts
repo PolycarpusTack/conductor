@@ -101,7 +101,7 @@ const httpServer = createServer(async (req, res) => {
 
 const io = new Server(httpServer, {
   cors: {
-    origin(origin, callback) {
+    origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
       if (!origin || allowedOrigins.has(origin)) {
         callback(null, true)
         return

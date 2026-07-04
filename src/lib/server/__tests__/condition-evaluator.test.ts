@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { evaluateCondition, resolveNextSteps, type StepCondition, type StepContext, type StepEdge } from '../condition-evaluator'
+import { evaluateCondition, resolveNextSteps, type StepContext, type StepEdge } from '../condition-evaluator'
 
 // ===========================================================================
 // evaluateCondition

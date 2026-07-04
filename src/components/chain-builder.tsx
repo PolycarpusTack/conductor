@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { X, Plus, Save, LayoutTemplate, GitBranch } from 'lucide-react'
 import { AgentBadge } from '@/components/agent-badge'
-import { WorkflowEditor, type DagStep, type StepEdge } from '@/components/workflow-editor'
+import { WorkflowEditor, type DagStep } from '@/components/workflow-editor'
 import type { StepDraft, ChainTemplate, ProjectMode } from '@/types/settings'
 import type { Agent } from '@/types/board'
 import { resolveStepAgents } from '@/lib/resolve-step-agents'
@@ -72,7 +72,6 @@ function toDagStep(step: StepDraft, index: number): DagStep {
 }
 
 export function ChainBuilder({
-  projectId,
   agents,
   modes,
   templates,

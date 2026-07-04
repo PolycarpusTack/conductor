@@ -47,7 +47,6 @@ mock.module('@/lib/server/project-event', () => ({
 
 // Import AFTER all mocks are in place
 import { advanceChain, rewindChain, closeChain, startChain } from '../dispatch'
-import { db } from '@/lib/db'
 
 // ---------------------------------------------------------------------------
 // Helpers

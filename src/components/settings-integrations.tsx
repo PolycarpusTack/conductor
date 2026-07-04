@@ -18,12 +18,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/settings-confirm-dialog'
 import { useToast } from '@/hooks/use-toast'
 
-type TriggerFilter = {
-  field: string
-  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'matches'
-  value: string
-}
-
 type Reaction = {
   id: string
   name: string

@@ -83,9 +83,6 @@ function RememberBox({ children }: { children: React.ReactNode }) {
   return <Callout tone="purple" title="🧠 Remember">{children}</Callout>
 }
 
-function TechStuff({ children }: { children: React.ReactNode }) {
-  return <Callout tone="cobalt" title="🤓 Technical stuff (safe to skip)">{children}</Callout>
-}
 
 /** Head First-style Q&A block. Pass [question, answer] pairs. */
 function DumbQuestions({ items }: { items: Array<[React.ReactNode, React.ReactNode]> }) {

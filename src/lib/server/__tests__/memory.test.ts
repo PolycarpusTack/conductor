@@ -211,7 +211,7 @@ describe('saveMemory + searchMemories (text-fallback path)', () => {
   })
 
   test('reinforceMemory increments reinforcement and sets lastAccessed', async () => {
-    mockAgentMemoryUpdate.mockImplementationOnce((args: any) =>
+    mockAgentMemoryUpdate.mockImplementationOnce((_args: any) =>
       Promise.resolve({ id: 'm1', reinforcement: 2, lastAccessed: new Date() })
     )
     const { reinforceMemory } = await import('@/lib/server/memory')

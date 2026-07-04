@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -26,19 +25,13 @@ import { SettingsScopedKeys } from '@/components/settings-scoped-keys'
 import { SettingsSecurity } from '@/components/settings-security'
 import { SettingsUsers } from '@/components/settings-users'
 import { SettingsAgents } from '@/components/settings-agents'
-import { AgentActivityDashboard } from '@/components/agent-activity-dashboard'
 import {
-  Activity,
   Check,
   Copy,
-  CopyPlus,
   ExternalLink,
   Key,
-  Pencil,
-  Plus,
   RefreshCw,
   Sparkles,
-  Trash2,
 } from 'lucide-react'
 import type { Project } from '@/types/board'
 import type { ProjectMode, ChainTemplate } from '@/types/settings'

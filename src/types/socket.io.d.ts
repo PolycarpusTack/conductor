@@ -14,7 +14,7 @@ declare module 'socket.io' {
   }
 
   export class Server {
-    constructor(...args: any[])
+    constructor(...args: unknown[])
     to(room: string): {
       emit(event: string, payload?: unknown): void
     }

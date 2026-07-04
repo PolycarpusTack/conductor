@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 
 import { getLogger } from '@/lib/server/logger'
 
@@ -25,17 +25,6 @@ function hashKey(value: string) {
   return createHash('sha256').update(value).digest('hex')
 }
 
-function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left)
-  const rightBuffer = Buffer.from(right)
-
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false
-  }
-
-  return timingSafeEqual(leftBuffer, rightBuffer)
-}
-
 function keyPrefix(kind: KeyKind) {
   return kind === 'agent' ? 'ab_agent' : 'ab_project'
 }
@@ -53,15 +42,6 @@ function generateStructuredKey(kind: KeyKind, entityId: string) {
     hash: hashKey(rawKey),
     preview: buildApiKeyPreview(rawKey),
   }
-}
-
-function parseStructuredKey(rawKey: string, kind: KeyKind) {
-  const [prefix, entityId] = rawKey.split('.', 3)
-  if (prefix !== keyPrefix(kind) || !entityId) {
-    return null
-  }
-
-  return { entityId }
 }
 
 export function createAgentApiKey(agentId: string) {

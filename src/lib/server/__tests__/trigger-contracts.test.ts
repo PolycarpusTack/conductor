@@ -1,9 +1,7 @@
 import { describe, test, expect } from 'bun:test'
 import {
   createTriggerSchema,
-  updateTriggerSchema,
   createReactionSchema,
-  updateReactionSchema,
 } from '../contracts'
 
 describe('createTriggerSchema', () => {

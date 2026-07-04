@@ -396,7 +396,7 @@ async function runDaemonE2E() {
 
     // -- 3. Workspace / project / runtime / agent / task --------------------
     const wsSlug = 'daemon-e2e-smoke'
-    let wsRes = await api('/api/workspaces', { json: { name: 'Daemon E2E Smoke', slug: wsSlug } })
+    const wsRes = await api('/api/workspaces', { json: { name: 'Daemon E2E Smoke', slug: wsSlug } })
     let workspace: { id: string } | undefined
     if (wsRes.status === 409) {
       const list = await (await api('/api/workspaces')).json()
