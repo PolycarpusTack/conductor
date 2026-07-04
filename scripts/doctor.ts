@@ -25,6 +25,7 @@ import { join } from 'node:path'
 
 import { db } from '../src/lib/db'
 import { validateEnv } from '../src/lib/env'
+import { LEASE_TIMEOUT_MS } from '../src/lib/server/step-queue'
 
 type Severity = 'pass' | 'warn' | 'fail'
 
@@ -123,6 +124,53 @@ async function checkDaemons() {
   }
 }
 
+// SLO-3 signal (docs/ops/slos.md): the claim reaper (60s tick) and lease-steal
+// sweep should keep stranded work near zero. This surfaces the current backlog
+// of *overdue* reclaims — claims/leases already past expiry that the sweeps
+// have not yet returned. A steady non-zero count means a sweep is not running
+// (scheduler stopped, or no poller on this DB) — investigate per the
+// dispatch-stalled runbook.
+async function checkStranded() {
+  // 90s grace over the 60s reaper tick — anything older is genuinely overdue,
+  // not just mid-cycle.
+  const CLAIM_GRACE_MS = 90_000
+  try {
+    const now = Date.now()
+    const [strandedClaims, strandedLeases] = await Promise.all([
+      // Model-B claims past expiry with no active step (matches reaper scope).
+      db.task.count({
+        where: {
+          status: 'IN_PROGRESS',
+          deletedAt: null,
+          claimExpiresAt: { lt: new Date(now - CLAIM_GRACE_MS) },
+          steps: { none: { status: 'active' } },
+        },
+      }),
+      // Step leases held past LEASE_TIMEOUT_MS (stealable but not yet stolen —
+      // i.e. no dispatch tick has run to steal them).
+      db.taskStep.count({
+        where: {
+          status: 'active',
+          leasedBy: { not: null },
+          leasedAt: { lt: new Date(now - LEASE_TIMEOUT_MS) },
+        },
+      }),
+    ])
+    const total = strandedClaims + strandedLeases
+    if (total === 0) {
+      record('stranded-work', 'pass', 'no overdue claims or leases')
+    } else {
+      record(
+        'stranded-work',
+        'warn',
+        `${strandedClaims} overdue claim(s) + ${strandedLeases} stale-lease step(s) not yet reclaimed — is a poller running? (SLO-3)`,
+      )
+    }
+  } catch {
+    record('stranded-work', 'warn', 'could not query (database unreachable)')
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Network checks (skipped with --offline)
 // ---------------------------------------------------------------------------
@@ -145,19 +193,25 @@ async function checkServer() {
 async function checkRealtimeService() {
   const base = (process.env.AGENTBOARD_WS_URL || 'http://127.0.0.1:3003').replace(/\/$/, '')
   try {
-    // board-ws has no health route; ANY HTTP answer (e.g. 401 on an
-    // unauthenticated broadcast) proves the service is up.
-    const res = await fetch(`${base}/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-      signal: AbortSignal.timeout(5000),
-    })
-    record('realtime-service', 'pass', `${base} reachable (HTTP ${res.status})`)
+    // board-ws exposes GET /healthz → 200 {status:'ok', connections}. Hit the
+    // real health route (not just "any HTTP answer proves it's up"): require
+    // 200 + status ok, otherwise the service is reachable but unhealthy.
+    const res = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(5000) })
+    const body = await res.json().catch(() => null)
+    if (res.ok && (body?.status === 'ok' || body?.ok === true)) {
+      const conns = typeof body?.connections === 'number' ? `, ${body.connections} client(s)` : ''
+      record('realtime-service', 'pass', `${base} healthy (HTTP ${res.status}${conns})`)
+    } else {
+      record(
+        'realtime-service',
+        networkSeverity,
+        `${base} responded ${res.status} but /healthz is not ok (status: ${body?.status ?? 'unknown'})`,
+      )
+    }
   } catch {
     record(
       'realtime-service',
-      SMOKE ? 'fail' : 'warn',
+      networkSeverity,
       `${base} unreachable — realtime disabled, polling fallback active`,
     )
   }
@@ -644,6 +698,7 @@ async function main() {
     await checkDatabase()
     await checkRuntimes()
     await checkDaemons()
+    await checkStranded()
 
     if (!OFFLINE) {
       await checkServer()

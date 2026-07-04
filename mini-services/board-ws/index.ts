@@ -83,9 +83,15 @@ const httpServer = createServer(async (req, res) => {
     return
   }
 
-  if (url.pathname === '/healthz') {
+  if (req.method === 'GET' && url.pathname === '/healthz') {
+    // Liveness + a cheap realtime signal for the doctor / F-6 WS SLO.
+    // `connections` = live authenticated clients, summed from the per-project
+    // room membership we already track (proxy for "clients are actually
+    // attached"); `ok`/`status` are both kept for backward compat.
+    let connections = 0
+    for (const sockets of projectRooms.values()) connections += sockets.size
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true }))
+    res.end(JSON.stringify({ ok: true, status: 'ok', connections }))
     return
   }
 
