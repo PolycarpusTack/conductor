@@ -14,9 +14,14 @@ Updated: 2026-07-03 (post EPICs A+B — see phase-summaries/phase-summary-epics-
 - **Persistence (Prisma)**: SQLite default / Postgres+pgvector optional; embeddings as String cast via raw SQL on PG; schema provider hardcoded sqlite — fragile duality
 - **Frontend**: App Router route group `src/app/(board)/` (board/runtime/skills client pages + server-rendered /help) over a shared `board-shell.tsx` that runs the four hooks once and packages them into six memoized contexts (`board-context.tsx`); components are prop-less context consumers; typed API client (`src/lib/api/`); dnd-kit keyboard-accessible board with memoized cards; mobile authoring via slide-over Sheet. next-intl/zustand removed; react-query installed-but-unused (deferred, TD-023)
 
-## Key ADRs (current)
+## Key ADRs (current) — docs/adr/
 
-None recorded. (Finding: ADR coverage ABSENT — decisions like SQLite/PG duality, three-plane auth, poll-based dispatch, WS mini-service split are undocumented tribal knowledge.)
+- ADR-0001 Runner process model (daemon spawns CLI: arg-arrays, stdin prompt, NDJSON, cwd enforcement)
+- ADR-0002 Leasing & idempotency (steps AND claims: lease-first, attempt key, reaper, stale reclaim)
+- ADR-0003 Budget enforcement point (month-to-date StepExecution.cost gates dispatch; DAEMON gap = TD-018b)
+- ADR-0004 SQLite/Postgres/pgvector duality (provider hardcoded sqlite, runtime adapter swap, embeddings via raw SQL)
+- ADR-0005 Three-plane auth (sessions / agent keys / daemon+scoped keys; CSRF + SSRF guards)
+- ADR-0006 Poll-based single-instance dispatch (in-process scheduler + SchedulerLock guard)
 
 ## Domain Glossary (initial, extracted from code)
 
@@ -42,8 +47,8 @@ None recorded. (Finding: ADR coverage ABSENT — decisions like SQLite/PG dualit
 
 - ~~TD-A daemon execution~~ ~~TD-B claim reaper~~ ~~TD-C dispatch race~~ ~~TD-D key scoping~~ — RESOLVED (EPICs A+B, 2026-07-03)
 - ~~TD-E frontend stack drift~~ — RESOLVED (EPIC E, 2026-07-03: routing, contexts, typed client, dnd-kit a11y, memoization, dep cleanup)
-- TD-F-remainder: no Dockerfile; ESLint rules mostly off — EPIC F
-- TD-018-remainder: daemon runs create no StepExecution rows (budgets/cost blind for DAEMON agents); daemon failures never dead-letter
-- ADR-1..3 (runner model, leasing/idempotency, budget enforcement point) promised by the plan, not yet written
+- ~~TD-F (no Dockerfile, lint off)~~ — RESOLVED (EPIC F: Docker/compose/launcher F-1; lint+any+strict F-4; ADRs F-3; SLOs/runbooks F-6). Full register: TECHNICAL_DEBT.md
+- TD-018b: daemon runs create no StepExecution rows (budgets/cost blind for DAEMON agents); TD-025: daemon failures never dead-letter
+- TD-024: Docker images never actually built (no Docker on dev host) — verify on a Docker host before prod
 
 ## Current Mode: DELIVERY (see mode.md)
