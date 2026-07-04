@@ -1,9 +1,66 @@
-version: '3.8'
+# AgentBoard / Conductor — full-stack compose (F-1)
+#
+# One-command deploy:
+#   docker compose up --build            # SQLite default (DB on a named volume)
+#   docker compose --profile postgres up --build   # + Postgres/pgvector server
+#
+# Secrets & config come from a local .env (copy .env.example -> .env first).
+# In production the app FAILS FAST unless these are set (see src/lib/env.ts):
+#   AGENTBOARD_ADMIN_PASSWORD, AGENTBOARD_WS_SECRET, AGENTBOARD_WS_INTERNAL_SECRET
+# The two WS secrets are shared between `app` and `board-ws` (both read .env).
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Enables browser realtime; must be the URL the BROWSER can reach board-ws on.
+        NEXT_PUBLIC_AGENTBOARD_WS_URL: ${NEXT_PUBLIC_AGENTBOARD_WS_URL:-}
+    image: agentboard-app
+    container_name: agentboard-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # SQLite on the persistent volume by default. To use Postgres instead,
+      # set APP_DATABASE_URL in .env to your postgresql:// URL (see the postgres
+      # profile below) — note the Prisma schema provider caveat in INSTALL.md.
+      DATABASE_URL: ${APP_DATABASE_URL:-file:/data/app.db}
+      # Server-side URL the app uses to reach board-ws over the compose network.
+      AGENTBOARD_WS_URL: http://board-ws:3003
+    volumes:
+      # Persists the SQLite DB file (and is the place for any app data dir).
+      - app_data:/data
+    ports:
+      - '3000:3000'
+    depends_on:
+      board-ws:
+        condition: service_healthy
+
+  board-ws:
+    build:
+      context: .                              # repo root — the image needs /src + tsconfig.json
+      dockerfile: mini-services/board-ws/Dockerfile
+    image: agentboard-board-ws
+    container_name: agentboard-board-ws
+    restart: unless-stopped
+    env_file:
+      - .env                                  # AGENTBOARD_WS_SECRET / _INTERNAL_SECRET / _ALLOWED_ORIGINS
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+    ports:
+      - '3003:3003'
+
+  # Optional Postgres + pgvector (semantic memory/skill search). Only started
+  # with `--profile postgres`; SQLite-default users never run it.
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: conductor-postgres
+    container_name: agentboard-postgres
+    profiles: [postgres]
     restart: unless-stopped
     environment:
       POSTGRES_DB: conductor
@@ -21,4 +78,5 @@ services:
       retries: 10
 
 volumes:
+  app_data:
   conductor_pgdata:

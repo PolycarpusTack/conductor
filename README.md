@@ -45,9 +45,9 @@ bun run db:push
 
 **PostgreSQL (optional — for semantic search via pgvector):**
 ```bash
-docker compose up -d
+docker compose --profile postgres up -d postgres   # just the pgvector server
 # Update .env: DATABASE_URL="postgresql://conductor:conductor_dev@localhost:5432/conductor"
-bun run db:push
+bun run db:push                                     # see ADR-0004 provider caveat in INSTALL.md
 ```
 
 ### 3. Start Development Server
@@ -71,6 +71,22 @@ Navigate to `http://localhost:3000`
 Open the board, sign in with the admin password, and create a project from the header. You can choose whether to provision starter agents during project creation.
 
 Optional for local evaluation: use the "Load Demo Data" button from the empty state instead of creating a project manually.
+
+## Deployment
+
+The turnkey production path is Docker — one command brings up the web app plus
+the realtime service with a persistent SQLite database on a named volume:
+
+```bash
+cp .env.example .env      # set AGENTBOARD_ADMIN_PASSWORD + the two AGENTBOARD_WS_* secrets
+docker compose up --build # app on :3000, board-ws on :3003
+```
+
+For manual/local production (`bun run build` then `bun run start`), the Postgres
+profile, browser-realtime build arg, backups, and the optional daemon workers,
+see **[INSTALL.md](INSTALL.md)**. Note: the production standalone server runs
+under **Node** (not Bun) and targets **Linux** — on a Windows host use
+`bun run dev` for development.
 
 ## API Usage
 
