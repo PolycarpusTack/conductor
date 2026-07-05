@@ -136,6 +136,22 @@ export const BoardTaskCard = memo(function BoardTaskCard({
   // overlay; the mobile view (no sortable, no overlay) renders no grip.
   const showGrip = Boolean(sortable) || overlay
 
+  // Screen-reader description of the card. Rolls the color-only signals
+  // (priority dot, due-date tone, paused badge) into text so they are not the
+  // SOLE carrier of meaning (WCAG 1.4.1). Feeds the card's aria-label so a
+  // screen reader announces something meaningful on focus (WCAG 4.1.2).
+  const isPaused = task.agent?.isActive === false
+  const statusText = task.status.replace('_', ' ').toLowerCase()
+  const cardLabel = [
+    `Open task: ${task.title}`,
+    `priority ${task.priority.toLowerCase()}`,
+    `status ${statusText}`,
+    due ? due.label : null,
+    isPaused ? 'agent paused' : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
   // Enter/Space opens the drawer — but only when the card root itself holds
   // focus, so the grip handle's own Space/Enter (which the KeyboardSensor uses
   // to lift the card) never doubles as an "open".
@@ -168,7 +184,7 @@ export const BoardTaskCard = memo(function BoardTaskCard({
       style={sortable?.style}
       role="button"
       tabIndex={overlay ? -1 : 0}
-      aria-label={`Open task: ${task.title}`}
+      aria-label={cardLabel}
       onClick={overlay ? undefined : () => onOpen(task)}
       onKeyDown={handleKeyDown}
       className={cn(
@@ -208,7 +224,7 @@ export const BoardTaskCard = memo(function BoardTaskCard({
               {...sortable.listeners}
               onClick={(e) => e.stopPropagation()}
               aria-label={`Drag to move task: ${task.title}. Press space or enter to lift, arrow keys to move between columns, space to drop, escape to cancel.`}
-              className="mt-0.5 shrink-0 cursor-grab touch-none rounded text-muted-foreground/20 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+              className="mt-0.5 shrink-0 cursor-grab touch-none rounded text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
             >
               <GripVertical className="h-3.5 w-3.5" />
             </button>
@@ -219,7 +235,7 @@ export const BoardTaskCard = memo(function BoardTaskCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-1.5">
-              <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${priorityColors[task.priority]}`} />
+              <span aria-hidden="true" className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${priorityColors[task.priority]}`} />
               <span className="text-[13px] font-medium leading-tight text-foreground/90">{task.title}</span>
             </div>
             {task.agent && (
@@ -245,8 +261,10 @@ export const BoardTaskCard = memo(function BoardTaskCard({
 
           {steps.length > 0 && (
             <button
+              type="button"
+              aria-label={`View workflow steps for task: ${task.title}`}
               onClick={(e) => { e.stopPropagation(); onViewSteps({ id: task.id, title: task.title, steps }) }}
-              className="absolute top-2 right-2 p-1 rounded hover:bg-card/80 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+              className="absolute top-2 right-2 p-1 rounded hover:bg-card/80 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Eye className="h-3 w-3" />
             </button>

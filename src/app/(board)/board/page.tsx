@@ -85,11 +85,20 @@ const SortableTaskCard = memo(function SortableTaskCard(props: Omit<React.Compon
   )
 })
 
-/** A status column that accepts drops even when empty (SortableContext alone can't). */
-function DroppableColumn({ status, className, children }: { status: TaskStatus; className?: string; children: React.ReactNode }) {
+/**
+ * A status column that accepts drops even when empty (SortableContext alone
+ * can't). Exposed as a labelled `group` landmark so a screen reader announces
+ * the status name and task count on entry (WCAG 1.3.1 Info and Relationships).
+ */
+function DroppableColumn({ status, label, count, className, children }: { status: TaskStatus; label: string; count: number; className?: string; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: status, data: { status } satisfies DndData })
   return (
-    <div ref={setNodeRef} className={cn(className, isOver && 'rounded-lg ring-1 ring-ring/40')}>
+    <div
+      ref={setNodeRef}
+      role="group"
+      aria-label={`${label} column, ${count} ${count === 1 ? 'task' : 'tasks'}`}
+      className={cn(className, isOver && 'rounded-lg ring-1 ring-ring/40')}
+    >
       {children}
     </div>
   )
@@ -481,17 +490,17 @@ export default function BoardPage() {
             </div>
 
             {/* Desktop / tablet board grid */}
-            <div className="hidden xs:flex md:grid md:grid-cols-5 xs:flex-nowrap gap-4 overflow-x-auto">
+            <div role="region" aria-label="Task board" className="hidden xs:flex md:grid md:grid-cols-5 xs:flex-nowrap gap-4 overflow-x-auto">
               {statusColumns.map((column) => {
                 const tasks = tasksByStatus[column.id]
                 return (
-                  <DroppableColumn key={column.id} status={column.id} className="min-w-[280px] md:min-w-0">
+                  <DroppableColumn key={column.id} status={column.id} label={column.label} count={tasks.length} className="min-w-[280px] md:min-w-0">
                     <div className="mb-3 flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <span className={`text-[11px] font-medium uppercase tracking-wider ${column.color}`}>
                           {column.label}
                         </span>
-                        <span className="text-[10px] text-muted-foreground/30">{tasks.length}</span>
+                        <span className="text-[10px] text-muted-foreground">{tasks.length}</span>
                       </div>
                       <Button
                         variant="ghost"
@@ -524,7 +533,7 @@ export default function BoardPage() {
 
                         <button
                           onClick={() => openNewTaskDialog(column.id)}
-                          className="flex items-center gap-2 rounded-lg border border-dashed border-border/30 p-2 text-[11px] text-muted-foreground/50 hover:border-border/50 hover:text-muted-foreground/70 transition-colors"
+                          className="flex items-center gap-2 rounded-lg border border-dashed border-border/30 p-2 text-[11px] text-muted-foreground hover:border-border/50 hover:text-foreground transition-colors"
                         >
                           <Plus className="h-3 w-3" />
                           Add task
@@ -564,14 +573,14 @@ export default function BoardPage() {
 
                       <button
                         onClick={() => openNewTaskDialog(column.id)}
-                        className="flex items-center gap-2 rounded-lg border border-dashed border-border/30 p-2 text-[11px] text-muted-foreground/50 hover:border-border/50 hover:text-muted-foreground/70 transition-colors w-full"
+                        className="flex items-center gap-2 rounded-lg border border-dashed border-border/30 p-2 text-[11px] text-muted-foreground hover:border-border/50 hover:text-foreground transition-colors w-full"
                       >
                         <Plus className="h-3 w-3" />
                         Add task
                       </button>
 
                       {columnTasks.length === 0 && (
-                        <div className="text-xs text-muted-foreground/40 text-center py-8">No tasks</div>
+                        <div className="text-xs text-muted-foreground text-center py-8">No tasks</div>
                       )}
                     </div>
                   )

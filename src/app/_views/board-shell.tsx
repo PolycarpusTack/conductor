@@ -498,24 +498,24 @@ function BoardChrome({ children }: { children: ReactNode }) {
       )}
 
       {selectedTask && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" onClick={() => setSelectedTask(null)} />
-          <TaskDetailDrawer
-            task={selectedTask}
-            agents={currentProject?.agents ?? []}
-            onClose={() => setSelectedTask(null)}
-            onEdit={() => { openEditTaskDialog(selectedTask); setSelectedTask(null) }}
-            onRefresh={() => {
-              if (currentProject) fetchProject(currentProject.id).then(p => {
-                setCurrentProject(p)
-                if (p) {
-                  const updated = p.tasks?.find((t) => t.id === selectedTask.id)
-                  if (updated) setSelectedTask(updated)
-                }
-              })
-            }}
-          />
-        </>
+        // Overlay/backdrop, focus trap, Escape-to-close and focus restoration are
+        // now owned by the Radix Dialog inside TaskDetailDrawer (G-2). The former
+        // hand-built dimming <div> was removed to avoid a double backdrop.
+        <TaskDetailDrawer
+          task={selectedTask}
+          agents={currentProject?.agents ?? []}
+          onClose={() => setSelectedTask(null)}
+          onEdit={() => { openEditTaskDialog(selectedTask); setSelectedTask(null) }}
+          onRefresh={() => {
+            if (currentProject) fetchProject(currentProject.id).then(p => {
+              setCurrentProject(p)
+              if (p) {
+                const updated = p.tasks?.find((t) => t.id === selectedTask.id)
+                if (updated) setSelectedTask(updated)
+              }
+            })
+          }}
+        />
       )}
 
       <AgentWizardModal

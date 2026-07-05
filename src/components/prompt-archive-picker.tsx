@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,10 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
   const [selected, setSelected] = useState<PromptLibraryEntry | null>(null)
   const [preview, setPreview] = useState<FetchState<PromptLibraryEntryFull>>({ status: 'idle' })
   const [filter, setFilter] = useState('')
+  // TD-005: roving-tabindex focus target for the entry list (the option whose
+  // tabIndex is 0). Arrow/Home/End move it; only one entry is in the tab order.
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const entryRefs = useRef(new Map<string, HTMLButtonElement>())
 
   const filteredCategories = library.status === 'ok'
     ? library.data.categories
@@ -40,6 +45,34 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
         }))
         .filter((cat) => cat.entries.length > 0)
     : []
+
+  // TD-005: flat DOM-order list of visible entries for roving-tabindex math.
+  const flatEntries = filteredCategories.flatMap((cat) => cat.entries)
+  // The single entry that is keyboard-focusable (tabIndex 0). Falls back to the
+  // first entry when nothing has been focused yet or the active one filtered out.
+  const rovingId = activeId && flatEntries.some((e) => e.id === activeId)
+    ? activeId
+    : flatEntries[0]?.id
+
+  function focusEntryAt(index: number) {
+    if (flatEntries.length === 0) return
+    const clamped = Math.min(Math.max(index, 0), flatEntries.length - 1)
+    const target = flatEntries[clamped]
+    setActiveId(target.id)
+    entryRefs.current.get(target.id)?.focus()
+  }
+
+  function handleListKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (flatEntries.length === 0) return
+    const current = flatEntries.findIndex((entry) => entry.id === rovingId)
+    const idx = current < 0 ? 0 : current
+    switch (e.key) {
+      case 'ArrowDown': e.preventDefault(); focusEntryAt(idx + 1); break
+      case 'ArrowUp': e.preventDefault(); focusEntryAt(idx - 1); break
+      case 'Home': e.preventDefault(); focusEntryAt(0); break
+      case 'End': e.preventDefault(); focusEntryAt(flatEntries.length - 1); break
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -59,6 +92,7 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
       setSelected(null)
       setPreview({ status: 'idle' })
       setFilter('')
+      setActiveId(null)
     }
     onOpenChange(next)
   }
@@ -116,17 +150,25 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
                   {library.message}
                 </div>
               )}
-              {library.status === 'ok' &&
-                filteredCategories.map((cat) => (
-                  <div key={cat.name} className="py-2">
-                    <p className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {library.status === 'ok' && (
+                <div role="listbox" aria-label="Prompt templates" onKeyDown={handleListKeyDown}>
+                  {filteredCategories.map((cat, catIndex) => (
+                  <div key={cat.name} role="group" aria-labelledby={`prompt-cat-${catIndex}`} className="py-2">
+                    <p id={`prompt-cat-${catIndex}`} className="px-4 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       {cat.name}
                     </p>
                     {cat.entries.map((entry) => (
                       <button
                         key={entry.id}
-                        onClick={() => handleSelectEntry(entry)}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors flex items-start gap-2 ${
+                        ref={(el) => {
+                          if (el) entryRefs.current.set(entry.id, el)
+                          else entryRefs.current.delete(entry.id)
+                        }}
+                        role="option"
+                        aria-selected={selected?.id === entry.id}
+                        tabIndex={entry.id === rovingId ? 0 : -1}
+                        onClick={() => { setActiveId(entry.id); handleSelectEntry(entry) }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors flex items-start gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
                           selected?.id === entry.id ? 'bg-accent' : ''
                         }`}
                       >
@@ -143,7 +185,9 @@ export function PromptArchivePicker({ open, onOpenChange, onSelect }: PromptArch
                       </button>
                     ))}
                   </div>
-                ))}
+                  ))}
+                </div>
+              )}
               {library.status === 'ok' && filter.trim() && filteredCategories.length === 0 && (
                 <p className="px-4 py-6 text-xs text-muted-foreground text-center">
                   No prompts match &ldquo;{filter}&rdquo;

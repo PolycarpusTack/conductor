@@ -123,7 +123,10 @@
 
   /* Muted */
   --muted: #1C2333;
-  --muted-foreground: #5E6F8A;
+  /* G-2 a11y: was #5E6F8A (3.75:1 on --background #0B0F19 — fails WCAG AA 1.4.3
+     for normal text). #6E7D99 measures 4.61:1, clearing the 4.5:1 threshold
+     while staying a muted slate. Light-mode value is unchanged (already 4.8:1). */
+  --muted-foreground: #6E7D99;
 
   /* Accent */
   --accent: #232E45;

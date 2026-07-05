@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -73,7 +74,7 @@ const STEP_STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   active: { color: 'text-[var(--op-blue)]', label: 'Active' },
   pending: { color: 'text-muted-foreground', label: 'Pending' },
   failed: { color: 'text-[var(--op-red)]', label: 'Failed' },
-  skipped: { color: 'text-muted-foreground/50', label: 'Skipped' },
+  skipped: { color: 'text-muted-foreground', label: 'Skipped' },
 }
 
 export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh }: TaskDetailDrawerProps) {
@@ -163,7 +164,18 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
   const doneCount = fullSteps.filter(s => s.status === 'done' || s.status === 'skipped').length
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[520px] max-w-full z-50 bg-background border-l border-border/30 shadow-2xl flex flex-col animate-slide-in">
+    <Dialog.Root open onOpenChange={(next) => { if (!next) onClose() }}>
+      <Dialog.Portal>
+        {/* Radix-owned dim/backdrop (replaces the board-shell hand-built overlay);
+            clicking it, or Escape, closes via onOpenChange -> onClose. */}
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <Dialog.Content
+          aria-describedby="task-drawer-desc"
+          className="fixed inset-y-0 right-0 w-[520px] max-w-full z-50 bg-background border-l border-border/30 shadow-2xl flex flex-col animate-slide-in focus:outline-none"
+        >
+          <Dialog.Description id="task-drawer-desc" className="sr-only">
+            Task details, workflow steps, sessions and messages for {task.title}. Press Escape to close.
+          </Dialog.Description>
       {/* Header */}
       <div className="flex items-start justify-between px-5 py-4 border-b border-border/30">
         <div className="min-w-0 flex-1">
@@ -180,7 +192,9 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
               </span>
             )}
           </div>
-          <h2 className="text-base font-semibold font-heading leading-tight">{task.title}</h2>
+          <Dialog.Title asChild>
+            <h2 className="text-base font-semibold font-heading leading-tight">{task.title}</h2>
+          </Dialog.Title>
           {task.agent && (
             <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
               <AgentBadge agent={task.agent} size="full" />
@@ -308,12 +322,12 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
                               {step.agent ? <AgentBadge agent={step.agent} size="card" /> : (step.humanLabel || 'Human')}
                             </span>
                             {step.attempts && step.attempts > 0 && (
-                              <span className="text-[9px] font-mono text-[var(--op-amber)]/60">#{step.attempts + 1}</span>
+                              <span className="text-[9px] font-mono text-[var(--op-amber)]/70">#{step.attempts + 1}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className={`text-[10px] font-mono ${config.color}`}>{config.label}</span>
-                            <span className={`text-[9px] font-mono ${step.autoContinue ? 'text-[var(--op-green)]/40' : 'text-[var(--op-amber)]/40'}`}>
+                            <span className={`text-[9px] font-mono ${step.autoContinue ? 'text-[var(--op-green)]/70' : 'text-[var(--op-amber)]/70'}`}>
                               {step.autoContinue ? 'auto' : 'pause'}
                             </span>
                           </div>
@@ -430,7 +444,7 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
           {/* Timestamps */}
           <div className="pt-2">
             <Separator className="mb-3" />
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-muted-foreground/60">
+            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-muted-foreground">
               {task.createdAt && <div>Created: {new Date(task.createdAt).toLocaleString()}</div>}
               {task.startedAt && <div>Started: {new Date(task.startedAt).toLocaleString()}</div>}
               {task.completedAt && <div>Completed: {new Date(task.completedAt).toLocaleString()}</div>}
@@ -438,6 +452,8 @@ export function TaskDetailDrawer({ task, agents = [], onClose, onEdit, onRefresh
           </div>
         </div>
       </ScrollArea>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
