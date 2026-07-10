@@ -58,6 +58,13 @@ CLAUDE.local.md
 # Archive (local-only working files)
 .archive/
 
+# Playwright e2e artifacts (G-1)
+test-results/
+playwright-report/
+playwright/.cache/
+e2e/test-results/
+e2e/playwright-report/
+
 # Lock files (project uses bun.lock)
 package-lock.json
 
