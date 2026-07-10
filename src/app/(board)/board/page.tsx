@@ -306,6 +306,22 @@ export default function BoardPage() {
     return grouped
   }, [filteredTasks])
 
+  // G-4: per-column ordered id arrays for dnd-kit's SortableContext. Keyed on
+  // tasksByStatus so the id array handed to each SortableContext keeps its
+  // identity across re-renders that don't touch tasks/filter (e.g. toggling one
+  // card's selection). Previously `items={tasks.map((t) => t.id)}` allocated a
+  // fresh array for all five columns on EVERY BoardPage render, defeating
+  // SortableContext's internal same-items bail. Behaviour is identical — same
+  // ids in the same order — only the reference is now stable. (No O(n²): one
+  // O(n) pass over the already-grouped tasks, memoized.)
+  const itemIdsByStatus = useMemo(() => {
+    const ids = {} as Record<TaskStatus, string[]>
+    for (const status of Object.keys(tasksByStatus) as TaskStatus[]) {
+      ids[status] = tasksByStatus[status].map((t) => t.id)
+    }
+    return ids
+  }, [tasksByStatus])
+
   // The card currently lifted, mirrored into a DragOverlay so the pointer/
   // keyboard drag has a visible, detached representation.
   const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -512,7 +528,7 @@ export default function BoardPage() {
                       </Button>
                     </div>
 
-                    <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={itemIdsByStatus[column.id]} strategy={verticalListSortingStrategy}>
                       <div className="flex flex-col gap-2">
                         {tasks.map((task) => (
                           <SortableTaskCard
