@@ -15,31 +15,12 @@ import {
 import { db } from '@/lib/db'
 import { ApiError, badRequest, unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { adminLoginSchema } from '@/lib/server/contracts'
-
-const LOGIN_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
-const MAX_LOGIN_ATTEMPTS = 10
-// NOTE: In-memory rate limiter. Resets on server restart and does not
-// persist across multiple worker processes. For production deployments
-// with multiple instances, replace with Redis-backed rate limiting.
-// NOTE: When no trusted proxy is configured (TRUSTED_PROXY env var not set),
-// all requests share a single rate-limit bucket ('global'). This prevents
-// bypass via X-Forwarded-For / X-Real-IP header rotation. If TRUSTED_PROXY=true,
-// the operator MUST configure their reverse proxy to strip and rewrite these
-// headers so clients cannot spoof them.
-const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now()
-  const entry = loginAttempts.get(ip)
-
-  if (!entry || now - entry.firstAttempt > LOGIN_WINDOW_MS) {
-    loginAttempts.set(ip, { count: 1, firstAttempt: now })
-    return false
-  }
-
-  entry.count++
-  return entry.count > MAX_LOGIN_ATTEMPTS
-}
+import {
+  GLOBAL_MAX_ATTEMPTS,
+  MAX_LOGIN_ATTEMPTS,
+  clearLoginRateLimit,
+  isLoginRateLimited,
+} from '@/lib/server/login-rate-limit'
 
 // Public endpoint — frontend needs to know whether to show login screen.
 // Returns whether auth is configured, whether the current session is valid,
@@ -63,7 +44,10 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
        'unknown')
     : 'global' // single bucket when no trusted proxy — can't be bypassed by IP rotation
 
-  if (isRateLimited(ip)) {
+  // The shared 'global' bucket gets the forgiving cap (backstop only); a real
+  // per-IP bucket (trusted proxy) gets the strict cap. Per-email is enforced
+  // separately below and is the authoritative per-account brute-force gate.
+  if (isLoginRateLimited(ip, trustProxy ? MAX_LOGIN_ATTEMPTS : GLOBAL_MAX_ATTEMPTS)) {
     throw new ApiError(429, 'Too many login attempts. Try again later.')
   }
 
@@ -78,7 +62,7 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
   const parsed = adminLoginSchema.safeParse(await bodyClone.json())
   if (!parsed.success) throw badRequest('Password is required')
 
-  if (parsed.data.email && isRateLimited(`email:${parsed.data.email}`)) {
+  if (parsed.data.email && isLoginRateLimited(`email:${parsed.data.email}`)) {
     throw new ApiError(429, 'Too many login attempts for this account. Try again later.')
   }
 
@@ -90,8 +74,8 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
     const user = await verifyUserCredentials(parsed.data.email, parsed.data.password)
     if (!user) throw unauthorized('Invalid email or password')
 
-    loginAttempts.delete(ip)
-    loginAttempts.delete(`email:${parsed.data.email}`)
+    clearLoginRateLimit(ip)
+    clearLoginRateLimit(`email:${parsed.data.email}`)
     await createAdminSession(user.id)
     db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {})
     return NextResponse.json({ success: true, user: { name: user.name, email: user.email, role: user.role } })
@@ -106,7 +90,7 @@ export const POST = withErrorHandling('api/admin/session', async (request: Reque
   const validPassword = await verifyAdminPassword(parsed.data.password)
   if (!validPassword) throw unauthorized('Invalid password')
 
-  loginAttempts.delete(ip)
+  clearLoginRateLimit(ip)
 
   // First successful legacy login bootstraps the owner account — same
   // password, now with an identity. Recovery mode never bootstraps.

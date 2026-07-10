@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { getLegacyApiKeyStatus, migrateLegacyApiKeys } from '@/lib/server/api-keys'
+import { getLegacyApiKeyStatus, migrateLegacyApiKeys } from '@/lib/server/legacy-key-purge'
 import { requireRole } from '@/lib/server/admin-session'
 import { withErrorHandling } from '@/lib/server/api-errors'
 

@@ -15,11 +15,10 @@ type AgentAuthResult = {
   projectId: string
 }
 
-type LegacyApiKeyStatus = {
-  projectsWithPlaintext: number
-  agentsWithPlaintext: number
-  totalWithPlaintext: number
-}
+// The legacy plaintext-key purge lives in ./legacy-key-purge (import it from
+// there directly). It is deliberately NOT re-exported here: this module is
+// module-mocked by several route tests, and a re-export makes those stubs
+// shadow a real import of the purge functions through the shared bun registry.
 
 function hashKey(value: string) {
   return createHash('sha256').update(value).digest('hex')
@@ -110,6 +109,14 @@ export async function resolveAgentByApiKey(rawKey: string): Promise<AgentAuthRes
   })
 
   if (legacyAgent) {
+    // DEPRECATION (G-3): a plaintext key was still stored for this agent. The
+    // fallback is retained so unmigrated self-host installs keep working, but
+    // it is a migration path, not a permanent affordance — run the one-shot
+    // purge (`bun run scripts/purge-legacy-keys.ts`, or migrateLegacyApiKeys())
+    // to hash + NULL every remaining plaintext key. Column drop is a follow-up.
+    log.warn('legacy plaintext agent key resolved — auto-migrating; run purge-legacy-keys to eliminate plaintext keys', {
+      agentId: legacyAgent.id,
+    })
     // Auto-migrate this agent's key to hashed format
     await db.agent.update({
       where: { id: legacyAgent.id },
@@ -124,72 +131,4 @@ export async function resolveAgentByApiKey(rawKey: string): Promise<AgentAuthRes
   }
 
   return null
-}
-
-export async function getLegacyApiKeyStatus(): Promise<LegacyApiKeyStatus> {
-  const [projectsWithPlaintext, agentsWithPlaintext] = await Promise.all([
-    db.project.count({ where: { apiKey: { not: null } } }),
-    db.agent.count({ where: { apiKey: { not: null } } }),
-  ])
-
-  return {
-    projectsWithPlaintext,
-    agentsWithPlaintext,
-    totalWithPlaintext: projectsWithPlaintext + agentsWithPlaintext,
-  }
-}
-
-export async function migrateLegacyApiKeys() {
-  const [projects, agents] = await Promise.all([
-    db.project.findMany({
-      where: { apiKey: { not: null } },
-      select: { id: true, apiKey: true, apiKeyPreview: true },
-    }),
-    db.agent.findMany({
-      where: { apiKey: { not: null } },
-      select: { id: true, apiKey: true, apiKeyPreview: true },
-    }),
-  ])
-
-  const updates = [
-    ...projects.flatMap((project) =>
-      project.apiKey
-        ? [
-            db.project.update({
-              where: { id: project.id },
-              data: {
-                apiKey: null,
-                apiKeyHash: hashKey(project.apiKey),
-                apiKeyPreview: project.apiKeyPreview || buildApiKeyPreview(project.apiKey),
-              },
-            }),
-          ]
-        : [],
-    ),
-    ...agents.flatMap((agent) =>
-      agent.apiKey
-        ? [
-            db.agent.update({
-              where: { id: agent.id },
-              data: {
-                apiKey: null,
-                apiKeyHash: hashKey(agent.apiKey),
-                apiKeyPreview: agent.apiKeyPreview || buildApiKeyPreview(agent.apiKey),
-              },
-            }),
-          ]
-        : [],
-    ),
-  ]
-
-  if (updates.length > 0) {
-    await db.$transaction(updates)
-  }
-
-  return {
-    migratedProjects: projects.length,
-    migratedAgents: agents.length,
-    totalMigrated: projects.length + agents.length,
-    status: await getLegacyApiKeyStatus(),
-  }
 }

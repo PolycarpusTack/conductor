@@ -8,6 +8,11 @@ interface ReviewDecision {
   projectId: string
   decision: 'approved' | 'rejected' | 'revision_requested'
   note?: string
+  // SECURITY (G-3): `reviewer` is the identity credited with the sign-off and
+  // is the key for unique-approver + multi-sign-off enforcement below. It MUST
+  // be an authenticated identity resolved server-side (the caller route binds
+  // it to the session user's email), NEVER a caller-supplied free-form string —
+  // otherwise one person could satisfy an N-approver gate with N invented names.
   reviewer: string
   reassignAgentId?: string
   reassignMode?: string

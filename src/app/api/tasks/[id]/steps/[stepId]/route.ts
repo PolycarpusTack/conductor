@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { requireAdminSession } from '@/lib/server/admin-session'
+import { getSessionUser, requireAdminSession } from '@/lib/server/admin-session'
 import { ApiError, badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { dispatchStep, advanceChain, rewindChain, closeChain, findPreviousAgentStep } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
@@ -122,13 +122,20 @@ export const PUT = withErrorHandling(
         throw badRequest(parsed.error.issues[0]?.message || 'Invalid review payload')
       }
 
+      // SECURITY (G-3): bind the reviewer to the AUTHENTICATED session identity,
+      // never the body-supplied `reviewer` string. Trusting the body let one
+      // person satisfy an N-approver sign-off gate by POSTing different names.
+      // requireAdminSession() already passed above, so a user is present.
+      const sessionUser = await getSessionUser()
+      if (!sessionUser) throw new ApiError(401, 'Unauthorized')
+
       const result = await submitReview({
         stepId,
         taskId: id,
         projectId,
         decision: parsed.data.decision,
         note: parsed.data.note,
-        reviewer: parsed.data.reviewer,
+        reviewer: sessionUser.email,
         reassignAgentId: parsed.data.reassignAgentId,
         reassignMode: parsed.data.reassignMode,
       })
