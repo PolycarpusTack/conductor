@@ -6,15 +6,22 @@
 > This register is reviewed at each EPIC retro (GPM cadence). Resolved items are
 > kept below for history. Numbering is stable — IDs are never reused.
 >
-> **EPIC G0 progress (2026-07-10):** working tree reconciled (G-1/G-3/G-4 committed
-> per story); type-check gate made honest (`.next/dev` excluded, gap 0.1); **first
-> verified production `next build`** — BUILD_ID + `.next/static` now exist (gap 0.4);
-> `verify` one-command gate added. Full unit suite is **842/0 on a quiet host**; the
-> `verify` chain can still trip on **TD-014b** (cross-file `mock.module` order leak,
-> surfaced under concurrent-build load as `db.task.findUnique is not a function`) —
-> the last thing between `verify` and deterministic green. Not a regression; tracked
-> below. Remaining G0: G0-2 (doctor Node re-exec), G0-3 (ADR-0007 runtime story).
-> Gap detail: `GAP-ANALYSIS-2026-07-10.md`; plan: `docs/gpm/state/backlog-2026-07-10-working-program.md`.
+> **EPIC G0 "green gates" — COMPLETE (2026-07-10). All 4 Tier-0 gaps closed:**
+> - G0-0: working tree reconciled — G-1/G-3/G-4 committed per story.
+> - G0-1 (gap 0.1): type-check honest — `.next/dev` excluded; negative-tested.
+> - G0-2 (gap 0.2): `bun run doctor` passes on the default install — runs under
+>   node via `tsx`; DB check reachable; 10 checks, 0 failed (ADR-0007).
+> - G0-3 (gap 0.3): runtime story pinned (ADR-0007); `bun run dev` boots on
+>   default SQLite — /api/health 200, db ok; README corrected.
+> - G0-4 (gap 0.4): **first verified production `next build`** — BUILD_ID +
+>   `.next/static` exist; `verify` = type-check + lint + test + build + doctor.
+>
+> Unit suite **842/0 on a quiet host**. One caveat: the `verify` chain can trip on
+> **TD-014b** (cross-file `mock.module` order leak, seen under concurrent-build load
+> as `db.task.findUnique is not a function`) — the last thing between `verify` and
+> deterministic green. Not a regression; tracked below and a candidate for the next
+> EPIC. **Next: EPIC G1 "daemon parity."** Gap detail: `GAP-ANALYSIS-2026-07-10.md`;
+> plan: `docs/gpm/state/backlog-2026-07-10-working-program.md`.
 
 ## Active
 

@@ -9,19 +9,25 @@
 
 ## One-line status (updated 2026-07-10)
 
-EPICs **A–F complete**. **The 2026-07-05 in-flight tree is RECONCILED** — G-1
-(Playwright), G-3 (security: sign-off identity binding + legacy-key purge +
-login rate limit), G-4 (board perf) each committed per story. **EPIC G0 "green
-gates" largely done**: type-check honest (`.next/dev` excluded), first verified
-production build (BUILD_ID exists), `verify` one-command gate added; unit suite
-842/0 on a quiet host (the `verify` chain can still trip on TD-014b mock-order
-flakiness under load — not a regression).
-**Next:** G0-2 (doctor Node re-exec) + G0-3 (ADR-0007 runtime story) to finish
-G0, then EPIC **G1 "daemon parity"** — the big one; the daemon path skips ~half
-the engine's bookkeeping (unresolved prompt tokens, no chain context, no
-rejection feedback, single-attempt retries, no dead-letter/budget). The old G-5
-finale (TD-024 Docker build, 1.0 cut, seven-dimension re-eval) still stands,
-resequenced as G2 + close-out.
+EPICs **A–F complete**. **In-flight tree RECONCILED** (G-1 Playwright, G-3
+security, G-4 perf — committed per story). **EPIC G0 "green gates" COMPLETE** —
+all 4 Tier-0 gaps closed: type-check honest, `bun run doctor` passes on the
+default install (node via tsx, ADR-0007), `bun run dev` boots (health 200/db ok),
+**first verified production build** (BUILD_ID exists), `verify` = type-check +
+lint + test + build + doctor. Unit suite 842/0 quiet (the `verify` chain can
+still trip on TD-014b mock-order flakiness under load — not a regression).
+
+**Next: EPIC G1 "daemon parity"** — the big one. The daemon dispatch path skips
+~half the engine's bookkeeping vs the HTTP path: unresolved `{{...}}` prompt
+tokens, no previous-step context, no review-rejection feedback, single-attempt
+retries (reference daemon hardcodes `willRetry:false`), no dead-letter/notify,
+budgets never bind (TD-018b/TD-025 + the 7 undocumented siblings in the gap
+file). **G1-1 is the mandated thin slice** (one daemon step: resolved prompt +
+previousOutput + server-owned retry + dead-letter + StepExecution/budget) —
+start there. Then G2 "proven deploy" (needs a Docker/Linux host — TD-024,
+migrations, `--accept-data-loss` removal, WAL), G3 "truth in features", G4
+"UX coherence" (from FUNCTIONALITY-REVIEW), and the 1.0 cut + seven-dimension
+re-eval as close-out.
 
 ## Superseded original status (2026-07-05)
 
