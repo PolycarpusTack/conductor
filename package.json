@@ -12,9 +12,9 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "type-check": "tsc --noEmit --incremental false",
-    "verify": "bun run type-check && bun run lint && bun test && bunx next build",
-    "doctor": "bun scripts/doctor.ts",
-    "smoke-test": "bun scripts/doctor.ts --smoke",
+    "verify": "bun run type-check && bun run lint && bun test && bunx next build && bun run doctor --offline",
+    "doctor": "tsx scripts/doctor.ts",
+    "smoke-test": "tsx scripts/doctor.ts --smoke",
     "smoke:daemon": "bun scripts/doctor.ts --daemon-e2e",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
@@ -97,6 +97,7 @@
     "prisma": "^7.5.0",
     "shx": "^0.4.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.0",
     "typescript": "^5"
   }
 }

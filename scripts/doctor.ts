@@ -54,9 +54,19 @@ function record(name: string, severity: Severity, detail: string) {
 // ---------------------------------------------------------------------------
 
 function checkRuntime() {
+  // The app server and this diagnostic run under NODE (ADR-0007): better-sqlite3
+  // cannot load under Bun (oven-sh/bun#4290), so the DB check — and the server's
+  // own boot — fail there. Bun remains the tooling runtime for `test`/`build`.
   const bunVersion = typeof Bun !== 'undefined' ? Bun.version : null
-  if (bunVersion) record('runtime', 'pass', `bun ${bunVersion}`)
-  else record('runtime', 'warn', `node ${process.version} (bun recommended)`)
+  if (bunVersion) {
+    record(
+      'runtime',
+      'warn',
+      `bun ${bunVersion} — DB checks will fail (better-sqlite3 needs node); run \`bun run doctor\` (delegates to node via tsx)`,
+    )
+  } else {
+    record('runtime', 'pass', `node ${process.version}`)
+  }
 }
 
 function checkEnvFile() {
@@ -689,6 +699,16 @@ const ICONS: Record<Severity, string> = { pass: '✓', warn: '!', fail: '✗' }
 
 async function main() {
   if (DAEMON_E2E) {
+    // The daemon e2e smoke spawns child processes via Bun's spawn APIs, so it
+    // must run under Bun: `bun run smoke:daemon`. (The core doctor/smoke-test
+    // run under node via tsx for the better-sqlite3 DB checks — ADR-0007.)
+    if (typeof Bun === 'undefined') {
+      console.error(
+        'daemon-e2e requires the Bun runtime (it spawns the fixture via Bun.spawn).\n' +
+          'Run:  bun run smoke:daemon',
+      )
+      process.exit(2)
+    }
     await runDaemonE2E()
   } else {
     checkRuntime()
