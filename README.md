@@ -25,7 +25,10 @@ A professional-grade orchestration platform for AI agents with workflow chains, 
 
 ## Requirements
 
-- Bun 1.3+ and Node.js 20+ (Node is used by the Next.js build)
+- **Node.js 20+** runs the app server and diagnostics — the default SQLite
+  driver (`better-sqlite3`) cannot load under Bun. **Bun 1.3+** is the tooling
+  runtime (install, tests, build). `bun run dev` / `bun run doctor` delegate to
+  Node for you. See [ADR-0007](docs/adr/ADR-0007-node-runtime-bun-tooling.md).
 - Optional: Docker (for PostgreSQL + pgvector — enables semantic skill search)
 
 ## Quick Start
