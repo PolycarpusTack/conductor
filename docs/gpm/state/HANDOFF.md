@@ -1,14 +1,32 @@
 # HANDOFF — resume here
 
-> Written 2026-07-05, end of a long autonomous GPM run. Read this first, then
+> Written 2026-07-05; updated 2026-07-10 (EPIC G0 pass). Read this first, then
 > `docs/gpm/state/mode.md` and `docs/gpm/state/development-plan-v1.md`.
-> The GPM router is `CLAUDE.md`; the plan lives in `development-plan-v1.md`.
+> The GPM router is `CLAUDE.md`. The road to 1.0 now follows the review-driven
+> **`docs/gpm/state/backlog-2026-07-10-working-program.md`** (EPICs G0–G4),
+> backed by `GAP-ANALYSIS-2026-07-10.md` + `FUNCTIONALITY-REVIEW-2026-07-10.md`
+> at the repo root, which supersede the G-1..G-5 sketch below.
 
-## One-line status
+## One-line status (updated 2026-07-10)
 
-EPICs **A–F are complete and committed**. **EPIC G (hardening/1.0) is in progress** —
-G-2 committed; G-1, G-3, G-4 were running as background agents when this session
-paused and left **uncommitted edits in the working tree**. G-5 not started.
+EPICs **A–F complete**. **The 2026-07-05 in-flight tree is RECONCILED** — G-1
+(Playwright), G-3 (security: sign-off identity binding + legacy-key purge +
+login rate limit), G-4 (board perf) each committed per story. **EPIC G0 "green
+gates" largely done**: type-check honest (`.next/dev` excluded), first verified
+production build (BUILD_ID exists), `verify` one-command gate added; unit suite
+842/0 on a quiet host (the `verify` chain can still trip on TD-014b mock-order
+flakiness under load — not a regression).
+**Next:** G0-2 (doctor Node re-exec) + G0-3 (ADR-0007 runtime story) to finish
+G0, then EPIC **G1 "daemon parity"** — the big one; the daemon path skips ~half
+the engine's bookkeeping (unresolved prompt tokens, no chain context, no
+rejection feedback, single-attempt retries, no dead-letter/budget). The old G-5
+finale (TD-024 Docker build, 1.0 cut, seven-dimension re-eval) still stands,
+resequenced as G2 + close-out.
+
+## Superseded original status (2026-07-05)
+
+EPICs A–F complete; G-2 committed; G-1/G-3/G-4 were uncommitted background-agent
+edits (**now reconciled — see above**); G-5 not started.
 
 ## FIRST THING TO DO TOMORROW — reconcile the working tree
 
