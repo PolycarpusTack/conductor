@@ -17,17 +17,39 @@ default install (node via tsx, ADR-0007), `bun run dev` boots (health 200/db ok)
 lint + test + build + doctor. Unit suite 842/0 quiet (the `verify` chain can
 still trip on TD-014b mock-order flakiness under load — not a regression).
 
-**Next: EPIC G1 "daemon parity"** — the big one. The daemon dispatch path skips
-~half the engine's bookkeeping vs the HTTP path: unresolved `{{...}}` prompt
-tokens, no previous-step context, no review-rejection feedback, single-attempt
-retries (reference daemon hardcodes `willRetry:false`), no dead-letter/notify,
-budgets never bind (TD-018b/TD-025 + the 7 undocumented siblings in the gap
-file). **G1-1 is the mandated thin slice** (one daemon step: resolved prompt +
-previousOutput + server-owned retry + dead-letter + StepExecution/budget) —
-start there. Then G2 "proven deploy" (needs a Docker/Linux host — TD-024,
-migrations, `--accept-data-loss` removal, WAL), G3 "truth in features", G4
-"UX coherence" (from FUNCTIONALITY-REVIEW), and the 1.0 cut + seven-dimension
-re-eval as close-out.
+**EPIC G1 "daemon parity" — IN PROGRESS (updated 2026-07-11).** G1-1 thin slice,
+2 of 5 tasks done and committed, suite 843/0 after each:
+- **G1-1-T1 DONE** — extracted the Finalizer (`finalizeStepSuccess`/
+  `finalizeStepFailure`, exported from `dispatch.ts`); HTTP path rewired onto it,
+  zero behaviour change (dispatch suite 86/0 unchanged). `executionId` nullable +
+  `eventMeta` optional so the daemon path can share it.
+- **G1-1-T2 DONE** — daemon fail path routes through `finalizeStepFailure`
+  (ADR-0008). Server decides retry vs terminal from the step's own maxRetries;
+  daemon `willRetry` is a logged hint, never obeyed. Exhaustion now dead-letters +
+  notifies + escalates to fallback. **Closes TD-025**, gaps 1.4/1.5.
+
+**RESUME AT G1-1-T3** (discovery done — payload v2: resolved prompt + previousOutput):
+- Server side: `src/app/api/daemon/steps/next/route.ts` — today it ships raw
+  `instructions` + `agent.systemPrompt` with literal `{{task.title}}`/
+  `{{memory.recent}}` tokens (gaps 1.1/1.2). Run `resolvePrompt` server-side
+  (`src/lib/server/resolve-prompt.ts` — check its full token set vs how
+  `dispatch.ts prepareDispatch` applies it) over instructions/systemPrompt, add
+  `previousOutput` (previous step's output), bump `payloadVersion: 2`.
+- Daemon side: `mini-services/conductor-daemon/runner.ts` —
+  `EXECUTION_PAYLOAD_VERSION` const, `validateExecutionPayload` (accept v2),
+  `composeUserBody` (~line 179, include previousOutput). Since the server
+  pre-resolves, the daemon uses resolved text as-is. Update `runner.test.ts`.
+- Snapshot: `docs/gpm/state/snapshots/daemon-execution-payload.md` → Version 2.
+- Then **T4** (StepExecution row per daemon attempt at lease → finalized by the
+  Finalizer, passing the real `executionId` instead of null; cost/turns from the
+  claude metadata artifact; closes TD-018b, binds budgets) and **T5** (extend
+  `bun run smoke:daemon` — note it runs under Bun via `Bun.spawn`, ADR-0007 — with
+  parity assertions). Then G1-2 (rejectionNote), G1-3 (MCP spike), G1-4 bundle,
+  G1-5 close-out.
+
+Then G2 "proven deploy" (needs a Docker/Linux host — TD-024, migrations,
+`--accept-data-loss` removal, WAL), G3 "truth in features", G4 "UX coherence"
+(from FUNCTIONALITY-REVIEW), 1.0 cut + seven-dimension re-eval as close-out.
 
 ## Superseded original status (2026-07-05)
 
