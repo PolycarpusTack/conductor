@@ -7,7 +7,7 @@ import { badRequest, forbidden, notFound, unauthorized, withErrorHandling } from
 import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { stepArtifactSchema } from '@/lib/server/contracts'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
-import { advanceChain, resolveTaskStatus } from '@/lib/server/dispatch'
+import { advanceChain, finalizeStepFailure } from '@/lib/server/dispatch'
 import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { appendStepEvent } from '@/lib/server/step-events'
@@ -63,9 +63,14 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
         taskId: true,
         status: true,
         leasedBy: true,
+        agentId: true,
+        mode: true,
+        instructions: true,
+        maxRetries: true,
         retryDelayMs: true,
+        fallbackAgentId: true,
         attempts: true,
-        task: { select: { projectId: true } },
+        task: { select: { projectId: true, title: true } },
       },
     })
 
@@ -146,39 +151,12 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
         log.error('advanceChain failed after daemon step completion', chainErr)
       }
     } else if (action === 'fail') {
-      const retryDelayMs = step.retryDelayMs ?? 5000
-      await db.taskStep.update({
-        where: { id: stepId },
-        data: {
-          // Retry: keep step 'active' so the queue re-leases it after the delay.
-          // Non-retry: 'failed' is terminal.
-          status: willRetry ? 'active' : 'failed',
-          error: errorMsg?.slice(0, MAX_OUTPUT_CHARS),
-          attempts: { increment: 1 },
-          completedAt: willRetry ? null : new Date(),
-          leasedBy: null,
-          leasedAt: willRetry && retryDelayMs > 0 ? new Date(Date.now() + retryDelayMs) : null,
-        },
-      })
-
+      // Evidence first — a failed run's git diff is exactly what a reviewer needs,
+      // and it must survive whatever the Finalizer decides.
       await persistArtifacts()
 
-      await appendStepEvent(stepId, 'failed', {
-        source: 'daemon',
-        daemonId: daemon.id,
-        attempt: step.attempts + 1,
-        error: errorMsg?.slice(0, 500),
-        ...(sessionId ? { sessionId } : {}),
-      })
-      if (willRetry) {
-        await appendStepEvent(stepId, 'retry_scheduled', {
-          source: 'daemon',
-          attempt: step.attempts + 1,
-          delayMs: retryDelayMs,
-        })
-      }
-
-      // Daemon-specific event for the runtime dashboard's live log
+      // Daemon-specific event for the runtime dashboard's live log. `willRetry`
+      // is echoed as the daemon's *hint* — the actual decision is the server's.
       broadcastProjectEvent(step.task.projectId, 'daemon-step-failed', {
         stepId,
         taskId: step.taskId,
@@ -187,22 +165,23 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
         willRetry,
       })
 
-      // Terminal failure must drive the task state machine like HTTP-dispatched
-      // failures do (see dispatch.ts:failStep). Emit the generic step-failed
-      // event so the board refetches, and call resolveTaskStatus so the task
-      // doesn't stay stuck in IN_PROGRESS when no other branches are active.
-      if (!willRetry) {
-        broadcastProjectEvent(step.task.projectId, 'step-failed', {
-          taskId: step.taskId,
-          stepId,
-          error: errorMsg,
-        })
-        try {
-          await resolveTaskStatus(step.taskId, step.task.projectId)
-        } catch (resolveErr) {
-          log.error('resolveTaskStatus failed after daemon terminal fail', resolveErr, { stepId })
-        }
-      }
+      // G1-1-T2: route the daemon fail path through the same Finalizer the HTTP
+      // path uses (ADR-0008). The SERVER decides retry vs terminal from the
+      // step's own maxRetries/backoff — the daemon-supplied `willRetry` is a hint
+      // we log, never obey (the reference daemon hardcodes willRetry:false, which
+      // would otherwise make every daemon failure single-attempt and terminal).
+      // Exhaustion now dead-letters + notifies exactly like HTTP (closes TD-025).
+      // executionId is null until G1-1-T4 wires a StepExecution row per attempt.
+      const attemptNumber = step.attempts + 1
+      const outcome = await finalizeStepFailure({
+        step,
+        attemptNumber,
+        executionId: null,
+        message: errorMsg?.slice(0, MAX_OUTPUT_CHARS) || 'Daemon reported failure',
+        isTimeout: false,
+        eventMeta: { source: 'daemon', daemonId: daemon.id, ...(sessionId ? { sessionId } : {}) },
+      })
+      log.info('daemon fail finalized', { stepId, attemptNumber, outcome, willRetryHint: willRetry })
     }
 
     return NextResponse.json({ status: 'ok', stepId, action })

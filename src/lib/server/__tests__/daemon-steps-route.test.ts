@@ -19,6 +19,8 @@ const mockSessionFindUnique = mock(() => Promise.resolve(null)) as any
 const mockSessionUpdate = mock(() => Promise.resolve({})) as any
 const mockStepEventCreate = mock(() => Promise.resolve({ id: 'evt-1' })) as any
 const mockArtifactCreate = mock(() => Promise.resolve({ id: 'art-1' })) as any
+const mockDeadLetterCreate = mock(() => Promise.resolve({ id: 'dl-1' })) as any
+const mockNotificationCreate = mock(() => Promise.resolve({ id: 'notif-1' })) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -43,6 +45,9 @@ mock.module('@/lib/db', () => ({
     stepArtifact: {
       create: mockArtifactCreate,
     },
+    // G1-1-T2: the Finalizer's terminal branch dead-letters + notifies.
+    deadLetterStep: { create: mockDeadLetterCreate },
+    notification: { create: mockNotificationCreate },
     activityLog: { create: () => Promise.resolve({}) },
   },
   isPostgresDb: false,
@@ -79,9 +84,14 @@ const LEASED_STEP = {
   taskId: 'task-1',
   status: 'active',
   leasedBy: 'daemon-1',
+  agentId: 'agent-1',
+  mode: 'develop',
+  instructions: 'do the thing',
+  maxRetries: 2,
   retryDelayMs: 5000,
+  fallbackAgentId: null,
   attempts: 0,
-  task: { projectId: 'p-1' },
+  task: { projectId: 'p-1', title: 'Task One' },
 }
 
 beforeEach(() => {
@@ -99,6 +109,10 @@ beforeEach(() => {
   mockStepEventCreate.mockResolvedValue({ id: 'evt-1' })
   mockArtifactCreate.mockReset()
   mockArtifactCreate.mockResolvedValue({ id: 'art-1' })
+  mockDeadLetterCreate.mockReset()
+  mockDeadLetterCreate.mockResolvedValue({ id: 'dl-1' })
+  mockNotificationCreate.mockReset()
+  mockNotificationCreate.mockResolvedValue({ id: 'notif-1' })
   mockResolveDaemonByToken.mockReset()
   mockResolveDaemonByToken.mockResolvedValue(DAEMON)
   mockExtractDaemonToken.mockReset()
@@ -172,7 +186,7 @@ describe('POST /api/daemon/steps — step events', () => {
     expect(data.sessionId).toBe('sess-1')
   })
 
-  test('fail with willRetry appends failed + retry_scheduled events', async () => {
+  test('fail with attempts remaining appends failed + retry_scheduled events', async () => {
     const res = await POST(
       makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: true }),
       params,
@@ -183,16 +197,37 @@ describe('POST /api/daemon/steps — step events', () => {
     const failData = JSON.parse(eventsOfType('failed')[0][0].data.data)
     expect(failData.error).toBe('boom')
     expect(failData.attempt).toBe(1)
+    expect(failData.source).toBe('daemon')
   })
 
-  test('terminal fail appends only the failed event', async () => {
+  // G1-1-T2 (ADR-0008): the SERVER decides retry vs terminal from the step's own
+  // maxRetries — the daemon's willRetry is a hint we ignore. With attempts left,
+  // willRetry:false must STILL retry (the reference daemon always sends false).
+  test('server retries despite willRetry:false when attempts remain (hint ignored)', async () => {
     const res = await POST(
       makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: false }),
       params,
     )
     expect(res.status).toBe(200)
+    expect(eventsOfType('retry_scheduled')).toHaveLength(1)
+    expect(mockDeadLetterCreate).not.toHaveBeenCalled()
+  })
+
+  // Exhaustion (attempt maxRetries+1) → terminal regardless of willRetry:true.
+  test('exhausted retries dead-letter + notify, even with willRetry:true', async () => {
+    mockStepFindUnique.mockResolvedValue({ ...LEASED_STEP, attempts: 2 }) // next attempt = 3 = maxRetries+1
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: true }),
+      params,
+    )
+    expect(res.status).toBe(200)
     expect(eventsOfType('failed')).toHaveLength(1)
     expect(eventsOfType('retry_scheduled')).toHaveLength(0)
+    expect(mockDeadLetterCreate).toHaveBeenCalledTimes(1) // TD-025: now visible in the panel
+    expect(mockNotificationCreate).toHaveBeenCalledTimes(1) // and the bell
+    const dl = mockDeadLetterCreate.mock.calls[0][0].data
+    expect(dl.originalStepId).toBe('step-1')
+    expect(dl.lastError).toBe('boom')
   })
 
   test('403 when step is leased by another daemon', async () => {
