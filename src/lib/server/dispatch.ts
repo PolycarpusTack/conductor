@@ -361,6 +361,227 @@ async function allocateExecution(stepId: string) {
   return null
 }
 
+/**
+ * The minimal step shape the Finalizer needs. Both `PreparedDispatch.step` (HTTP
+ * path) and the daemon route's step query satisfy it structurally.
+ */
+export interface FinalizableStep {
+  id: string
+  taskId: string
+  agentId: string | null
+  mode: string
+  instructions: string | null
+  maxRetries: number | null
+  retryDelayMs: number | null
+  fallbackAgentId: string | null
+  task: { projectId: string; title: string }
+}
+
+/**
+ * Close a step attempt that SUCCEEDED. Extracted (G1-1-T1) from executeDispatch
+ * so the daemon completion route can finalize identically to the HTTP path:
+ * execution row → step row → event → artifacts → board broadcast → chain advance.
+ * `executionId` may be null when no StepExecution row exists (daemon before
+ * G1-1-T4); the execution write is then skipped. `eventMeta` merges extra keys
+ * into the `succeeded` event (e.g. the daemon's source/daemonId) — omitted on the
+ * HTTP path, so its behaviour is unchanged.
+ */
+export async function finalizeStepSuccess(opts: {
+  step: FinalizableStep
+  attemptNumber: number
+  executionId: string | null
+  output: string
+  tokensUsed?: number | null
+  cost?: number | null
+  artifacts?: Array<{ type: string; label: string; content?: string | null; url?: string | null; mimeType?: string | null }>
+  eventMeta?: Record<string, unknown>
+}): Promise<void> {
+  const { step, attemptNumber, executionId, output, tokensUsed, cost, artifacts, eventMeta } = opts
+  const stepId = step.id
+
+  if (executionId) {
+    await succeedExecution(executionId, output, tokensUsed ?? undefined, cost ?? undefined)
+  }
+
+  await db.taskStep.update({
+    where: { id: stepId },
+    data: {
+      status: 'done',
+      output,
+      attempts: attemptNumber,
+      completedAt: new Date(),
+      leasedBy: null,
+      leasedAt: null,
+    },
+  })
+
+  await appendStepEvent(stepId, 'succeeded', {
+    attempt: attemptNumber,
+    tokensUsed: tokensUsed ?? null,
+    ...eventMeta,
+  })
+
+  if (artifacts && artifacts.length > 0) {
+    await db.stepArtifact.createMany({
+      data: artifacts.map(artifact => ({
+        stepId,
+        executionId,
+        type: artifact.type,
+        label: artifact.label,
+        content: artifact.content || null,
+        url: artifact.url || null,
+        mimeType: artifact.mimeType || null,
+      })),
+    })
+  }
+
+  broadcastProjectEvent(step.task.projectId, 'step-completed', {
+    taskId: step.taskId,
+    stepId,
+    output,
+    attempt: attemptNumber,
+    tokensUsed,
+  })
+
+  await advanceChain(step.taskId, step.task.projectId, stepId)
+}
+
+/**
+ * Close a step attempt that FAILED. Extracted (G1-1-T1) from executeDispatch:
+ * record the execution failure, then apply the SERVER-authoritative retry policy
+ * (step maxRetries/backoff) → retry, else fallback agent, else dead-letter +
+ * notification + task-status resolution. Returns the outcome so callers can log
+ * it. `executionId` null → skip the execution-log write (daemon before T4).
+ */
+export async function finalizeStepFailure(opts: {
+  step: FinalizableStep
+  attemptNumber: number
+  executionId: string | null
+  message: string
+  isTimeout: boolean
+  eventMeta?: Record<string, unknown>
+}): Promise<'retry_scheduled' | 'fallback' | 'dead_lettered'> {
+  const { step, attemptNumber, executionId, message, isTimeout, eventMeta } = opts
+  const stepId = step.id
+
+  if (executionId) {
+    if (isTimeout) await timeoutExecution(executionId)
+    else await failExecution(executionId, message)
+  }
+
+  await appendStepEvent(stepId, 'failed', {
+    attempt: attemptNumber,
+    error: message,
+    timeout: isTimeout,
+    ...eventMeta,
+  })
+
+  const maxRetries = step.maxRetries ?? 2
+  const retryDelayMs = step.retryDelayMs ?? 5000
+
+  if (attemptNumber < maxRetries + 1) {
+    // Retry: keep step active, schedule for re-pickup with exponential backoff
+    // + jitter (leasedAt doubles as the "not before" time).
+    const delayMs = retryDelayMs > 0 ? computeBackoffMs(attemptNumber, retryDelayMs) : 0
+    const retryAt = delayMs > 0 ? new Date(Date.now() + delayMs) : null
+
+    await db.taskStep.update({
+      where: { id: stepId },
+      data: { attempts: attemptNumber, leasedBy: null, leasedAt: retryAt },
+    })
+
+    await appendStepEvent(stepId, 'retry_scheduled', {
+      attempt: attemptNumber,
+      delayMs,
+      retryAt: retryAt?.toISOString() ?? null,
+      error: message,
+      ...eventMeta,
+    })
+
+    broadcastProjectEvent(step.task.projectId, 'step-retrying', {
+      taskId: step.taskId,
+      stepId,
+      attempt: attemptNumber,
+      maxRetries,
+      error: message,
+    })
+    return 'retry_scheduled'
+  }
+
+  // Exhausted retries — check for fallback agent before dead-lettering.
+  if (step.fallbackAgentId && step.fallbackAgentId !== step.agentId) {
+    await db.taskStep.update({
+      where: { id: stepId },
+      data: {
+        agentId: step.fallbackAgentId,
+        status: 'active',
+        error: null,
+        attempts: 0,
+        leasedBy: null,
+        leasedAt: null,
+      },
+    })
+
+    broadcastProjectEvent(step.task.projectId, 'step-fallback', {
+      taskId: step.taskId,
+      stepId,
+      fromAgentId: step.agentId,
+      toAgentId: step.fallbackAgentId,
+      reason: message,
+    })
+    return 'fallback'
+  }
+
+  // No fallback — snapshot into the dead-letter table, then mark failed.
+  await moveToDeadLetter(
+    {
+      id: stepId,
+      taskId: step.taskId,
+      agentId: step.agentId,
+      mode: step.mode,
+      instructions: step.instructions,
+      attempts: attemptNumber,
+    },
+    message,
+  )
+
+  await db.taskStep.update({
+    where: { id: stepId },
+    data: {
+      status: 'failed',
+      error: `Failed after ${attemptNumber} attempts. Last error: ${message}`,
+      attempts: attemptNumber,
+      completedAt: new Date(),
+      leasedBy: null,
+      leasedAt: null,
+    },
+  })
+
+  broadcastProjectEvent(step.task.projectId, 'step-failed', {
+    taskId: step.taskId,
+    stepId,
+    error: message,
+    attempt: attemptNumber,
+    maxRetries,
+    mode: step.mode,
+    exhaustedRetries: true,
+  })
+
+  // C-4: a dead-lettered step needs a human — notify (never throws).
+  await notifyDeadLetter({
+    projectId: step.task.projectId,
+    taskId: step.taskId,
+    taskTitle: step.task.title,
+    stepId,
+    error: message,
+  })
+
+  // Use resolveTaskStatus instead of hardcoding WAITING — other parallel
+  // branches may still be active and the task should stay IN_PROGRESS.
+  await resolveTaskStatus(step.taskId, step.task.projectId)
+  return 'dead_lettered'
+}
+
 async function executeDispatch(stepId: string, prepared: PreparedDispatch) {
   const {
     step,
@@ -441,171 +662,26 @@ async function executeDispatch(stepId: string, prepared: PreparedDispatch) {
         ? estimateCost(agent.runtimeModel || '', result.tokensUsed) || undefined
         : undefined)
 
-    await succeedExecution(execution.id, result.output, result.tokensUsed, recordedCost)
-
-    await db.taskStep.update({
-      where: { id: stepId },
-      data: {
-        status: 'done',
-        output: result.output,
-        attempts: attemptNumber,
-        completedAt: new Date(),
-        leasedBy: null,
-        leasedAt: null,
-      },
-    })
-
-    await appendStepEvent(stepId, 'succeeded', {
-      attempt: attemptNumber,
-      tokensUsed: result.tokensUsed ?? null,
-    })
-
-    // Save MCP artifacts if any were collected during tool use
-    if (result.artifacts && result.artifacts.length > 0) {
-      await db.stepArtifact.createMany({
-        data: result.artifacts.map(artifact => ({
-          stepId,
-          executionId: execution.id,
-          type: artifact.type,
-          label: artifact.label,
-          content: artifact.content || null,
-          url: artifact.url || null,
-          mimeType: artifact.mimeType || null,
-        })),
-      })
-    }
-
-    broadcastProjectEvent(step.task.projectId, 'step-completed', {
-      taskId: step.taskId,
-      stepId,
+    await finalizeStepSuccess({
+      step,
+      attemptNumber,
+      executionId: execution.id,
       output: result.output,
-      attempt: attemptNumber,
       tokensUsed: result.tokensUsed,
+      cost: recordedCost,
+      artifacts: result.artifacts,
     })
-
-    await advanceChain(step.taskId, step.task.projectId, stepId)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown dispatch error'
     const isTimeout = message === 'STEP_TIMEOUT'
 
-    if (isTimeout) {
-      await timeoutExecution(execution.id)
-    } else {
-      await failExecution(execution.id, message)
-    }
-
-    await appendStepEvent(stepId, 'failed', {
-      attempt: attemptNumber,
-      error: message,
-      timeout: isTimeout,
+    await finalizeStepFailure({
+      step,
+      attemptNumber,
+      executionId: execution.id,
+      message,
+      isTimeout,
     })
-
-    const maxRetries = step.maxRetries ?? 2
-    const retryDelayMs = step.retryDelayMs ?? 5000
-
-    if (attemptNumber < maxRetries + 1) {
-      // Retry: keep step active, schedule for re-pickup with exponential
-      // backoff + jitter (leasedAt doubles as the "not before" time).
-      const delayMs = retryDelayMs > 0 ? computeBackoffMs(attemptNumber, retryDelayMs) : 0
-      const retryAt = delayMs > 0 ? new Date(Date.now() + delayMs) : null
-
-      await db.taskStep.update({
-        where: { id: stepId },
-        data: {
-          attempts: attemptNumber,
-          leasedBy: null,
-          leasedAt: retryAt,
-        },
-      })
-
-      await appendStepEvent(stepId, 'retry_scheduled', {
-        attempt: attemptNumber,
-        delayMs,
-        retryAt: retryAt?.toISOString() ?? null,
-        error: message,
-      })
-
-      broadcastProjectEvent(step.task.projectId, 'step-retrying', {
-        taskId: step.taskId,
-        stepId,
-        attempt: attemptNumber,
-        maxRetries,
-        error: message,
-      })
-    } else {
-      // Exhausted retries — check for fallback agent before dead-lettering
-      if (step.fallbackAgentId && step.fallbackAgentId !== step.agentId) {
-        // Switch to fallback agent and reset for another attempt cycle
-        await db.taskStep.update({
-          where: { id: stepId },
-          data: {
-            agentId: step.fallbackAgentId,
-            status: 'active',
-            error: null,
-            attempts: 0,
-            leasedBy: null,
-            leasedAt: null,
-          },
-        })
-
-        broadcastProjectEvent(step.task.projectId, 'step-fallback', {
-          taskId: step.taskId,
-          stepId,
-          fromAgentId: step.agentId,
-          toAgentId: step.fallbackAgentId,
-          reason: message,
-        })
-        // Step is active with new agent — the queue will pick it up
-      } else {
-        // No fallback — snapshot into the dead-letter table, then mark failed
-        await moveToDeadLetter(
-          {
-            id: stepId,
-            taskId: step.taskId,
-            agentId: step.agentId,
-            mode: step.mode,
-            instructions: step.instructions,
-            attempts: attemptNumber,
-          },
-          message,
-        )
-
-        await db.taskStep.update({
-          where: { id: stepId },
-          data: {
-            status: 'failed',
-            error: `Failed after ${attemptNumber} attempts. Last error: ${message}`,
-            attempts: attemptNumber,
-            completedAt: new Date(),
-            leasedBy: null,
-            leasedAt: null,
-          },
-        })
-
-        broadcastProjectEvent(step.task.projectId, 'step-failed', {
-          taskId: step.taskId,
-          stepId,
-          error: message,
-          attempt: attemptNumber,
-          maxRetries,
-          mode: step.mode,
-          exhaustedRetries: true,
-        })
-
-        // C-4: a dead-lettered step needs a human — notify (never throws).
-        await notifyDeadLetter({
-          projectId: step.task.projectId,
-          taskId: step.taskId,
-          taskTitle: step.task.title,
-          stepId,
-          error: message,
-        })
-
-        // Use resolveTaskStatus instead of hardcoding WAITING — other parallel
-        // branches may still be active and the task should stay IN_PROGRESS.
-        await resolveTaskStatus(step.taskId, step.task.projectId)
-      }
-    }
   }
 }
 
