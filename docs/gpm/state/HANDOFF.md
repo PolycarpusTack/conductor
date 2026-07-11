@@ -18,34 +18,42 @@ lint + test + build + doctor. Unit suite 842/0 quiet (the `verify` chain can
 still trip on TD-014b mock-order flakiness under load — not a regression).
 
 **EPIC G1 "daemon parity" — IN PROGRESS (updated 2026-07-11).** G1-1 thin slice,
-2 of 5 tasks done and committed, suite 843/0 after each:
+3 of 5 tasks done and committed, suite 845/0 after each:
 - **G1-1-T1 DONE** — extracted the Finalizer (`finalizeStepSuccess`/
-  `finalizeStepFailure`, exported from `dispatch.ts`); HTTP path rewired onto it,
-  zero behaviour change (dispatch suite 86/0 unchanged). `executionId` nullable +
-  `eventMeta` optional so the daemon path can share it.
+  `finalizeStepFailure`, exported from `dispatch.ts`); HTTP path rewired, zero
+  behaviour change. `executionId` nullable + `eventMeta` optional.
 - **G1-1-T2 DONE** — daemon fail path routes through `finalizeStepFailure`
-  (ADR-0008). Server decides retry vs terminal from the step's own maxRetries;
-  daemon `willRetry` is a logged hint, never obeyed. Exhaustion now dead-letters +
-  notifies + escalates to fallback. **Closes TD-025**, gaps 1.4/1.5.
+  (ADR-0008). Server-authoritative retry; `willRetry` a logged hint; exhaustion
+  dead-letters + notifies + fallback. **Closes TD-025**, gaps 1.4/1.5.
+- **G1-1-T3 DONE** — Execution Payload **v2**: extracted `buildResolvedPrompt`
+  from prepareDispatch (dispatch.ts, exported); the daemon poll route resolves
+  systemPrompt + instructions server-side (no literal `{{tokens}}`, gap 1.1) and
+  ships `previousOutput` (gap 1.2). Daemon runner + `validateExecutionPayload` +
+  snapshot all at v2.
 
-**RESUME AT G1-1-T3** (discovery done — payload v2: resolved prompt + previousOutput):
-- Server side: `src/app/api/daemon/steps/next/route.ts` — today it ships raw
-  `instructions` + `agent.systemPrompt` with literal `{{task.title}}`/
-  `{{memory.recent}}` tokens (gaps 1.1/1.2). Run `resolvePrompt` server-side
-  (`src/lib/server/resolve-prompt.ts` — check its full token set vs how
-  `dispatch.ts prepareDispatch` applies it) over instructions/systemPrompt, add
-  `previousOutput` (previous step's output), bump `payloadVersion: 2`.
-- Daemon side: `mini-services/conductor-daemon/runner.ts` —
-  `EXECUTION_PAYLOAD_VERSION` const, `validateExecutionPayload` (accept v2),
-  `composeUserBody` (~line 179, include previousOutput). Since the server
-  pre-resolves, the daemon uses resolved text as-is. Update `runner.test.ts`.
-- Snapshot: `docs/gpm/state/snapshots/daemon-execution-payload.md` → Version 2.
-- Then **T4** (StepExecution row per daemon attempt at lease → finalized by the
-  Finalizer, passing the real `executionId` instead of null; cost/turns from the
-  claude metadata artifact; closes TD-018b, binds budgets) and **T5** (extend
-  `bun run smoke:daemon` — note it runs under Bun via `Bun.spawn`, ADR-0007 — with
-  parity assertions). Then G1-2 (rejectionNote), G1-3 (MCP spike), G1-4 bundle,
-  G1-5 close-out.
+**RESUME AT G1-1-T4** — StepExecution row per daemon attempt (closes TD-018b,
+binds budgets for DAEMON-only projects). Discovery notes:
+- Create the `StepExecution` row when a step is leased to a daemon — see
+  `src/lib/server/daemon-dispatch.ts` (the lease/dispatch path) and reuse the
+  HTTP path's `createExecution(stepId, attempt)` (`execution-log.ts`). Stamp
+  `startedAt` (also closes the startedAt part of gap 1.7).
+- Thread the real `executionId` through to the completion route
+  (`src/app/api/daemon/steps/route.ts`): the **fail** path already calls
+  `finalizeStepFailure` (pass the executionId instead of `null`); route the
+  **success** path through `finalizeStepSuccess` too (currently bespoke, lines
+  ~114-147) so the execution row is finalized with cost/tokens.
+- Cost/turns: lift from the claude metadata artifact (`{ type:'json', label:
+  'claude run metadata' }` — total_cost_usd, num_turns, session_id per the
+  snapshot §Output Streaming) into `StepExecution.cost`/`tokensUsed`. Keep the
+  artifact for evidence. This is exactly what ADR-0008's "Consequences" and the
+  snapshot's B-7 note anticipate.
+- Budget-binding test: a DAEMON-only project whose recorded spend ≥ budget is
+  skipped on the next tick (the `step-queue` budget gate reads StepExecution.cost).
+- **Then T5** — extend `bun run smoke:daemon` (runs under Bun via `Bun.spawn`,
+  ADR-0007) with parity assertions: resolved-token, forced-fail→retry→dead-letter,
+  StepExecution row + cost, budget pause. Then G1-2 (rejectionNote — note the
+  payload already carries the pieces; wire it in composeInstructions), G1-3 (MCP
+  spike), G1-4 bundle, G1-5 close-out.
 
 Then G2 "proven deploy" (needs a Docker/Linux host — TD-024, migrations,
 `--accept-data-loss` removal, WAL), G3 "truth in features", G4 "UX coherence"
