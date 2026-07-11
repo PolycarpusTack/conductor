@@ -22,7 +22,9 @@ import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 
 // ---------------------------------------------------------------------------
-// Execution Payload (payloadVersion 1) — mirrors GET /api/daemon/steps/next
+// Execution Payload (payloadVersion 2) — mirrors GET /api/daemon/steps/next
+// v2 (G1-1-T3): instructions + agent.systemPrompt arrive server-RESOLVED (no
+// `{{tokens}}`), and `previousOutput` carries the prior step's output.
 // ---------------------------------------------------------------------------
 
 export interface SessionBlock {
@@ -44,6 +46,8 @@ export interface ExecutionPayload {
   taskId: string
   mode: string
   instructions: string | null
+  /** Prior step's output (v2) — chain context for a mid-chain daemon step. */
+  previousOutput?: string | null
   timeoutMs: number | null
   session: SessionBlock
   agent: {
@@ -57,7 +61,7 @@ export interface ExecutionPayload {
   task: { id: string; title: string; description?: string | null }
 }
 
-export const EXECUTION_PAYLOAD_VERSION = 1
+export const EXECUTION_PAYLOAD_VERSION = 2
 
 /**
  * Contract guard, both directions: the server route test asserts its response
@@ -77,6 +81,9 @@ export function validateExecutionPayload(value: unknown): string[] {
   }
   if (p.instructions !== null && typeof p.instructions !== 'string') {
     problems.push('instructions must be a string or null')
+  }
+  if (p.previousOutput !== undefined && p.previousOutput !== null && typeof p.previousOutput !== 'string') {
+    problems.push('previousOutput must be a string, null, or absent')
   }
   const session = p.session as Record<string, unknown> | null | undefined
   if (typeof session !== 'object' || session === null) {
@@ -176,11 +183,14 @@ export function composeSystemPrompt(payload: ExecutionPayload): string {
   return parts.join('\n\n').trim()
 }
 
-/** Task context + step instructions — the stdin body (spike §3 stdin protocol). */
+/** Task context + step instructions — the stdin body (spike §3 stdin protocol).
+ *  v2: prepends the previous step's output as chain context (parity with the
+ *  HTTP path, which passes previousOutput to the adapter). */
 export function composeInstructions(payload: ExecutionPayload): string {
   return [
     `Task: ${payload.task.title}`,
     payload.task.description ? `Description: ${payload.task.description}` : '',
+    payload.previousOutput ? `Previous Step Output:\n${payload.previousOutput}` : '',
     payload.instructions ? `Step Instructions: ${payload.instructions}` : '',
   ]
     .filter(Boolean)

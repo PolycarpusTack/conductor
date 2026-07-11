@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test'
 
 // ---------------------------------------------------------------------------
 // Test target: src/app/api/daemon/steps/next/route.ts (poll endpoint)
@@ -23,10 +23,14 @@ mock.module('@/lib/db', () => ({
   db: {
     taskStep: {
       findFirst: mockStepFindFirst,
+      // G1-1-T3: buildResolvedPrompt looks up predecessor output (DAG path).
+      findMany: () => Promise.resolve([]),
     },
     task: {
       findUnique: mockTaskFindUnique,
     },
+    // G1-1-T3: buildResolvedPrompt reads the project mode for label/instructions.
+    projectMode: { findFirst: () => Promise.resolve(null) },
     stepEvent: {
       findFirst: mockStepEventFindFirst,
       create: mockStepEventCreate,
@@ -58,6 +62,10 @@ mock.module('@/lib/server/realtime', () => ({
 
 // Import AFTER all mocks are in place
 import { GET } from '@/app/api/daemon/steps/next/route'
+// G1-1-T3: the route now resolves prompts via dispatch.buildResolvedPrompt, which
+// builds memory through dispatchDeps. Stub those deps (no module mock → no
+// shared-registry leak, TD-014b) so resolution is deterministic and DB-free.
+import { setDispatchDeps, resetDispatchDeps } from '@/lib/server/dispatch'
 // Daemon-side contract guard — the "other direction" of the contract test.
 import { validateExecutionPayload } from '../../../../mini-services/conductor-daemon/runner'
 
@@ -117,6 +125,15 @@ beforeEach(() => {
   mockResolveDaemonByToken.mockResolvedValue(DAEMON)
   mockExtractDaemonToken.mockReset()
   mockExtractDaemonToken.mockReturnValue('fake-token')
+  // Deterministic, DB-free memory for buildResolvedPrompt (G1-1-T3).
+  setDispatchDeps({
+    buildWorkingMemory: async () => '',
+    buildRelevantMemoryWithHits: async () => ({ text: '', hits: [] }),
+  })
+})
+
+afterEach(() => {
+  resetDispatchDeps()
 })
 
 function makeRequest(): Request {
@@ -128,18 +145,20 @@ function makeRequest(): Request {
 const params = { params: Promise.resolve({}) }
 
 describe('GET /api/daemon/steps/next — execution payload contract', () => {
-  test('carries payloadVersion 1 and everything the runner needs', async () => {
+  test('carries payloadVersion 2 and everything the runner needs', async () => {
     const res = await GET(makeRequest(), params)
     expect(res.status).toBe(200)
     const body = await res.json()
 
-    expect(body.step.payloadVersion).toBe(1)
+    expect(body.step.payloadVersion).toBe(2)
     // Runner inputs (A-1): systemPrompt + instructions + step.mode + agent.runtimeModel
     expect(body.step.mode).toBe('develop')
     expect(body.step.instructions).toBe('Implement the calendar view.')
     expect(body.step.agent.systemPrompt).toBe('You are Builder.')
     expect(body.step.agent.modeInstructions).toContain('production-grade')
     expect(body.step.agent.runtimeModel).toBe('claude-sonnet-4-5')
+    // G1-1-T3: previousOutput present (null when there is no predecessor).
+    expect(body.step).toHaveProperty('previousOutput')
     // Task context for prompt composition
     expect(body.step.task).toMatchObject({ id: 'task-1', title: 'Build calendar', description: 'A month grid.' })
     // Session block with the resolved command template
@@ -147,6 +166,22 @@ describe('GET /api/daemon/steps/next — execution payload contract', () => {
     expect(body.step.session.command).toBe('mycli --model claude-sonnet-4-5 --step step-1')
     expect(body.step.session.commandError).toBeNull()
     expect(body.step.timeoutMs).toBe(60_000)
+  })
+
+  // G1-1-T3 (gap 1.1): prompt tokens are resolved server-side — the daemon must
+  // never receive a literal {{task.title}} to hand to the CLI.
+  test('resolves prompt tokens in systemPrompt and instructions', async () => {
+    const step = leasedStep()
+    step.agent.systemPrompt = 'You are Builder. Working on {{task.title}}.'
+    step.instructions = 'Finish {{task.title}} now.'
+    mockStepFindFirst.mockResolvedValue(step)
+
+    const res = await GET(makeRequest(), params)
+    const body = await res.json()
+    expect(body.step.agent.systemPrompt).toBe('You are Builder. Working on Build calendar.')
+    expect(body.step.instructions).toBe('Finish Build calendar now.')
+    expect(body.step.agent.systemPrompt).not.toContain('{{')
+    expect(body.step.instructions).not.toContain('{{')
   })
 
   test('the payload passes the daemon runner contract guard (both directions)', async () => {
@@ -175,7 +210,7 @@ describe('GET /api/daemon/steps/next — execution payload contract', () => {
     mockStepFindFirst.mockResolvedValue(leasedStep({ agent: null, agentId: null }))
     const res = await GET(makeRequest(), params)
     const body = await res.json()
-    expect(body.step.payloadVersion).toBe(1)
+    expect(body.step.payloadVersion).toBe(2)
     expect(body.step.agent).toBeNull()
     expect(validateExecutionPayload(body.step)).toEqual([])
   })

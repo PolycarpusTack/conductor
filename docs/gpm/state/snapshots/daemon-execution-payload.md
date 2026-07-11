@@ -1,9 +1,13 @@
 # CONTRACT SNAPSHOT: Daemon Execution Payload
 
-Version: 1 (`payloadVersion: 1`)
-Date: 2026-07-03 (A-1; daemon-side cwd/policy semantics added in A-2; output
-streaming + evidence artifacts added in A-3 — payload shape unchanged, the
-completion report gained an optional `artifacts` field)
+Version: 2 (`payloadVersion: 2`)
+Date: 2026-07-11 (G1-1-T3)
+History: v1 2026-07-03 (A-1; cwd/policy A-2; streaming + evidence artifacts A-3).
+**v2 (G1-1-T3):** `instructions` and `agent.systemPrompt` now arrive **server-
+resolved** — `resolvePrompt` runs on the server (via `dispatch.buildResolvedPrompt`,
+the same resolver the HTTP path uses), so the daemon never receives a literal
+`{{task.title}}`/`{{memory.recent}}` token (gap 1.1). New field **`previousOutput:
+string | null`** carries the prior step's output for chain context (gap 1.2).
 
 ## Public Interface
 
@@ -13,12 +17,13 @@ completion report gained an optional `artifacts` field)
 { step: ExecutionPayload | null }
 
 interface ExecutionPayload {
-  payloadVersion: 1            // bump on any breaking change to this shape
+  payloadVersion: 2            // bump on any breaking change to this shape
   id: string                   // step id
   taskId: string
   order: number
   mode: string                 // step mode (develop|draft|analyze|verify|review|human|custom)
-  instructions: string | null  // step instructions — stdin prose, NEVER shell/argv
+  instructions: string | null  // step instructions, SERVER-RESOLVED (v2) — stdin prose, NEVER shell/argv
+  previousOutput: string | null// prior step's output (v2) — chain context, stdin prose
   timeoutMs: number | null     // daemon kills the child after this (default 300000)
   retryDelayMs: number | null
   maxRetries: number | null
@@ -39,7 +44,7 @@ interface ExecutionPayload {
   agent: {
     id: string
     name: string
-    systemPrompt: string | null      // → temp file + --append-system-prompt-file
+    systemPrompt: string | null      // SERVER-RESOLVED (v2) → temp file + --append-system-prompt-file
     modeInstructions: string | null  // JSON string Record<mode, string>; [step.mode] joins systemPrompt
     mcpConnectionIds: string | null
     runtimeModel: string | null      // → --model flag when set

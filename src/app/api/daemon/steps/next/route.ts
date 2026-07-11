@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { resolveRuntime } from '@/lib/server/daemon-dispatch'
+import { buildResolvedPrompt } from '@/lib/server/dispatch'
 import { parseSessionPolicy, sessionKeyForStep, resolveCommandTemplate } from '@/lib/server/session-policy'
 import { appendStepEvent } from '@/lib/server/step-events'
 
@@ -60,6 +61,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         order: true,
         mode: true,
         instructions: true,
+        prevSteps: true,
         timeoutMs: true,
         retryDelayMs: true,
         maxRetries: true,
@@ -71,6 +73,9 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
           select: {
             id: true,
             name: true,
+            role: true,
+            capabilities: true,
+            personality: true,
             systemPrompt: true,
             modeInstructions: true,
             mcpConnectionIds: true,
@@ -93,6 +98,12 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
     if (!step) {
       return NextResponse.json({ step: null })
     }
+
+    // G1-1-T3: resolve the prompt server-side so the daemon never receives a
+    // literal `{{task.title}}`/`{{memory.recent}}` token (gap 1.1), and hand it
+    // the previous step's output for chain context (gap 1.2). Uses the same
+    // buildResolvedPrompt the HTTP path uses — identical resolution.
+    const resolved = step.agent ? await buildResolvedPrompt(step, step.agent) : null
 
     const runtime = await resolveRuntime(step.taskId, step.agent?.runtime?.adapter)
 
@@ -149,12 +160,16 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
 
     return NextResponse.json({
       step: {
-        payloadVersion: 1,
+        payloadVersion: 2,
         id: step.id,
         taskId: step.taskId,
         order: step.order,
         mode: step.mode,
-        instructions: step.instructions,
+        // Instructions and the agent system prompt are RESOLVED server-side
+        // (v2): the daemon spawns the CLI with real text, never `{{tokens}}`.
+        instructions: resolved ? resolved.resolvedInstructions : step.instructions,
+        // Previous step's output — chain context, parity with the HTTP path.
+        previousOutput: resolved?.previousStep?.output ?? null,
         timeoutMs: step.timeoutMs,
         retryDelayMs: step.retryDelayMs,
         maxRetries: step.maxRetries,
@@ -168,7 +183,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
           ? {
               id: step.agent.id,
               name: step.agent.name,
-              systemPrompt: step.agent.systemPrompt,
+              systemPrompt: resolved ? resolved.systemPrompt : step.agent.systemPrompt,
               modeInstructions: step.agent.modeInstructions,
               mcpConnectionIds: step.agent.mcpConnectionIds,
               runtimeModel: step.agent.runtimeModel,

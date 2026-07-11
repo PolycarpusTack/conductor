@@ -146,6 +146,125 @@ async function releaseLease(stepId: string) {
  * every such path either releases the lease or clears it as part of a status
  * change, so the caller doesn't have to.
  */
+/** Minimal step/agent shapes the prompt resolver needs (both the HTTP
+ *  prepareDispatch load and the daemon payload route's query satisfy them). */
+interface ResolvableStep {
+  taskId: string
+  order: number
+  mode: string
+  instructions: string | null
+  prevSteps: string | null
+  task: { title: string; description: string | null; projectId: string }
+}
+interface ResolvableAgent {
+  id: string
+  name: string
+  role: string | null
+  capabilities: string | null
+  personality: string | null
+  systemPrompt: string | null
+  modeInstructions: string | null
+}
+
+/**
+ * Resolve a step's system prompt and gather its dispatch context — the previous
+ * step's output, the project mode, the layered mode instructions, and the
+ * working/relevant memory — then run resolvePrompt over the agent's system
+ * prompt template. Extracted (G1-1-T3) from prepareDispatch so the DAEMON
+ * payload route resolves prompts identically instead of shipping raw
+ * `{{task.title}}`/`{{memory.recent}}` tokens to the CLI (gaps 1.1/1.2).
+ */
+export async function buildResolvedPrompt(step: ResolvableStep, agent: ResolvableAgent) {
+  // Find predecessor step: use prevSteps edges for DAG, order-1 for linear
+  let previousStep: { output: string | null } | null = null
+  if (step.prevSteps) {
+    const prevIds: string[] = safeJsonParse(step.prevSteps, [])
+    if (prevIds.length > 0) {
+      const prevSteps = await db.taskStep.findMany({
+        where: { id: { in: prevIds } },
+        select: { output: true },
+      })
+      if (prevSteps.length === 1) {
+        previousStep = prevSteps[0]
+      } else if (prevSteps.length > 1) {
+        const combinedOutput = prevSteps
+          .filter(s => s.output)
+          .map(s => s.output)
+          .join('\n\n---\n\n')
+        previousStep = { output: combinedOutput || null }
+      }
+    }
+  } else {
+    previousStep = await db.taskStep.findFirst({
+      where: { taskId: step.taskId, order: step.order - 1 },
+      select: { output: true },
+    })
+  }
+
+  const projectMode = await db.projectMode.findFirst({
+    where: { projectId: step.task.projectId, name: step.mode },
+  })
+
+  const agentModeInstructions = agent.modeInstructions
+    ? safeJsonParse<Record<string, string>>(agent.modeInstructions, {})[step.mode] ?? null
+    : null
+
+  let modeInstructions = agentModeInstructions || projectMode?.instructions || ''
+
+  // Mode policy (Epic S4): output-format hint rides the mode-instruction layer
+  if (projectMode?.outputFormat) {
+    modeInstructions = `${modeInstructions}\nRespond in ${projectMode.outputFormat} format.`.trim()
+  }
+
+  const capabilities = agent.capabilities
+    ? safeJsonParse<string[]>(agent.capabilities, []).join(', ')
+    : ''
+
+  const memoryQuery = [step.task.title, step.task.description, step.instructions]
+    .filter(Boolean)
+    .join('\n')
+
+  const [workingMemory, relevantMemoryResult] = await Promise.all([
+    dispatchDeps.buildWorkingMemory({
+      agentId: agent.id,
+      projectId: step.task.projectId,
+    }),
+    dispatchDeps.buildRelevantMemoryWithHits({
+      agentId: agent.id,
+      projectId: step.task.projectId,
+      query: memoryQuery,
+      limit: 5,
+    }),
+  ])
+  const relevantMemory = relevantMemoryResult.text
+
+  const resolveCtx = {
+    task: { title: step.task.title, description: step.task.description },
+    step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
+    mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
+    agent: { name: agent.name, role: agent.role, capabilities, personality: agent.personality },
+    memory: { recent: workingMemory, relevant: relevantMemory },
+  }
+
+  const systemPrompt = resolvePrompt(agent.systemPrompt || '', resolveCtx)
+  // Resolve instruction tokens too, so the daemon payload never ships a literal
+  // `{{task.title}}`/`{{memory.recent}}` to the CLI (G1-1-T3, AC). The HTTP path
+  // consumes `resolvedInstructions` from G1-1-T3 onward as well.
+  const resolvedInstructions = step.instructions
+    ? resolvePrompt(step.instructions, resolveCtx)
+    : step.instructions
+
+  return {
+    previousStep,
+    projectMode,
+    modeInstructions,
+    systemPrompt,
+    resolvedInstructions,
+    workingMemory,
+    relevantMemoryResult,
+  }
+}
+
 async function prepareDispatch(stepId: string, evictedFrom: string | null) {
   const step = await db.taskStep.findUnique({
     where: { id: stepId },
@@ -214,83 +333,13 @@ async function prepareDispatch(stepId: string, evictedFrom: string | null) {
     return null
   }
 
-  // Find predecessor step: use prevSteps edges for DAG, order-1 for linear
-  let previousStep: { output: string | null } | null = null
-  if (step.prevSteps) {
-    const prevIds: string[] = safeJsonParse(step.prevSteps, [])
-    if (prevIds.length > 0) {
-      // Use the first predecessor's output (or concatenate all for multi-parent merge)
-      const prevSteps = await db.taskStep.findMany({
-        where: { id: { in: prevIds } },
-        select: { output: true },
-      })
-      if (prevSteps.length === 1) {
-        previousStep = prevSteps[0]
-      } else if (prevSteps.length > 1) {
-        // Merge point: combine outputs from all incoming branches
-        const combinedOutput = prevSteps
-          .filter(s => s.output)
-          .map(s => s.output)
-          .join('\n\n---\n\n')
-        previousStep = { output: combinedOutput || null }
-      }
-    }
-  } else {
-    previousStep = await db.taskStep.findFirst({
-      where: { taskId: step.taskId, order: step.order - 1 },
-      select: { output: true },
-    })
-  }
-
-  const projectMode = await db.projectMode.findFirst({
-    where: { projectId: step.task.projectId, name: step.mode },
-  })
-
-  const agentModeInstructions = agent.modeInstructions
-    ? safeJsonParse<Record<string, string>>(agent.modeInstructions, {})[step.mode] ?? null
-    : null
-
-  let modeInstructions = agentModeInstructions || projectMode?.instructions || ''
-
-  // Mode policy (Epic S4): output-format hint rides the mode-instruction layer
-  if (projectMode?.outputFormat) {
-    modeInstructions = `${modeInstructions}\nRespond in ${projectMode.outputFormat} format.`.trim()
-  }
-
-  const capabilities = agent.capabilities
-    ? safeJsonParse<string[]>(agent.capabilities, []).join(', ')
-    : ''
-
-  const memoryQuery = [step.task.title, step.task.description, step.instructions]
-    .filter(Boolean)
-    .join('\n')
-
-  const [workingMemory, relevantMemoryResult] = await Promise.all([
-    dispatchDeps.buildWorkingMemory({
-      agentId: agent.id,
-      projectId: step.task.projectId,
-    }),
-    dispatchDeps.buildRelevantMemoryWithHits({
-      agentId: agent.id,
-      projectId: step.task.projectId,
-      query: memoryQuery,
-      limit: 5,
-    }),
-  ])
-  const relevantMemory = relevantMemoryResult.text
-
-  const systemPrompt = resolvePrompt(agent.systemPrompt || '', {
-    task: { title: step.task.title, description: step.task.description },
-    step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
-    mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
-    agent: { name: agent.name, role: agent.role, capabilities, personality: agent.personality },
-    memory: { recent: workingMemory, relevant: relevantMemory },
-  })
+  const { previousStep, projectMode, systemPrompt, resolvedInstructions, workingMemory, relevantMemoryResult } =
+    await buildResolvedPrompt(step, agent)
 
   const taskContext = [
     `Task: ${step.task.title}`,
     step.task.description ? `Description: ${step.task.description}` : '',
-    step.instructions ? `Step Instructions: ${step.instructions}` : '',
+    resolvedInstructions ? `Step Instructions: ${resolvedInstructions}` : '',
   ].filter(Boolean).join('\n\n')
 
   const rejectionContext = step.rejectionNote

@@ -33,7 +33,7 @@ process.on('exit', () => rmSync(TEST_WORKSPACE, { recursive: true, force: true }
 
 function payload(overrides: Partial<ExecutionPayload> = {}): ExecutionPayload {
   return {
-    payloadVersion: 1,
+    payloadVersion: 2,
     id: 'step-1',
     taskId: 'task-1',
     mode: 'develop',
@@ -224,9 +224,17 @@ describe('validateExecutionPayload', () => {
   })
 
   test('flags missing fields and wrong version', () => {
-    const problems = validateExecutionPayload({ payloadVersion: 2, id: 'x' })
+    const problems = validateExecutionPayload({ payloadVersion: 1, id: 'x' })
     expect(problems.length).toBeGreaterThan(0)
     expect(problems.join(' ')).toContain('payloadVersion')
+  })
+
+  test('accepts an absent/null/string previousOutput, rejects a non-string', () => {
+    expect(validateExecutionPayload(payload({ previousOutput: undefined }))).toEqual([])
+    expect(validateExecutionPayload(payload({ previousOutput: null }))).toEqual([])
+    expect(validateExecutionPayload(payload({ previousOutput: 'prior output' }))).toEqual([])
+    expect(validateExecutionPayload(payload({ previousOutput: 42 as unknown as string })).join(' '))
+      .toContain('previousOutput')
   })
 })
 
