@@ -27,9 +27,7 @@
 
 | ID | Sev | Description | File(s) | Disposition |
 |----|-----|-------------|---------|-------------|
-| TD-018b | 🟡 | Daemon runs create no `StepExecution` rows — cost/turns/session_id ride a JSON artifact, so B-7 budgets and cost analytics do **not** bind for DAEMON-mode agents (only HTTP-path). The biggest correctness gap remaining in the dispatch model. | mini-services/conductor-daemon/evidence.ts, src/lib/server/step-queue.ts | Wire daemon results into StepExecution rows — next daemon iteration (candidate EPIC G or a follow-on) |
-| TD-024 | 🟠 | The Docker images + compose (F-1) were **never built** — Docker was absent from the dev host. Every non-Docker link is verified, but the container build (Debian better-sqlite3 compile, standalone tracing completeness, in-container `prisma db push`) is unproven. | Dockerfile, docker-compose.yml, mini-services/board-ws/Dockerfile | Run `docker compose up --build` on a Docker host before any production use; fold into EPIC G |
-| TD-025 | 🟡 | Daemon terminal failures never dead-letter — `POST /api/daemon/steps` fail path marks the step failed but never calls `moveToDeadLetter` (only the HTTP path does), so daemon failures are invisible to the dead-letter/requeue panel. | src/app/api/daemon/steps/route.ts | Route daemon exhaustion through moveToDeadLetter (with TD-018b) |
+| TD-024 | 🟠 | The Docker images + compose (F-1) were **never built** — Docker was absent from the dev host. Every non-Docker link is verified, but the container build (Debian better-sqlite3 compile, standalone tracing completeness, in-container `prisma db push`) is unproven. | Dockerfile, docker-compose.yml, mini-services/board-ws/Dockerfile | Run `docker compose up --build` on a Docker host before any production use; **EPIC G2**. |
 | TD-014b | 🟡 | Cross-file `mock.module` load-order fragility — several test suites depend on alphabetical execution order because Bun's mock registry is shared across files (seen in B-2, D-3). | src/lib/server/__tests__/** | Harness fix (per-file mock isolation) — EPIC G test hardening |
 | TD-016 | ⚪ | commandTemplate tokens validated at poll/spawn time, not when `ProjectRuntime.config` is written — bad templates surface late. | src/app/api/daemon/steps/next/route.ts | Validate in the runtime-config settings API |
 | TD-015 | ⚪ | Workspace-less step retries every poll tick, writing a `daemon_dispatch_failed` activity entry each time — no dedupe. | src/lib/server/daemon-dispatch.ts | Dedupe or park after N identical failures |
@@ -59,6 +57,8 @@
 | TD-010 ✅ | Runtimes API returned a bare array | Standardized in E-2a endpoints |
 | TD-014 ✅ | composeAgent trusted LLM JSON shape | `composeResultSchema` + safeParse (wizard-composer.ts) |
 | TD-018 ✅ (partial) | Adapter cost dropped on the HTTP path | B-7 wires `result.cost` + estimate fallback; daemon remainder tracked as TD-018b |
+| TD-018b ✅ | Daemon runs created no `StepExecution` rows — cost/budgets/analytics didn't bind for DAEMON agents | **G1-1-T4**: StepExecution created at daemon lease (steps/next), finalized on completion; cost lifted from the `claude run metadata` artifact into `StepExecution.cost`; startedAt stamped. Budget gate (source-agnostic `StepExecution.cost` sum) now binds daemon spend. |
+| TD-025 ✅ | Daemon terminal failures never dead-lettered — invisible to the panel/bell | **G1-1-T2**: daemon fail path routes through the shared `finalizeStepFailure` (ADR-0008); exhaustion dead-letters + notifies + escalates to fallback, at parity with HTTP. |
 | TD-E ✅ | Frontend stack drift (unused deps, prop drilling, no memoization, a11y) | EPIC E (routing, contexts, typed client, dnd-kit, memoization, dep cleanup) |
 | TD-F(lint) ✅ | ESLint rules mostly disabled, `any` unguarded | F-4: rules re-enabled as errors, any→0, noImplicitAny + reactStrictMode on |
 | TD(ADR) ✅ | No ADRs — cross-cutting decisions were tribal | F-3: ADR-0001..0006 |

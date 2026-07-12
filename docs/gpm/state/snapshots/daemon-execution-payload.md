@@ -115,10 +115,11 @@ persisted. The daemon attaches (`mini-services/conductor-daemon/evidence.ts`):
   `metadata.dirtyFiles` (non-empty `git status --porcelain` lines). Emitted on
   success AND failure; not a repo / git missing → skipped silently.
 - `{ type: 'json', label: 'claude run metadata' }` — total_cost_usd,
-  num_turns, session_id from the final stream-json result line. Parked as an
-  artifact because the daemon lease path has no StepExecution row and TaskStep
-  has no cost fields (no schema change allowed in A-3) — B-7 should move this
-  into `StepExecution.cost`/`tokensUsed`.
+  num_turns, session_id from the final stream-json result line. **G1-1-T4:** the
+  completion route now lifts `totalCostUsd` from this artifact into
+  `StepExecution.cost` (the StepExecution row is created at poll time and
+  finalized on completion), so daemon spend binds budgets (TD-018b). The artifact
+  is retained for evidence; num_turns/session_id still live only here.
 
 ## Delivery Mechanics (spike A-0 contract)
 

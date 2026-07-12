@@ -21,6 +21,10 @@ const mockStepEventCreate = mock(() => Promise.resolve({ id: 'evt-1' })) as any
 const mockArtifactCreate = mock(() => Promise.resolve({ id: 'art-1' })) as any
 const mockDeadLetterCreate = mock(() => Promise.resolve({ id: 'dl-1' })) as any
 const mockNotificationCreate = mock(() => Promise.resolve({ id: 'notif-1' })) as any
+const mockExecFindFirst = mock(() => Promise.resolve(null)) as any
+const mockExecCreate = mock(() => Promise.resolve({ id: 'exec-1' })) as any
+const mockExecFindUnique = mock(() => Promise.resolve({ startedAt: new Date('2026-07-12T10:00:00Z') })) as any
+const mockExecUpdate = mock(() => Promise.resolve({})) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -48,6 +52,13 @@ mock.module('@/lib/db', () => ({
     // G1-1-T2: the Finalizer's terminal branch dead-letters + notifies.
     deadLetterStep: { create: mockDeadLetterCreate },
     notification: { create: mockNotificationCreate },
+    // G1-1-T4: StepExecution row per daemon attempt (cost/budget binding).
+    stepExecution: {
+      findFirst: mockExecFindFirst,
+      create: mockExecCreate,
+      findUnique: mockExecFindUnique,
+      update: mockExecUpdate,
+    },
     activityLog: { create: () => Promise.resolve({}) },
   },
   isPostgresDb: false,
@@ -113,6 +124,14 @@ beforeEach(() => {
   mockDeadLetterCreate.mockResolvedValue({ id: 'dl-1' })
   mockNotificationCreate.mockReset()
   mockNotificationCreate.mockResolvedValue({ id: 'notif-1' })
+  mockExecFindFirst.mockReset()
+  mockExecFindFirst.mockResolvedValue(null)
+  mockExecCreate.mockReset()
+  mockExecCreate.mockResolvedValue({ id: 'exec-1' })
+  mockExecFindUnique.mockReset()
+  mockExecFindUnique.mockResolvedValue({ startedAt: new Date('2026-07-12T10:00:00Z') })
+  mockExecUpdate.mockReset()
+  mockExecUpdate.mockResolvedValue({})
   mockResolveDaemonByToken.mockReset()
   mockResolveDaemonByToken.mockResolvedValue(DAEMON)
   mockExtractDaemonToken.mockReset()
@@ -235,6 +254,44 @@ describe('POST /api/daemon/steps — step events', () => {
     const res = await POST(makeRequest({ stepId: 'step-1', action: 'complete', output: 'x' }), params)
     expect(res.status).toBe(403)
     expect(mockStepEventCreate).not.toHaveBeenCalled()
+  })
+
+  // G1-1-T4 (TD-018b): a completed daemon attempt finalizes a StepExecution row
+  // carrying the cost lifted from the 'claude run metadata' artifact, so daemon
+  // spend binds budgets.
+  test('complete finalizes a StepExecution with cost from the metadata artifact', async () => {
+    const res = await POST(
+      makeRequest({
+        stepId: 'step-1',
+        action: 'complete',
+        output: 'built it',
+        artifacts: [
+          {
+            type: 'json',
+            label: 'claude run metadata',
+            content: '{"totalCostUsd":0.0421}',
+            metadata: { totalCostUsd: 0.0421, numTurns: 3, claudeSessionId: 'sess-x' },
+          },
+        ],
+      }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    // succeedExecution reads startedAt then updates with the cost.
+    expect(mockExecUpdate).toHaveBeenCalledTimes(1)
+    const update = mockExecUpdate.mock.calls[0][0]
+    expect(update.data.status).toBe('succeeded')
+    expect(update.data.cost).toBe(0.0421)
+  })
+
+  test('fail finalizes the StepExecution row too (cost path binds for failures)', async () => {
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: false }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    // failExecution updates the row to 'failed' (attempt 1 retries, but the row is finalized).
+    expect(mockExecUpdate).toHaveBeenCalled()
   })
 })
 

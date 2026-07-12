@@ -8,6 +8,7 @@ import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { stepArtifactSchema } from '@/lib/server/contracts'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
 import { advanceChain, finalizeStepFailure } from '@/lib/server/dispatch'
+import { createExecution, succeedExecution } from '@/lib/server/execution-log'
 import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { appendStepEvent } from '@/lib/server/step-events'
@@ -116,6 +117,29 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
       }
     }
 
+    // G1-1-T4: the StepExecution row for this attempt is created at poll time
+    // (steps/next). Find it — or create it defensively — so both completion paths
+    // finalize a real execution row and daemon spend binds budgets (TD-018b).
+    const attemptNumber = step.attempts + 1
+    const findOrCreateExecution = async () => {
+      const existing = await db.stepExecution.findFirst({
+        where: { stepId, attempt: attemptNumber },
+        select: { id: true },
+      })
+      return existing ?? (await createExecution(stepId, attemptNumber))
+    }
+
+    // Cost/turns ride the daemon's 'claude run metadata' json artifact
+    // (mini-services/conductor-daemon/evidence.ts). Lift total_cost_usd into
+    // StepExecution.cost — the artifact stays for evidence.
+    const claudeMetadataCost = (): number | undefined => {
+      const meta = parsedArtifacts.find(a => a.label === 'claude run metadata')?.metadata as
+        | Record<string, unknown>
+        | undefined
+      const cost = meta?.totalCostUsd
+      return typeof cost === 'number' ? cost : undefined
+    }
+
     if (action === 'complete') {
       const truncated = output ? output.length > 5000 : false
       await db.taskStep.update({
@@ -130,6 +154,15 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
       })
 
       await persistArtifacts()
+
+      // G1-1-T4: finalize the StepExecution row with the recorded cost (TD-018b).
+      const execution = await findOrCreateExecution()
+      await succeedExecution(
+        execution.id,
+        output?.slice(0, MAX_OUTPUT_CHARS) ?? '',
+        undefined,
+        claudeMetadataCost(),
+      )
 
       await appendStepEvent(stepId, 'succeeded', {
         source: 'daemon',
@@ -171,12 +204,13 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
       // we log, never obey (the reference daemon hardcodes willRetry:false, which
       // would otherwise make every daemon failure single-attempt and terminal).
       // Exhaustion now dead-letters + notifies exactly like HTTP (closes TD-025).
-      // executionId is null until G1-1-T4 wires a StepExecution row per attempt.
-      const attemptNumber = step.attempts + 1
+      // G1-1-T4: finalize a real StepExecution row (failExecution) so the failed
+      // attempt records against the budget too.
+      const execution = await findOrCreateExecution()
       const outcome = await finalizeStepFailure({
         step,
         attemptNumber,
-        executionId: null,
+        executionId: execution.id,
         message: errorMsg?.slice(0, MAX_OUTPUT_CHARS) || 'Daemon reported failure',
         isTimeout: false,
         eventMeta: { source: 'daemon', daemonId: daemon.id, ...(sessionId ? { sessionId } : {}) },

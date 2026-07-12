@@ -5,6 +5,7 @@ import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { resolveRuntime } from '@/lib/server/daemon-dispatch'
 import { buildResolvedPrompt } from '@/lib/server/dispatch'
+import { createExecution } from '@/lib/server/execution-log'
 import { parseSessionPolicy, sessionKeyForStep, resolveCommandTemplate } from '@/lib/server/session-policy'
 import { appendStepEvent } from '@/lib/server/step-events'
 
@@ -156,6 +157,24 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         daemonId: daemon.id,
         attempt: step.attempts + 1,
       })
+
+      // G1-1-T4: create the StepExecution row for this attempt so the daemon
+      // path records cost and binds budgets like the HTTP path (closes TD-018b).
+      // Deduped by the same started-once-per-lease guard, with a belt-and-braces
+      // (stepId, attempt) check. startedAt on the first attempt = parity with
+      // executeDispatch (closes the startedAt part of gap 1.7).
+      const attempt = step.attempts + 1
+      const existingExecution = await db.stepExecution.findFirst({
+        where: { stepId: step.id, attempt },
+        select: { id: true },
+      })
+      if (!existingExecution) await createExecution(step.id, attempt)
+      if (step.attempts === 0) {
+        await db.taskStep.updateMany({
+          where: { id: step.id, status: 'active' },
+          data: { startedAt: new Date() },
+        })
+      }
     }
 
     return NextResponse.json({

@@ -25,12 +25,19 @@ mock.module('@/lib/db', () => ({
       findFirst: mockStepFindFirst,
       // G1-1-T3: buildResolvedPrompt looks up predecessor output (DAG path).
       findMany: () => Promise.resolve([]),
+      // G1-1-T4: startedAt stamp on the first attempt.
+      updateMany: () => Promise.resolve({ count: 1 }),
     },
     task: {
       findUnique: mockTaskFindUnique,
     },
     // G1-1-T3: buildResolvedPrompt reads the project mode for label/instructions.
     projectMode: { findFirst: () => Promise.resolve(null) },
+    // G1-1-T4: the poll route creates the StepExecution row for the attempt.
+    stepExecution: {
+      findFirst: () => Promise.resolve(null),
+      create: () => Promise.resolve({ id: 'exec-1' }),
+    },
     stepEvent: {
       findFirst: mockStepEventFindFirst,
       create: mockStepEventCreate,
