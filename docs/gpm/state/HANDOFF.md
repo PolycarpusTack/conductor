@@ -100,10 +100,13 @@ architecture-memory refreshed (daemon path at engine parity, ADR-0007/0008
 listed, debt lines current), runbook caveats swept (daemon-step-stuck.md,
 budget-pause-recovery.md).
 
-**Recommended next:**
-- **Expand G3 "truth in features"** (no external dependency) — or **G2** when a
-  Docker/Linux host is available (A12); G2-2 (WAL pragmas) runs on Windows now.
-- On the Linux host, bundle: G2 proper + the carried G1-1-T5 smoke assertions.
+**EPIC G3 IN PROGRESS (2026-07-13; owner chose it — A12 failed for good, G2
+parked).** Expansion critic-reviewed in the backlog. **G3-1 + G3-2 COMPLETE**
+(skills consumption per ADR-0010; embed-on-save + full CRUD + versioning
+de-claim). See RESUME.md for the G3-3-T1 on-ramp (spec-MCP transport).
+Open owner decision: G3-5 schema lane (backlog G3-5 line).
+
+- On a Linux host ever appearing: G2 proper + the carried G1-1-T5 smoke assertions.
 - **G1-5** — close-out (phase summary + architecture-memory; register already updated).
 
 **T5 smoke (skipped for now) — when the loop is green, add these parity assertions**

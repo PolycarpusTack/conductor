@@ -70,13 +70,24 @@ G1-4 (parity bundle), G1-5 (close-out: `phase-summary-epic-G1.md`,
 architecture-memory, runbook sweep) all done. Only the T5 e2e smoke is carried
 (pre-existing run-loop issue; needs a Linux host).
 
-**G3 EXPANDED (2026-07-13, critic-reviewed)** — owner chose "truth in features";
-A12 FAILED (no Linux/Docker host, ever) so G2 is parked (G2-2 pulled into
-G3-7-T0) and G3-5 (Reaction Outbox) is HOLD on an owner schema-lane decision.
-Execution order: G3-1 → G3-2 → G3-3 → G3-4 → G3-6 → G3-7.
+**G3 IN PROGRESS (2026-07-13)** — expansion critic-reviewed; A12 FAILED (no
+Linux/Docker host, ever): G2 parked (G2-2 pulled into G3-7-T0), G3-5 (Reaction
+Outbox) HOLD on an owner schema-lane decision (db-push waiver vs sqlite-lane
+migrate first — see backlog G3-5 line).
 
-Next: **G3-1-T0** — ADR-0010 "Skill consumption model", then G3-1-T1 (inject
-attached skills in buildResolvedPrompt).
+- **G3-1 COMPLETE** — agents consume skills (ADR-0010: Agent.skillIds, workspace
+  boundary, token-override-else-append in buildResolvedPrompt, 8k/16k caps,
+  attach picker UI, README/help consumption fictions rewritten).
+- **G3-2 COMPLETE** — embed-on-save + backfill script (gap 1.14), full skills
+  CRUD `/api/skills/[id]` with re-embed-on-content-change (gap 1.15),
+  versioning de-claimed (TD-026).
+
+Next: **G3-3-T1** — spec-MCP transport in mcp-resolver.ts (initialize handshake,
+Mcp-Session-Id, streamable-HTTP; kill-switch MCP_LEGACY_TRANSPORT=1; contract
+tests vs a local mock MCP HTTP server — reuse the G1-3 spike fixture pattern).
+Opus-tier protocol judgment; scope guard: no stdio, no legacy SSE. Then G3-3-T2
+(auth via config.headers env-indirection — reuse daemon-mcp-config's template
+convention — + isSafeExternalUrl parity, gap 2.3).
 
 ## After G1
 
