@@ -56,8 +56,25 @@ Ran `bun run smoke:daemon` live. Findings:
 - **All G1-1 correctness work (T1–T4) is done and unit-verified (847/0)** — T5 is the
   e2e proof + new assertions, gated on getting the run loop green first.
 
-**When the loop is green, add these parity assertions** (run the live harness, don't
-write blind):
+**G1-2 DONE (2026-07-13)** — review-rejection feedback reaches daemon agents (gap
+1.3): the v2 payload carries `rejectionNote`; the daemon `composeInstructions`
+appends the same HUMAN-FEEDBACK block as the HTTP path. Unit-verified (daemon suites
+72/0 isolated). Independent of the smoke.
+
+**Recommended next (all unit-testable, no smoke/CLI dependency needed):**
+- **G1-4** — remaining parity bundle (gap 1.7 minus startedAt): (a) fallback-agent
+  escalation already flows through `finalizeStepFailure` for the daemon (T2) —
+  verify + test it; (b) enforce `agent.maxConcurrent` at daemon lease time in
+  `daemon-dispatch.ts` (HTTP does it in prepareDispatch); (c) add projectMode
+  `instructions`/`outputFormat` to the v2 payload composition. Same shape as G1-2.
+- **G1-3** — MCP tools for daemon agents (gap 1.6). Needs the **spike** first:
+  validate `claude` CLI `--mcp-config` flags headlessly (needs the claude binary on
+  the host — environmental/investigative). Then generate a secret-free MCP config in
+  the payload. HOLD the impl until the spike says GO.
+- **G1-5** — close-out (phase summary + architecture-memory; register already updated).
+
+**T5 smoke (skipped for now) — when the loop is green, add these parity assertions**
+(run the live harness, don't write blind):
 - resolved-token: assert the payload/prompt the fixture receives has no `{{ }}`.
 - forced-fail → retry → dead-letter: extend the daemon fixture
   (`scripts/daemon-e2e-fixture.ts`) to fail on a signal; assert a dead-letter row
