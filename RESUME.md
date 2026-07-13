@@ -65,12 +65,15 @@ tested (fallback verified + post-fallback StepExecution allocation fixed via
 `findOrCreateRunningExecution`; `maxConcurrent` at daemon lease time; server-layered
 `modeInstructions` in the v2 payload, snapshot updated). See HANDOFF.md.
 
-**G1-3 DONE (2026-07-13)** — spike T0 (GO, `docs/gpm/state/spike-g1-3-mcp-config.md`)
-+ T1 implementation (commit cfc22d4): MCP for daemon agents via `--mcp-config`,
-secrets via `${ENV_VAR}` indirection, loud failure on unset vars / broken servers.
+**EPIC G1 COMPLETE (2026-07-13)** — G1-3 (MCP via `--mcp-config`, spike + impl),
+G1-4 (parity bundle), G1-5 (close-out: `phase-summary-epic-G1.md`,
+architecture-memory, runbook sweep) all done. Only the T5 e2e smoke is carried
+(pre-existing run-loop issue; needs a Linux host).
 
 Next per backlog order:
-- **G1-5** close-out (phase summary + architecture-memory) → retro → expand G2/G3.
+- **Expand G3 "truth in features"** (no external dependency), or **G2 "proven
+  deploy"** when a Docker/Linux host is available (A12); G2-2 (WAL pragmas) is
+  runnable on Windows now.
 
 ## After G1
 

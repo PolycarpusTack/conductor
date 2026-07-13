@@ -1,6 +1,6 @@
 # ARCHITECTURE MEMORY: Conductor (AgentBoard)
 
-Updated: 2026-07-03 (post EPICs A+B — see phase-summaries/phase-summary-epics-A-B.md)
+Updated: 2026-07-13 (post EPICs G0+G1 — see phase-summaries/phase-summary-epic-G1.md)
 
 ## Components
 
@@ -8,7 +8,7 @@ Updated: 2026-07-03 (post EPICs A+B — see phase-summaries/phase-summary-epics-
 - **API layer (`src/app/api/**`)**: thin handlers over `src/lib/server/**`; three auth planes (admin/user session cookie, agent API keys SHA-256-hashed, daemon tokens + scoped keys) — stable
 - **Dispatch engine (`src/lib/server/dispatch.ts`, `step-queue.ts`, `scheduler.ts`)**: per-project 10s poll → lease-FIRST → execute → advanceChain; DAG chains, retries + backoff, dead-letter table, review gates; atomic attempt allocation; budget-paused projects skipped (`budget.ts`) — stable, 94.7% covered
 - **HTTP adapter path (`src/lib/server/adapters/anthropic.ts`)**: real LLM calls, 10-round tool loop, token accounting, cost recorded on StepExecution (estimate fallback TD-020) — WORKS end to end
-- **Daemon path (`mini-services/conductor-daemon`)**: REAL EXECUTION — runner.ts spawns claude/template CLI shell-less with stdin prompt in the workspace cwd (workspace.ts, deny-by-default policy), streams batched session events (streaming.ts), attaches git evidence (evidence.ts); gated by `bun run smoke:daemon` (13-check e2e). Gap: daemon runs create no StepExecution rows → budgets/cost bind only for HTTP agents (TD-018); daemon failures never dead-letter
+- **Daemon path (`mini-services/conductor-daemon`)**: REAL EXECUTION at ENGINE PARITY (EPIC G1) — runner.ts spawns claude/template CLI shell-less with stdin prompt in the workspace cwd (workspace.ts, deny-by-default policy), streams batched session events (streaming.ts), attaches git evidence (evidence.ts). Payload v2 is server-resolved (prompts, previousOutput, rejectionNote, layered modeInstructions, sanitized MCP servers via `--mcp-config` + env-indirection secrets); completion/failure route through the shared Finalizer in dispatch.ts (ADR-0008: server-authoritative retry, dead-letter+notify, fallback), StepExecution rows + cost bind budgets, maxConcurrent enforced at lease. Gap: e2e smoke (G1-1-T5) skipped — pre-existing run-loop issue, needs a Linux host session
 - **Pull-claim API (Model B, `/api/agent/*`, `/api/cli`)**: claims carry a renewable 15-min lease (Task.claimExpiresAt); claim-reaper.ts (60s tick) returns expired claims to BACKLOG; stale daemons release step leases in ~30s
 - **Realtime (`mini-services/board-ws`)**: Socket.IO service; app pushes via authed internal /broadcast; silently disabled if WS secret unset
 - **Persistence (Prisma)**: SQLite default / Postgres+pgvector optional; embeddings as String cast via raw SQL on PG; schema provider hardcoded sqlite — fragile duality
@@ -18,10 +18,12 @@ Updated: 2026-07-03 (post EPICs A+B — see phase-summaries/phase-summary-epics-
 
 - ADR-0001 Runner process model (daemon spawns CLI: arg-arrays, stdin prompt, NDJSON, cwd enforcement)
 - ADR-0002 Leasing & idempotency (steps AND claims: lease-first, attempt key, reaper, stale reclaim)
-- ADR-0003 Budget enforcement point (month-to-date StepExecution.cost gates dispatch; DAEMON gap = TD-018b)
+- ADR-0003 Budget enforcement point (month-to-date StepExecution.cost gates dispatch; binds BOTH paths since G1-1-T4)
 - ADR-0004 SQLite/Postgres/pgvector duality (provider hardcoded sqlite, runtime adapter swap, embeddings via raw SQL)
 - ADR-0005 Three-plane auth (sessions / agent keys / daemon+scoped keys; CSRF + SSRF guards)
 - ADR-0006 Poll-based single-instance dispatch (in-process scheduler + SchedulerLock guard)
+- ADR-0007 Node runs the app/tests, Bun is tooling (better-sqlite3 refuses Bun)
+- ADR-0008 Server-authoritative daemon retry (Finalizer owns retry/dead-letter/fallback; daemon willRetry = hint)
 
 ## Domain Glossary (initial, extracted from code)
 
@@ -45,10 +47,8 @@ Updated: 2026-07-03 (post EPICs A+B — see phase-summaries/phase-summary-epics-
 
 ## Active Technical Debt (top — full register in TECHNICAL_DEBT.md)
 
-- ~~TD-A daemon execution~~ ~~TD-B claim reaper~~ ~~TD-C dispatch race~~ ~~TD-D key scoping~~ — RESOLVED (EPICs A+B, 2026-07-03)
-- ~~TD-E frontend stack drift~~ — RESOLVED (EPIC E, 2026-07-03: routing, contexts, typed client, dnd-kit a11y, memoization, dep cleanup)
-- ~~TD-F (no Dockerfile, lint off)~~ — RESOLVED (EPIC F: Docker/compose/launcher F-1; lint+any+strict F-4; ADRs F-3; SLOs/runbooks F-6). Full register: TECHNICAL_DEBT.md
-- TD-018b: daemon runs create no StepExecution rows (budgets/cost blind for DAEMON agents); TD-025: daemon failures never dead-letter
-- TD-024: Docker images never actually built (no Docker on dev host) — verify on a Docker host before prod
+- ~~TD-A..D~~ (EPICs A+B) · ~~TD-E~~ (EPIC E) · ~~TD-F~~ (EPIC F) · ~~TD-018b + TD-025~~ (EPIC G1, 2026-07-13: daemon StepExecution/budgets + dead-letter parity) · ~~TD-014b~~ (2026-07-13: deterministic suite) — RESOLVED
+- TD-024: Docker images never actually built (no Docker on dev host) — verify on a Docker host before prod (EPIC G2, blocked on A12)
+- G1-1-T5 daemon e2e smoke skipped: pre-existing run-loop issue (step served, never completed) — needs a Linux-host session; parity work is unit-verified
 
 ## Current Mode: DELIVERY (see mode.md)

@@ -224,7 +224,7 @@ Size: M (one task, three independent blocks). INVEST: I bent deliberately — th
 
 **G1-5 — EPIC close-out.** (traces: EPIC hygiene per Core §4; Priority **M** — context compression keeps later EPICs executable in ≤3k tokens)
 Size: S (one task). INVEST: task-type work item — hygiene, no persona/user value by design. DoR: READY (after G1-4).
-- **G1-5-T1** (PREPARATORY, Haiku): snapshot v2 final, runbook caveat removal, TD-018b/TD-025 → Resolved in TECHNICAL_DEBT.md, phase summary + architecture-memory update. Pull Gate: G1-4-T1 landed + suite green. END OF STORY / END OF EPIC → retro, then expand G2 (if A12 met) and G3.
+- **G1-5-T1** (PREPARATORY, Haiku): snapshot v2 final, runbook caveat removal, TD-018b/TD-025 → Resolved in TECHNICAL_DEBT.md, phase summary + architecture-memory update. Pull Gate: G1-4-T1 landed + suite green. **DONE 2026-07-13** — snapshot final (G1-2/3/4 fields), runbook caveats swept (daemon-step-stuck, budget-pause-recovery), TD register was already current, `phase-summary-epic-G1.md` written (retro included), architecture-memory updated. END OF STORY / **END OF EPIC G1** (T5 smoke carried to a Linux-host session) → expand G2 (if A12 met) and G3.
 
 ---
 

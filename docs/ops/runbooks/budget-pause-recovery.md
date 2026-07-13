@@ -32,11 +32,12 @@ curl -s "localhost:3000/api/activity?projectId=<id>&search=budget" | jq
 2. **Check the numbers.** `details` on the activity row carries `budgetUsd` and
    `spentUsd`. Sanity-check against the runtimes/usage analytics (same
    `StepExecution.cost` source of truth).
-3. **DAEMON-heavy project caveat.** Daemon runs record **no** `StepExecution`
-   rows (TD-018 remainder), so their spend is invisible to the budget. A
-   daemon-only project will effectively **never** pause on budget, and a mixed
-   project under-counts. If a daemon project "ignores" its budget, that's why —
-   see [daemon-step-stuck.md](daemon-step-stuck.md).
+3. **DAEMON spend counts too** (since G1-1-T4, 2026-07-13 — TD-018b resolved).
+   Daemon runs record `StepExecution` rows with cost lifted from the claude
+   run-metadata artifact, so daemon-heavy projects pause on budget like any
+   other. Caveat: only the **claude runner** reports cost; generic/template
+   runner steps record a row but no cost (nothing to lift), so a
+   template-runner-only project still under-counts.
 
 ## Resolution (pick one)
 

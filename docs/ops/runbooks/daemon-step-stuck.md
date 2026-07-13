@@ -35,16 +35,27 @@ bun run doctor --daemon-e2e    # spend-free end-to-end proof of the daemon path
 - `doctor` `stranded-work > 0` for daemon steps ⇒ the stale sweep isn't running
   ⇒ no poller ⇒ [dispatch-stalled.md](dispatch-stalled.md) steps 1–2. (SLO-3, [../slos.md](../slos.md).)
 
-## Known gaps (from EPIC A/B)
+## Resolved gaps (EPIC G1 "daemon parity", 2026-07-13)
 
-- **Daemon terminal failures never dead-letter** (unlike HTTP steps). A failed
-  daemon step just goes `failed`; recover via **chain rewind** on the task or by
-  re-running the step from the drawer. (Tracked; not a bug to chase live.)
-- **Daemon runs create no `StepExecution` rows** (TD-018 remainder) → budgets
-  and cost analytics are blind to DAEMON agents. A daemon project can't be
-  budget-paused because it records no spend. Relevant if
-  [budget-pause-recovery.md](budget-pause-recovery.md) numbers look wrong for a
-  daemon-heavy project.
+The two big EPIC A/B caveats no longer apply:
+
+- **Daemon terminal failures now dead-letter + notify** exactly like HTTP steps
+  (G1-1-T2, ADR-0008 — the server owns retry/dead-letter; the daemon's
+  `willRetry` is a logged hint). Fallback-agent escalation also applies.
+- **Daemon runs create `StepExecution` rows** (G1-1-T4): created at poll time,
+  finalized on completion with cost lifted from the `claude run metadata`
+  artifact — budgets and cost analytics bind for DAEMON agents.
+
+New failure modes worth knowing (G1-3 MCP):
+
+- `mcp config rejected: …` — the server refused the agent's MCP connection
+  config (missing endpoint, literal secret in an auth header, unknown
+  connection id). Fix the connection in Settings → MCP; secrets must be
+  `${ENV_VAR}` templates.
+- `mcp env vars not set on this daemon host: …` — provision the listed vars in
+  the daemon's environment and restart it.
+- `mcp server(s) failed to start: …` — the daemon host could not reach/start a
+  promised MCP server; check the server URL/health from the daemon host.
 
 ## Escalation
 

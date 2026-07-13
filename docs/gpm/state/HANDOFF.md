@@ -94,10 +94,16 @@ mcp__<name>__*`, init-status `"failed"` fails the step; template/echo runners
 documented unsupported (steps proceed without tools). Unit-verified both sides
 + type-check clean.
 
+**G1-5 DONE (2026-07-13) — EPIC G1 COMPLETE** (T5 smoke carried to a Linux-host
+session). Close-out: `phase-summaries/phase-summary-epic-G1.md` (incl. retro),
+architecture-memory refreshed (daemon path at engine parity, ADR-0007/0008
+listed, debt lines current), runbook caveats swept (daemon-step-stuck.md,
+budget-pause-recovery.md).
+
 **Recommended next:**
-- **G1-5** — EPIC close-out: phase summary, architecture-memory update, runbook
-  caveat sweep (TD register already current). Then retro → expand G2 (needs A12
-  Docker host) and G3.
+- **Expand G3 "truth in features"** (no external dependency) — or **G2** when a
+  Docker/Linux host is available (A12); G2-2 (WAL pragmas) runs on Windows now.
+- On the Linux host, bundle: G2 proper + the carried G1-1-T5 smoke assertions.
 - **G1-5** — close-out (phase summary + architecture-memory; register already updated).
 
 **T5 smoke (skipped for now) — when the loop is green, add these parity assertions**
