@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { getAdapter } from '@/lib/server/adapters/registry'
 import { buildWorkingMemory, buildRelevantMemoryWithHits } from '@/lib/server/memory'
 import { resolvePrompt } from '@/lib/server/resolve-prompt'
+import { buildSkillsBlock } from '@/lib/server/skill-prompt'
 import { fireProjectEvent as broadcastProjectEvent } from '@/lib/server/project-event'
 import { resolveMcpTools } from '@/lib/server/mcp-resolver'
 import { estimateCost } from '@/lib/server/cost-estimator'
@@ -164,6 +165,7 @@ interface ResolvableAgent {
   personality: string | null
   systemPrompt: string | null
   modeInstructions: string | null
+  skillIds: string | null
 }
 
 /**
@@ -220,6 +222,31 @@ export async function buildResolvedPrompt(step: ResolvableStep, agent: Resolvabl
     ? safeJsonParse<string[]>(agent.capabilities, []).join(', ')
     : ''
 
+  // ADR-0010 (G3-1): load the agent's attached skills, workspace-filtered —
+  // a stale or cross-workspace id drops out here (defense in depth on top of
+  // the write-time validation) instead of leaking across the boundary.
+  const skillIds = agent.skillIds ? safeJsonParse<string[]>(agent.skillIds, []) : []
+  let injectedSkills: { title: string; body: string }[] = []
+  if (skillIds.length > 0) {
+    const project = await db.project.findUnique({
+      where: { id: step.task.projectId },
+      select: { workspaceId: true },
+    })
+    if (project?.workspaceId) {
+      const rows = await db.skill.findMany({
+        where: { id: { in: skillIds }, workspaceId: project.workspaceId },
+        select: { id: true, title: true, body: true },
+      })
+      const byId = new Map(rows.map(r => [r.id, r]))
+      // Attach order is the injection order (ADR-0010) — findMany doesn't keep it.
+      injectedSkills = skillIds.flatMap(id => {
+        const row = byId.get(id)
+        return row ? [{ title: row.title, body: row.body }] : []
+      })
+    }
+  }
+  const skillsBlock = buildSkillsBlock(injectedSkills)
+
   const memoryQuery = [step.task.title, step.task.description, step.instructions]
     .filter(Boolean)
     .join('\n')
@@ -242,11 +269,18 @@ export async function buildResolvedPrompt(step: ResolvableStep, agent: Resolvabl
     task: { title: step.task.title, description: step.task.description },
     step: { mode: step.mode, instructions: step.instructions, previousOutput: previousStep?.output },
     mode: { label: projectMode?.label || step.mode, instructions: modeInstructions },
-    agent: { name: agent.name, role: agent.role, capabilities, personality: agent.personality },
+    agent: { name: agent.name, role: agent.role, capabilities, personality: agent.personality, skills: skillsBlock },
     memory: { recent: workingMemory, relevant: relevantMemory },
   }
 
-  const systemPrompt = resolvePrompt(agent.systemPrompt || '', resolveCtx)
+  // ADR-0010: token-override-else-append. A `{{agent.skills}}` token in the
+  // template controls placement; without one the block is appended, so the
+  // attach action alone makes skills reach the prompt (both execution paths —
+  // the daemon consumes this same resolved systemPrompt).
+  let systemPrompt = resolvePrompt(agent.systemPrompt || '', resolveCtx)
+  if (skillsBlock && !(agent.systemPrompt || '').includes('{{agent.skills}}')) {
+    systemPrompt = systemPrompt ? `${systemPrompt}\n\n${skillsBlock}` : skillsBlock
+  }
   // Resolve instruction tokens too, so the daemon payload never ships a literal
   // `{{task.title}}`/`{{memory.recent}}` to the CLI (G1-1-T3, AC). The HTTP path
   // consumes `resolvedInstructions` from G1-1-T3 onward as well.
@@ -262,6 +296,8 @@ export async function buildResolvedPrompt(step: ResolvableStep, agent: Resolvabl
     resolvedInstructions,
     workingMemory,
     relevantMemoryResult,
+    // ADR-0010: which playbooks shaped this prompt — evidence for reviewers.
+    injectedSkillTitles: injectedSkills.map(s => s.title),
   }
 }
 
@@ -333,7 +369,7 @@ async function prepareDispatch(stepId: string, evictedFrom: string | null) {
     return null
   }
 
-  const { previousStep, projectMode, systemPrompt, resolvedInstructions, workingMemory, relevantMemoryResult } =
+  const { previousStep, projectMode, systemPrompt, resolvedInstructions, workingMemory, relevantMemoryResult, injectedSkillTitles } =
     await buildResolvedPrompt(step, agent)
 
   const taskContext = [
@@ -375,6 +411,7 @@ async function prepareDispatch(stepId: string, evictedFrom: string | null) {
     mcpConnectionIds,
     workingMemory,
     relevantMemoryResult,
+    injectedSkillTitles,
   }
 }
 
@@ -644,6 +681,7 @@ async function executeDispatch(stepId: string, prepared: PreparedDispatch) {
     mcpConnectionIds,
     workingMemory,
     relevantMemoryResult,
+    injectedSkillTitles,
   } = prepared
 
   const allocated = await allocateExecution(stepId)
@@ -666,6 +704,8 @@ async function executeDispatch(stepId: string, prepared: PreparedDispatch) {
         evidence: JSON.stringify({
           memoryHits: relevantMemoryResult.hits,
           workingMemory: workingMemory.length > 0,
+          // ADR-0010: which attached skills were injected into this prompt.
+          skillsInjected: injectedSkillTitles,
         }),
       },
     })

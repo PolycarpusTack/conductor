@@ -7,6 +7,7 @@ import { createAgentApiKey } from '@/lib/server/api-keys'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createAgentSchema } from '@/lib/server/contracts'
+import { validateSkillAttach } from '@/lib/server/skill-attach'
 import { projectSummarySelect } from '@/lib/server/selects'
 
 export const GET = withErrorHandling('api/agents', async (request: Request) => {
@@ -38,6 +39,7 @@ export const GET = withErrorHandling('api/agents', async (request: Request) => {
         runtimeId: true,
         runtimeModel: true,
         systemPrompt: true,
+        skillIds: true,
         invocationMode: true,
         project: {
           select: projectSummarySelect,
@@ -72,7 +74,14 @@ export const POST = withErrorHandling('api/agents', async (request: Request) => 
 
   const { name, emoji, color, description, projectId, role, capabilities,
           maxConcurrent, supportedModes, modeInstructions, runtimeId,
-          runtimeModel, systemPrompt, mcpConnectionIds, invocationMode } = parsed.data
+          runtimeModel, systemPrompt, mcpConnectionIds, skillIds, invocationMode } = parsed.data
+
+  // ADR-0010: skills are workspace-scoped — reject cross-workspace attaches.
+  if (skillIds && skillIds.length > 0) {
+    const attachError = await validateSkillAttach(skillIds, projectId)
+    if (attachError) throw badRequest(attachError)
+  }
+
   const id = randomUUID()
   const provisionedKey = createAgentApiKey(id)
 
@@ -93,6 +102,7 @@ export const POST = withErrorHandling('api/agents', async (request: Request) => 
       runtimeModel,
       systemPrompt,
       mcpConnectionIds: mcpConnectionIds ? JSON.stringify(mcpConnectionIds) : undefined,
+      skillIds: skillIds ? JSON.stringify(skillIds) : undefined,
       invocationMode: invocationMode || 'HTTP',
       apiKeyHash: provisionedKey.hash,
       apiKeyPreview: provisionedKey.preview,

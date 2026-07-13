@@ -2,7 +2,7 @@ type ResolveContext = {
   task: { title: string; description?: string | null }
   step: { mode: string; instructions?: string | null; previousOutput?: string | null }
   mode: { label: string; instructions?: string | null }
-  agent: { name: string; role?: string | null; capabilities?: string | null; personality?: string | null }
+  agent: { name: string; role?: string | null; capabilities?: string | null; personality?: string | null; skills?: string | null }
   memory?: { recent?: string | null; relevant?: string | null }
 }
 
@@ -19,6 +19,9 @@ export function resolvePrompt(template: string, ctx: ResolveContext): string {
     'agent.role': ctx.agent.role || '',
     'agent.capabilities': ctx.agent.capabilities || '',
     'agent.personality': ctx.agent.personality || '',
+    // ADR-0010: composed skills block — always defined so a template token
+    // resolves to '' rather than shipping a literal {{agent.skills}}.
+    'agent.skills': ctx.agent.skills || '',
   }
 
   if (ctx.memory) {

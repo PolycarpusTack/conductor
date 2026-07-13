@@ -69,6 +69,8 @@ export const createAgentSchema = z.object({
   runtimeModel: z.string().trim().max(120).optional(),
   systemPrompt: z.string().max(10000).optional(),
   mcpConnectionIds: z.array(z.string().trim().min(1)).max(10).optional(),
+  // ADR-0010: explicit skill attach; workspace boundary enforced in the route
+  skillIds: z.array(z.string().trim().min(1)).max(10).optional(),
   invocationMode: agentInvocationModeSchema.optional(),
 })
 
@@ -87,6 +89,7 @@ export const updateAgentSchema = z.object({
   runtimeModel: z.string().trim().max(120).optional().nullable(),
   systemPrompt: z.string().max(10000).optional().nullable(),
   mcpConnectionIds: z.array(z.string().trim().min(1)).max(10).optional().nullable(),
+  skillIds: z.array(z.string().trim().min(1)).max(10).optional().nullable(),
   invocationMode: agentInvocationModeSchema.optional(),
   // D-4: one-click pause/resume. Without this field zod strips an incoming
   // `isActive`, so the PUT could never actually toggle an agent's paused state.

@@ -6,6 +6,7 @@ import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, notFound, withErrorHandling } from '@/lib/server/api-errors'
 import { updateAgentSchema } from '@/lib/server/contracts'
 import { projectSummarySelect } from '@/lib/server/selects'
+import { validateSkillAttach } from '@/lib/server/skill-attach'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 
 export const GET = withErrorHandling(
@@ -34,6 +35,7 @@ export const GET = withErrorHandling(
         runtimeModel: true,
         systemPrompt: true,
         mcpConnectionIds: true,
+        skillIds: true,
         invocationMode: true,
         project: {
           select: projectSummarySelect,
@@ -81,6 +83,16 @@ export const PUT = withErrorHandling(
     if (data.mcpConnectionIds !== undefined) {
       data.mcpConnectionIds = data.mcpConnectionIds ? JSON.stringify(data.mcpConnectionIds) : null
     }
+    if (parsed.data.skillIds !== undefined) {
+      // ADR-0010: skills are workspace-scoped — reject cross-workspace attaches.
+      if (parsed.data.skillIds && parsed.data.skillIds.length > 0) {
+        const existing = await db.agent.findUnique({ where: { id }, select: { projectId: true } })
+        if (!existing) throw notFound('Agent not found')
+        const attachError = await validateSkillAttach(parsed.data.skillIds, existing.projectId)
+        if (attachError) throw badRequest(attachError)
+      }
+      data.skillIds = parsed.data.skillIds ? JSON.stringify(parsed.data.skillIds) : null
+    }
 
     const agent = await db.agent.update({
       where: { id },
@@ -102,6 +114,7 @@ export const PUT = withErrorHandling(
         runtimeModel: true,
         systemPrompt: true,
         mcpConnectionIds: true,
+        skillIds: true,
         invocationMode: true,
         project: {
           select: projectSummarySelect,

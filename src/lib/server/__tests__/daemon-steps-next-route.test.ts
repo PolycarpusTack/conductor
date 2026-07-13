@@ -20,6 +20,8 @@ const mockStepEventFindFirst = mock(() => Promise.resolve(null)) as any
 const mockStepEventCreate = mock(() => Promise.resolve({ id: 'evt-1' })) as any
 const mockProjectModeFindFirst = mock(() => Promise.resolve(null)) as any
 const mockMcpConnFindMany = mock(() => Promise.resolve([] as unknown[])) as any
+const mockProjectFindUnique = mock(() => Promise.resolve({ workspaceId: 'ws-1' })) as any
+const mockSkillFindMany = mock(() => Promise.resolve([] as unknown[])) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -37,6 +39,9 @@ mock.module('@/lib/db', () => ({
     projectMode: { findFirst: mockProjectModeFindFirst },
     // G1-3: buildDaemonMcpServers loads the agent's MCP connection defs.
     projectMcpConnection: { findMany: mockMcpConnFindMany },
+    // G3-1 (ADR-0010): buildResolvedPrompt loads attached skills, workspace-filtered.
+    project: { findUnique: mockProjectFindUnique },
+    skill: { findMany: mockSkillFindMany },
     // G1-1-T4: the poll route creates the StepExecution row for the attempt.
     stepExecution: {
       findFirst: () => Promise.resolve(null),
@@ -136,6 +141,10 @@ beforeEach(() => {
   mockProjectModeFindFirst.mockResolvedValue(null)
   mockMcpConnFindMany.mockReset()
   mockMcpConnFindMany.mockResolvedValue([])
+  mockProjectFindUnique.mockReset()
+  mockProjectFindUnique.mockResolvedValue({ workspaceId: 'ws-1' })
+  mockSkillFindMany.mockReset()
+  mockSkillFindMany.mockResolvedValue([])
   mockResolveDaemonByToken.mockReset()
   mockResolveDaemonByToken.mockResolvedValue(DAEMON)
   mockExtractDaemonToken.mockReset()
@@ -193,6 +202,54 @@ describe('GET /api/daemon/steps/next — execution payload contract', () => {
     mockStepFindFirst.mockResolvedValue(leasedStep({ rejectionNote: null }))
     body = await (await GET(makeRequest(), params)).json()
     expect(body.step.rejectionNote).toBeNull()
+  })
+
+  // G3-1 (ADR-0010, gap 1.13): attached skills are injected into the resolved
+  // systemPrompt server-side — the daemon path consumes them for free.
+  test('an attached skill is appended to the resolved systemPrompt', async () => {
+    const step = leasedStep()
+    ;(step.agent as Record<string, unknown>).skillIds = JSON.stringify(['skill-1'])
+    mockStepFindFirst.mockResolvedValue(step)
+    mockSkillFindMany.mockResolvedValue([
+      { id: 'skill-1', title: 'Code Review Checklist', body: 'Check error paths first.' },
+    ])
+    const body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.agent.systemPrompt).toContain('You are Builder.')
+    expect(body.step.agent.systemPrompt).toContain('## Skills')
+    expect(body.step.agent.systemPrompt).toContain('### Code Review Checklist')
+    expect(body.step.agent.systemPrompt).toContain('Check error paths first.')
+    // Workspace-filtered lookup (defense in depth on top of write-time validation).
+    expect(mockSkillFindMany.mock.calls[0][0].where).toEqual({
+      id: { in: ['skill-1'] },
+      workspaceId: 'ws-1',
+    })
+    expect(validateExecutionPayload(body.step)).toEqual([])
+  })
+
+  test('a {{agent.skills}} token controls placement instead of appending', async () => {
+    const step = leasedStep()
+    step.agent.systemPrompt = 'Before.\n{{agent.skills}}\nAfter.'
+    ;(step.agent as Record<string, unknown>).skillIds = JSON.stringify(['skill-1'])
+    mockStepFindFirst.mockResolvedValue(step)
+    mockSkillFindMany.mockResolvedValue([
+      { id: 'skill-1', title: 'Commit Style', body: 'Conventional commits.' },
+    ])
+    const body = await (await GET(makeRequest(), params)).json()
+    const prompt = body.step.agent.systemPrompt as string
+    expect(prompt.indexOf('## Skills')).toBeGreaterThan(prompt.indexOf('Before.'))
+    expect(prompt.indexOf('## Skills')).toBeLessThan(prompt.indexOf('After.'))
+    // Substituted, not ALSO appended.
+    expect(prompt.match(/## Skills/g)).toHaveLength(1)
+    expect(prompt).not.toContain('{{agent.skills}}')
+  })
+
+  test('no attached skills → no Skills section, token resolves empty', async () => {
+    const step = leasedStep()
+    step.agent.systemPrompt = 'You are Builder. {{agent.skills}}'
+    mockStepFindFirst.mockResolvedValue(step)
+    const body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.agent.systemPrompt).not.toContain('## Skills')
+    expect(body.step.agent.systemPrompt).not.toContain('{{agent.skills}}')
   })
 
   // G1-4 (gap 1.7): the payload carries the SERVER-LAYERED mode instructions —

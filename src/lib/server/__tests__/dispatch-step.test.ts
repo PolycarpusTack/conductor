@@ -642,6 +642,8 @@ describe('dispatchStep happy path', () => {
     expect(evidence).toEqual({
       memoryHits: [{ memoryId: 'm1', score: 0.9 }],
       workingMemory: true,
+      // ADR-0010: no skills attached in this fixture.
+      skillsInjected: [],
     })
   })
 })

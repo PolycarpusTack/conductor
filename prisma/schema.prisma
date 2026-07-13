@@ -86,6 +86,7 @@ model Agent {
   runtimeModel     String?
   systemPrompt     String?
   mcpConnectionIds String?
+  skillIds         String? // JSON string array — explicit skill attach (ADR-0010); workspace-boundary validated at write
   taskSteps        TaskStep[]          @relation("TaskStepAgent")
   memories         AgentMemory[]
   // HTTP = legacy polling agent; DAEMON = launched by conductor-daemon

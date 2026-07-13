@@ -82,6 +82,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
             systemPrompt: true,
             modeInstructions: true,
             mcpConnectionIds: true,
+            skillIds: true,
             runtimeModel: true,
             runtime: { select: { adapter: true, config: true } },
           },
