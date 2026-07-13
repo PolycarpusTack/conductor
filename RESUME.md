@@ -99,11 +99,12 @@ spike first; HOLD impl until GO), **G1-5** close-out (phase summary + architectu
 
 - **Node runs the app + tests; Bun is tooling only** (ADR-0007). `bun run dev` /
   `bun run doctor` delegate to node for you.
-- **Full-suite flakiness under load** (TD-014b): `evidence.test.ts` git-add and the
-  `runner.test.ts` "claude runner against the fake CLI" spawn tests time out (5–12s)
-  when the host is busy. They pass 100% isolated. Prefer running specific test files;
-  run the full suite on a quiet host. This caps `verify`'s determinism — a cleanup
-  candidate (per-file mock isolation).
+- **Test suite is now deterministically green** (855/0) — TD-014b **RESOLVED**
+  (2026-07-13): the `test` script uses `--timeout 30000` (the conductor-daemon spawn
+  tests exceeded bun's 5s default under load), `verify` runs `bun run test` (was bare
+  `bun test`), and a leak-safe `dbMock()` helper (`src/lib/server/__tests__/db-mock.ts`)
+  makes a leaked partial db mock a no-op instead of `is not a function`. New partial
+  db mocks should use `dbMock({...})`.
 - **Windows standalone build is broken** (Turbopack `:` filenames) — dev-only here;
   production target is Linux.
 - Repo convention: solo work commits straight to `main`; commit per story; verify

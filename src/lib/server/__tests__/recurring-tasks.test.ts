@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { dbMock } from './db-mock'
 
 // NOTE: bun's mock.module registry is shared across test files in a run, so
 // each factory must expose the full export surface of the real module.
@@ -12,13 +13,13 @@ const mockFireProjectEvent = mock(() => Promise.resolve()) as any
 const mockStartChain = mock(() => Promise.resolve()) as any
 
 mock.module('@/lib/db', () => ({
-  db: {
+  db: dbMock({
     recurringTask: { findMany: mockRecurringFindMany, updateMany: mockRecurringUpdateMany },
     task: { create: mockTaskCreate },
     agent: { findFirst: mockAgentFindFirst },
     projectMode: { findMany: mockModeFindMany },
     activityLog: { create: mockActivityCreate },
-  },
+  }),
   isPostgresDb: false,
 }))
 mock.module('@/lib/server/project-event', () => ({

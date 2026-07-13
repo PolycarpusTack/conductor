@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { dbMock } from './db-mock'
 
 // ---------------------------------------------------------------------------
 // Mock @/lib/db before importing the module under test
@@ -11,7 +12,7 @@ const mockAgentMemoryUpdate = mock(() => Promise.resolve({})) as any
 const mockQueryRawUnsafe = mock(() => Promise.resolve([])) as any
 
 mock.module('@/lib/db', () => ({
-  db: {
+  db: dbMock({
     task: { findMany: mockTaskFindMany },
     agentMemory: {
       create: mockAgentMemoryCreate,
@@ -19,7 +20,7 @@ mock.module('@/lib/db', () => ({
       update: mockAgentMemoryUpdate,
     },
     $queryRawUnsafe: mockQueryRawUnsafe,
-  },
+  }),
   isPostgresDb: false, // forces the text-fallback path in all tests in this file
 }))
 

@@ -16,11 +16,13 @@
 > - G0-4 (gap 0.4): **first verified production `next build`** — BUILD_ID +
 >   `.next/static` exist; `verify` = type-check + lint + test + build + doctor.
 >
-> Unit suite **842/0 on a quiet host**. One caveat: the `verify` chain can trip on
-> **TD-014b** (cross-file `mock.module` order leak, seen under concurrent-build load
-> as `db.task.findUnique is not a function`) — the last thing between `verify` and
-> deterministic green. Not a regression; tracked below and a candidate for the next
-> EPIC. **Next: EPIC G1 "daemon parity."** Gap detail: `GAP-ANALYSIS-2026-07-10.md`;
+> Unit suite **deterministically green** (855/0, verified across repeated runs).
+> **TD-014b is RESOLVED (2026-07-13):** the flaky `verify` had two causes — the
+> conductor-daemon spawn tests exceeding bun's 5s default under load (fixed:
+> `test` script now `--timeout 30000`, and `verify` runs `bun run test` not bare
+> `bun test`), and the cross-file `mock.module` `is not a function` crash (fixed:
+> the leak-safe `dbMock()` helper, `src/lib/server/__tests__/db-mock.ts`).
+> **Next: EPIC G1 "daemon parity."** Gap detail: `GAP-ANALYSIS-2026-07-10.md`;
 > plan: `docs/gpm/state/backlog-2026-07-10-working-program.md`.
 
 ## Active
@@ -28,7 +30,6 @@
 | ID | Sev | Description | File(s) | Disposition |
 |----|-----|-------------|---------|-------------|
 | TD-024 | 🟠 | The Docker images + compose (F-1) were **never built** — Docker was absent from the dev host. Every non-Docker link is verified, but the container build (Debian better-sqlite3 compile, standalone tracing completeness, in-container `prisma db push`) is unproven. | Dockerfile, docker-compose.yml, mini-services/board-ws/Dockerfile | Run `docker compose up --build` on a Docker host before any production use; **EPIC G2**. |
-| TD-014b | 🟡 | Cross-file `mock.module` load-order fragility — several test suites depend on alphabetical execution order because Bun's mock registry is shared across files (seen in B-2, D-3). | src/lib/server/__tests__/** | Harness fix (per-file mock isolation) — EPIC G test hardening |
 | TD-016 | ⚪ | commandTemplate tokens validated at poll/spawn time, not when `ProjectRuntime.config` is written — bad templates surface late. | src/app/api/daemon/steps/next/route.ts | Validate in the runtime-config settings API |
 | TD-015 | ⚪ | Workspace-less step retries every poll tick, writing a `daemon_dispatch_failed` activity entry each time — no dedupe. | src/lib/server/daemon-dispatch.ts | Dedupe or park after N identical failures |
 | TD-017 | ⚪ | Generic runner argv split is whitespace-based — no quoting for args with spaces (documented in the daemon README). | mini-services/conductor-daemon/runner.ts | Add quoted-arg parsing if a template needs it |
@@ -56,6 +57,7 @@
 | TD-009 ✅ | Wizard composing step was a placeholder | Wired in Epic 4 (wizard-composer) |
 | TD-010 ✅ | Runtimes API returned a bare array | Standardized in E-2a endpoints |
 | TD-014 ✅ | composeAgent trusted LLM JSON shape | `composeResultSchema` + safeParse (wizard-composer.ts) |
+| TD-014b ✅ | Cross-file `mock.module` load-order fragility + spawn-test flakiness made `verify` non-deterministic | **2026-07-13**: `test` script `--timeout 30000` (spawn tests exceeded bun's 5s default under load) + `verify` runs `bun run test` (was bare `bun test`, which skipped the path filters); leak-safe `dbMock()` helper (`__tests__/db-mock.ts`) so a leaked partial db mock is a no-op, never `is not a function`. Adopted in the 4 known-partial files. Suite 855/0 across repeated runs. |
 | TD-018 ✅ (partial) | Adapter cost dropped on the HTTP path | B-7 wires `result.cost` + estimate fallback; daemon remainder tracked as TD-018b |
 | TD-018b ✅ | Daemon runs created no `StepExecution` rows — cost/budgets/analytics didn't bind for DAEMON agents | **G1-1-T4**: StepExecution created at daemon lease (steps/next), finalized on completion; cost lifted from the `claude run metadata` artifact into `StepExecution.cost`; startedAt stamped. Budget gate (source-agnostic `StepExecution.cost` sum) now binds daemon spend. |
 | TD-025 ✅ | Daemon terminal failures never dead-lettered — invisible to the panel/bell | **G1-1-T2**: daemon fail path routes through the shared `finalizeStepFailure` (ADR-0008); exhaustion dead-letters + notifies + escalates to fallback, at parity with HTTP. |

@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { dbMock } from './db-mock'
 
 // ---------------------------------------------------------------------------
 // D-2-T2 overdue-reminder sweep.
@@ -48,7 +49,7 @@ function matchesWhere(t: StoreTask, where: any): boolean {
 }
 
 mock.module('@/lib/db', () => ({
-  db: {
+  db: dbMock({
     task: {
       findMany: mock(async ({ where }: any) =>
         tasks.filter((t) => matchesWhere(t, where)).map((t) => ({ ...t })),
@@ -66,7 +67,7 @@ mock.module('@/lib/db', () => ({
         return row
       }) as any,
     },
-  },
+  }),
   isPostgresDb: false,
 }))
 
