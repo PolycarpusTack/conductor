@@ -557,11 +557,12 @@ export function HelpContent() {
                 as <Ref href="#help-chain-templates">templates</Ref> and reused across projects.
               </p>
 
-              <H3>Skills library with semantic search</H3>
+              <H3>Skills library</H3>
               <p>
-                A shared library of reusable prompt fragments, code snippets, and playbooks. Agents can retrieve skills
-                by semantic similarity (via <code>pgvector</code> when PostgreSQL is configured) or by exact tag match
-                when running on SQLite.
+                A shared library of reusable prompt fragments, code snippets, and playbooks. Attach skills to an
+                agent and they are injected into its system prompt on every run; the library&apos;s search box finds
+                skills semantically (via <code>pgvector</code> when PostgreSQL is configured) or by text match on
+                SQLite.
               </p>
 
               <H3>MCP tool execution loop</H3>
@@ -1209,8 +1210,8 @@ export function HelpContent() {
                   The #1 rookie mistake: a 2,000-word system prompt. You pay for those tokens on <em>every single
                   call</em>, and smaller models drown in them. Keep the base prompt to 2–3 sentences (voice +
                   hard rules), push mode-specific guidance into per-mode overrides, and park reusable playbooks
-                  in the <Ref href="#help-skills">skills library</Ref> where agents fetch them only when needed.
-                  Shorter prompt, sharper agent, smaller bill.
+                  in the <Ref href="#help-skills">skills library</Ref> — attach them only to the agents that need
+                  them. Shorter prompt, sharper agent, smaller bill.
                 </p>
               </WatchIt>
 
@@ -1640,9 +1641,8 @@ export function HelpContent() {
               <PlainEnglish>
                 <p>
                   Skills are the office bookshelf. You don&apos;t make every employee carry the entire company
-                  handbook to every meeting — you put it on a shelf and they grab the chapter they need. Same
-                  deal: stuffing playbooks into every system prompt costs tokens on every call; skills get
-                  fetched only when relevant.
+                  handbook — you hand each one exactly the chapters their job needs. Same deal here: you
+                  <em> attach</em> chosen skills to an agent, and those skills ride along on every run.
                 </p>
               </PlainEnglish>
 
@@ -1651,29 +1651,31 @@ export function HelpContent() {
                 <li><strong>Title</strong> — short, imperative: &ldquo;Write a PR description&rdquo;, &ldquo;Reproduce a Rails test failure&rdquo;.</li>
                 <li><strong>Tags</strong> — free-form labels for filtering (<code>testing</code>, <code>security</code>, <code>onboarding</code>).</li>
                 <li><strong>Body</strong> — markdown. Usually 5-50 lines: the actual how-to.</li>
-                <li><strong>Example inputs/outputs</strong> — optional, one or two shots the retriever surfaces alongside the body.</li>
-                <li><strong>Embedding</strong> — computed on save (when pgvector is available), used for semantic search.</li>
+                <li><strong>Embedding</strong> — computed on save (when pgvector is available), used for semantic search on the Skills page.</li>
               </Bullets>
             </Section>
 
-            <Section id="help-skills-search" title="Semantic search">
+            <Section id="help-skills-search" title="How agents use skills">
               <p>
-                When an agent starts a step, Conductor runs a similarity search over the skills library using the
-                task description as the query. The top-N hits (configurable, default 5) are injected into the
-                agent&apos;s prompt as a <code>&lt;skills&gt;</code> block.
+                Skills reach an agent by <strong>explicit attachment</strong>: open the agent editor
+                (<em>Connections</em> tab), tick the skills you want (up to 10), save. On every subsequent run —
+                HTTP or daemon — the attached skills are injected into the agent&apos;s system prompt as a
+                <code> ## Skills</code> section, in attach order.
               </p>
 
-              <H3>How the search works</H3>
+              <H3>The rules</H3>
               <Bullets>
-                <li><strong>Embedding-based</strong> when PostgreSQL with <code>pgvector</code> is configured. Skills are embedded on save; queries are embedded on dispatch.</li>
-                <li><strong>Tag-based fallback</strong> when running on SQLite. The chain&apos;s mode and the task&apos;s tags drive a keyword match instead.</li>
+                <li><strong>Placement</strong> — put <code>{'{{agent.skills}}'}</code> in the agent&apos;s system prompt to control where the block lands; without the token it appends at the end.</li>
+                <li><strong>Workspace-scoped</strong> — an agent can only attach skills from its project&apos;s workspace; a project without a workspace can&apos;t attach skills.</li>
+                <li><strong>Size caps</strong> — 8,000 characters per skill, 16,000 for the whole block. Over-cap content is cut with a visible <code>[skill truncated]</code> / <code>[skills omitted…]</code> marker — trim or detach skills if you see one.</li>
+                <li><strong>Evidence</strong> — each execution records which skills were injected (<code>skillsInjected</code> in the step&apos;s execution evidence), so you can see what shaped an output.</li>
               </Bullets>
 
-              <H3>Tuning retrieval</H3>
-              <Bullets>
-                <li><em>Settings &rarr; Templates &rarr; Skills retrieval</em> controls how many skills are injected per dispatch and the minimum similarity threshold.</li>
-                <li>Pin a skill to &ldquo;always inject&rdquo; if it&apos;s a global rule that every agent should always see (keep these short — they&apos;re paid for on every call).</li>
-              </Bullets>
+              <p>
+                The <strong>search box on the Skills page</strong> finds skills for <em>you</em> (semantic on
+                Postgres+pgvector, text match on SQLite) — agents don&apos;t auto-retrieve skills; they get exactly
+                what you attached, nothing more.
+              </p>
             </Section>
 
             <Section id="help-skills-create" title="Creating skills">

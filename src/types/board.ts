@@ -20,6 +20,7 @@ export interface Agent {
   runtimeModel?: string | null
   systemPrompt?: string | null
   mcpConnectionIds?: string | null
+  skillIds?: string | null
   personality?: string | null
 }
 

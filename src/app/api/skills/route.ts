@@ -12,9 +12,26 @@ export const GET = withErrorHandling('api/skills', async (request: Request) => {
   if (unauthorized) return unauthorized
 
   const { searchParams } = new URL(request.url)
-  const workspaceId = searchParams.get('workspaceId') || undefined
+  let workspaceId = searchParams.get('workspaceId') || undefined
+  const projectId = searchParams.get('projectId') || undefined
   const tag = searchParams.get('tag') || undefined
   const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10) || 50, 100)
+
+  // G3-1 (ADR-0010): the agent editor asks by projectId — resolve the
+  // project's workspace server-side (skills are workspace-scoped; attaching
+  // across the boundary is rejected at agent write time). A workspace-less
+  // project has no attachable skills: empty list + workspaceId: null so the
+  // UI can explain why instead of showing a bare empty state.
+  if (projectId) {
+    const project = await db.project.findUnique({
+      where: { id: projectId },
+      select: { workspaceId: true },
+    })
+    if (!project?.workspaceId) {
+      return NextResponse.json({ data: [], total: 0, workspaceId: null })
+    }
+    workspaceId = project.workspaceId
+  }
 
   const where: Record<string, unknown> = {}
   if (workspaceId) where.workspaceId = workspaceId
@@ -42,7 +59,7 @@ export const GET = withErrorHandling('api/skills', async (request: Request) => {
     tags: s.tags ? JSON.parse(s.tags) : [],
   }))
 
-  return NextResponse.json({ data: parsed, total: parsed.length })
+  return NextResponse.json({ data: parsed, total: parsed.length, workspaceId: workspaceId ?? null })
 })
 
 export const POST = withErrorHandling('api/skills', async (request: Request) => {

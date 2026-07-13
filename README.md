@@ -16,7 +16,7 @@ A professional-grade orchestration platform for AI agents with workflow chains, 
 - **Recurring Tasks**: Instantiate task templates on a daily/weekly/monthly schedule, chains included
 - **Triggers & Reactions**: Internal events and Sentry alerts fire Slack, Jira, HTTP, and email reactions
 - **MCP Connections**: Per-project MCP servers with tool allowlists and per-tool usage stats
-- **Skills Library**: Reusable, versioned knowledge agents can pull in, with semantic search on pgvector
+- **Skills Library**: Reusable knowledge — attach skills to an agent and they are injected into its system prompt on every run (place with `{{agent.skills}}` or they append automatically)
 - **Runtime Dashboard**: Live view of daemon hosts, execution sessions, and the step queue
 - **Observability & Analytics**: Cross-project KPIs, per-agent dashboards, and per-project cost analytics
 - **Dead-Letter Recovery**: Steps that exhaust retries are snapshotted for review and requeue

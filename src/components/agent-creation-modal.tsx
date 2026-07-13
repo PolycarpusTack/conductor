@@ -102,6 +102,14 @@ export function AgentCreationModal({
   // Connections
   const [selectedMcpIds, setSelectedMcpIds] = useState<string[]>([])
 
+  // Skills (ADR-0010) — attachable set = the project workspace's skills,
+  // fetched when the modal opens (server resolves the workspace boundary).
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([])
+  const [workspaceSkills, setWorkspaceSkills] = useState<
+    { id: string; title: string; description?: string | null }[]
+  >([])
+  const [skillsWorkspaceMissing, setSkillsWorkspaceMissing] = useState(false)
+
   // Archive picker
   const [archivePickerOpen, setArchivePickerOpen] = useState(false)
 
@@ -125,6 +133,7 @@ export function AgentCreationModal({
       setSystemPrompt(editingAgent.systemPrompt || '')
       setInvocationMode((editingAgent.invocationMode as 'HTTP' | 'DAEMON') || 'HTTP')
       setSelectedMcpIds(parseJsonSafe<string[]>(editingAgent.mcpConnectionIds, []))
+      setSelectedSkillIds(parseJsonSafe<string[]>(editingAgent.skillIds, []))
     } else {
       setName('')
       setEmoji('🤖')
@@ -142,10 +151,27 @@ export function AgentCreationModal({
       setSystemPrompt('')
       setInvocationMode('HTTP')
       setSelectedMcpIds([])
+      setSelectedSkillIds([])
     }
     setTab('identity')
     setSaving(false)
   }, [open, editingAgent])
+
+  useEffect(() => {
+    if (!open || !projectId) return
+    let cancelled = false
+    fetch(`/api/skills?projectId=${encodeURIComponent(projectId)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (cancelled || !body) return
+        setWorkspaceSkills(body.data ?? [])
+        setSkillsWorkspaceMissing(body.workspaceId === null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [open, projectId])
 
   const selectedRuntime = runtimes.find((r) => r.id === runtimeId)
   const availableModels = selectedRuntime ? parseModels(selectedRuntime.models) : []
@@ -181,6 +207,14 @@ export function AgentCreationModal({
     }
   }
 
+  const toggleSkill = (id: string) => {
+    if (selectedSkillIds.includes(id)) {
+      setSelectedSkillIds(selectedSkillIds.filter((s) => s !== id))
+    } else if (selectedSkillIds.length < 10) {
+      setSelectedSkillIds([...selectedSkillIds, id])
+    }
+  }
+
   /** Called when the user picks an entry from the archive. */
   function handleArchiveSelect(content: string, _meta: PromptLibraryEntry) {
     const trimmed = content.length > MAX_PROMPT_CONTENT_CHARS ? content.slice(0, MAX_PROMPT_CONTENT_CHARS) : content
@@ -210,6 +244,9 @@ export function AgentCreationModal({
       systemPrompt: systemPrompt.trim() || undefined,
       invocationMode,
       mcpConnectionIds: selectedMcpIds.length > 0 ? selectedMcpIds : undefined,
+      // On edit always send the list so detaching the last skill persists;
+      // on create an empty list is simply omitted.
+      skillIds: isEditing ? selectedSkillIds : selectedSkillIds.length > 0 ? selectedSkillIds : undefined,
     }
 
     if (!isEditing) {
@@ -585,6 +622,42 @@ export function AgentCreationModal({
               <p className="text-xs text-muted-foreground">
                 Connections are optional. MCPs expand what the agent can access.
               </p>
+
+              {/* Skills (ADR-0010): attached skills are injected into the
+                  agent's system prompt on every dispatch — both paths. */}
+              <div className="pt-2 border-t">
+                <label className="text-sm font-medium mb-1.5 block">
+                  Skills{selectedSkillIds.length > 0 ? ` (${selectedSkillIds.length}/10)` : ''}
+                </label>
+                {skillsWorkspaceMissing ? (
+                  <p className="text-sm text-muted-foreground">
+                    This project has no workspace — skills are workspace-scoped, so assign one before attaching skills.
+                  </p>
+                ) : workspaceSkills.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No skills in this workspace yet. Create them on the Skills page.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {workspaceSkills.map((skill) => (
+                      <div key={skill.id} className="flex items-center gap-3 p-2 rounded-md border">
+                        <Checkbox
+                          id={`skill-${skill.id}`}
+                          checked={selectedSkillIds.includes(skill.id)}
+                          onCheckedChange={() => toggleSkill(skill.id)}
+                        />
+                        <label htmlFor={`skill-${skill.id}`} className="flex-1 cursor-pointer">
+                          <span className="text-sm font-medium">{skill.title}</span>
+                          {skill.description && (
+                            <span className="text-xs text-muted-foreground ml-2">{skill.description}</span>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Attached skills are injected into the system prompt on every run (place with {'{{agent.skills}}'} or they append at the end).
+                </p>
+              </div>
             </TabsContent>
 
             {/* Tab 4: Memory (edit only) */}
