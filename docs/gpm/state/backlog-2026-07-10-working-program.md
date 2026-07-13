@@ -104,8 +104,10 @@ completion path calls the **Finalizer**, not a "handler"/"reporter" synonym.
   retries — single-operator (A1) + no external users (A8) permit the breaking
   protocol bump. If wrong: G1-1 needs payloadVersion negotiation. ASSUMED.
 - **A12** A Linux/Docker host will be available for G2 (external dependency —
-  the dev host is Windows without Docker, verified A9 + TD-024). Until then G2
-  is blocked EXCEPT G2-2 (WAL pragmas run fine on Windows). ASSUMED.
+  the dev host is Windows without Docker, verified A9 + TD-024).
+  **FAILED 2026-07-13 — owner confirmed no Linux/Docker host is available,
+  indefinitely.** G2 parked except G2-2 (WAL pragmas — pulled into G3-7-T0);
+  G3-5 HOLD carries the schema-lane consequence (see its line).
 - **A13** MCP tools for daemon agents target the **claude runner only** via
   generated `--mcp-config`; the generic runner documents MCP as unsupported.
   **CONFIRMED 2026-07-13** — spike G1-3-T0 verified all mechanics on the dev
@@ -248,24 +250,55 @@ Stories (tasks sketched; full decomposition at expansion):
 
 ---
 
-### EPIC G3 — Truth in Features (story-level; expand after G1 retro)
+### EPIC G3 — Truth in Features (EXPANDED 2026-07-13 after G1 retro; tasks below each story)
+
+> Expansion notes (2026-07-13): **A12 is now indefinitely unmet — owner confirmed no
+> Linux/Docker host is available**, so G2 stays parked (G2-2 WAL pragmas excepted,
+> folded into G3-7 close-out as an opportunistic Windows-runnable item). Consequence
+> for this EPIC: **additive nullable columns via `db push` remain acceptable**
+> (existing A–F precedent, non-destructive), but **new tables stay gated on a
+> migration story** → G3-5 is HOLD with an explicit owner decision recorded on its
+> line. Execution order: G3-1 → G3-2 → G3-3 → G3-4 → G3-6 → G3-7 (smoke + close-out);
+> G3-5 HOLD.
 
 - **Objective:** every README/help claim either works or is removed — skills agents can consume, semantic search that searches, spec-compliant authed MCP, cross-project KPIs, durable reactions.
 - **Mode: DELIVERY** — new feature work (the "implement" arm of R7) on the validated architecture; TDD mandatory.
 - **Business Value (ASSUMED — confirm):** trust — the gap file's track (D); also the stated precondition for seeding the prompt-engineering kit as skills content (gap §sequencing item 4). Metric: README claim audit finds 0 claims without a code path.
 - **Risk:** MED — G3-3 (MCP) has spec-surface creep. Mitigation: scope to initialize handshake + session header + streamable-HTTP + auth from `config`; stdio explicitly out of scope v1 (ASSUMED — confirm).
-- **SLO:** Reactions — delivery loss on process restart = 0 (Outbox drained after reboot).
+- **SLO:** MCP tool call — handshake/auth failure rate < 5% over 7d (measurable on the delivered surface). The original Reactions SLO (delivery loss on restart = 0) moves with G3-5 and applies only if it un-HOLDs.
 - **Smoke:** one agent run consumes a skill, calls an authed MCP tool, and its project appears in the cross-project Rollup — single scripted pass.
 - **ADRs:** ADR-0010 "Skill consumption model"; ADR-0011 "Reaction Outbox".
-- **Runbook:** extended at story expansion.
+- **Runbook:** two entries land with their stories — "MCP handshake/auth failure triage" (G3-3-T2) and "skill-injection cap exceeded" (G3-1-T1).
+- **Feature flags (critic finding 5, resolved):** G3-3-T1 gets a real kill-switch (`MCP_LEGACY_TRANSPORT=1` env reverts to the raw JSON-RPC client for one release; removal = TD item). G3-1 and G3-4 carry recorded WAIVERS: skills injection is inert until an operator attaches a skill (the attach IS the flag), and the Rollup is an additive read-only view — no behavior change to existing surfaces.
 
 Stories (implement/de-claim per R7 — default choices CONFIRMED by owner 2026-07-10):
-- **G3-1 — Agents consume skills.** (traces: 1.13 — verified: `resolvePrompt` has no skill source; /api/skills is session-auth only) Priority **H** — headline README claim, and the prompt-kit seeding precondition. Journey (ASSUMED): operator attaches skills to an agent (or agent-level auto-match), dispatch injects matched skill content into the prompt via a `{{skills}}` token/section with a size cap. Test expectations: resolve-prompt unit tests + an e2e where removing the skill changes the composed prompt.
-- **G3-2 — Semantic skill search tells the truth.** (traces: 1.14, 1.15) Priority **M** — premium config (PG+pgvector) currently returns 0 rows forever (nothing embeds skills — verified claim per gap; embeddings only in memory.ts). AC: embed-on-save (+ backfill script); CRUD completed (get/update/delete); "versioning" de-claimed from UI/help (schema field stays, unused — recorded as a TD item) per R7. Test expectations: PG-path search returns the seeded skill; SQLite fallback unchanged.
-- **G3-3 — MCP client: handshake + auth + SSRF.** (traces: 1.17, **2.3**) Priority **H** — no-auth spoofing surface + the cosmetic Type dropdown is a trust break. AC: initialize handshake, session headers, streamable-HTTP, auth read from the `config` column (never logged, never in payloads), `isSafeExternalUrl` applied (parity with adapters/webhook.ts per gap). Pre-split: T-transport / T-auth+SSRF. Test expectations: contract tests against a local mock MCP server incl. auth-required and SSRF-blocked cases.
-- **G3-4 — Cross-project Rollup KPIs.** (traces: 1.16) Priority **M** — help docs promise it; analytics is per-project only. AC (ASSUMED journey): a Rollup view aggregates cycle time, review wait, rejection rate, cost/task across projects the session can see; help text matches what's computed, nothing more.
-- **G3-5 — Reaction Outbox.** (traces: 1.18) Priority **M** — process death currently loses deliveries silently. AC: reactions enqueue Outbox rows; scheduler drains with retry/backoff; chain no longer stops at first failing reaction; board surfaces failed deliveries. Idempotency: delivery key per (reaction, event). Schema change → migration + rollback + flag per BB rule 6 (lands after G2-1's migrate adoption — pull gate).
-- **G3-6 — Doc-truth sweep.** (traces: Tier 3 bullets: live-cursors/queue-view de-claim, .env.example omissions, wizard prerequisite errors surfaced, export-scope honesty, help-content overclaims, stale TODO) Priority **L** — cheap, opportunistic per gap file; batch as one story so it actually happens. END OF EPIC → README claim audit = EPIC smoke.
+
+**G3-1 — Agents consume skills.** (traces: 1.13 — verified: `resolvePrompt` has no skill source; /api/skills is session-auth only) Priority **H** — headline README claim, and the prompt-kit seeding precondition. Journey (ASSUMED): operator attaches skills to an agent (or agent-level auto-match), dispatch injects matched skill content into the prompt via a `{{skills}}` token/section with a size cap. Test expectations: resolve-prompt unit tests + an e2e where removing the skill changes the composed prompt.
+- **G3-1-T0** (Hat: PREPARATORY, Opus — judgment): **ADR-0010 "Skill consumption model"** — decide attach mechanism (proposal: explicit `Agent.skillIds` nullable JSON column, additive `db push` per expansion note — mirrors `mcpConnectionIds`), injection point (inside `buildResolvedPrompt` so the DAEMON path gets it free — abstraction check: same pattern as memory), token/`{{skills}}` section semantics, size cap + truncation marker. Deliverable: the ADR. Pull Gate: none. Unblocks T1.
+- **G3-1-T1** (FEATURE, Sonnet): schema column + contracts + agent CRUD accept `skillIds`; `buildResolvedPrompt` loads attached skills and injects per ADR-0010 with the cap; tests: resolve-prompt units (skill present/absent/capped) + daemon payload carries the injected prompt (route test extension). Pull Gate: ADR-0010 accepted. Unblocks T2. Size M.
+- **G3-1-T2** (FEATURE, Sonnet): agent editor UI — skill attach picker + attached-skill chips; README/help wording aligned to what shipped. Tests: the story e2e lands HERE — attach a skill, assert the composed prompt contains it, detach, assert it's gone (API-level e2e, no browser needed). Pull Gate: T1 green. END OF STORY. Size S.
+
+**G3-2 — Semantic skill search tells the truth.** (traces: 1.14, 1.15) Priority **M** — premium config (PG+pgvector) currently returns 0 rows forever (**no skill ROW is ever embedded on save** — the search route already embeds the query via `embeddings.generateEmbedding`, but nothing writes skill embeddings; claim corrected per critic 2026-07-13). AC: embed-on-save (+ backfill script); CRUD completed (get/update/delete); "versioning" de-claimed from UI/help (schema field stays, unused — recorded as a TD item) per R7. Test expectations: PG-path search returns the seeded skill; SQLite fallback unchanged.
+- **G3-2-T1** (FEATURE, Sonnet): embed-on-save for skill create/update (reuse the existing `embeddings.generateEmbedding` — already shared with memory.ts and the search route; no extraction needed) + `scripts/backfill-skill-embeddings.ts`; tests: embed called on save, PG search query shape returns seeded skill (mocked PG), SQLite substring fallback unchanged. Pull Gate: G3-1 landed (shared skill fixtures). Unblocks T2. Size M.
+- **G3-2-T2** (FEATURE, Sonnet): complete skills CRUD — GET one / PUT / DELETE routes + contracts (the unused `updateSkillSchema` finally consumed) + skills page wiring; de-claim "versioning" in UI/help; **TD item: Skill.version schema field unused**. Pull Gate: T1 green. END OF STORY. Size M.
+
+**G3-3 — MCP client: handshake + auth + SSRF.** (traces: 1.17, **2.3**) Priority **H** — no-auth spoofing surface + the cosmetic Type dropdown is a trust break. AC: initialize handshake, session headers, streamable-HTTP, auth read from the `config` column (never logged, never in payloads), `isSafeExternalUrl` applied (parity with adapters/webhook.ts per gap). Pre-split: T-transport / T-auth+SSRF. Test expectations: contract tests against a local mock MCP server incl. auth-required and SSRF-blocked cases.
+- **G3-3-T1** (FEATURE, Opus — protocol judgment): spec-MCP transport in `mcp-resolver.ts` — initialize handshake (+ protocolVersion negotiation), `Mcp-Session-Id` header, streamable-HTTP POST; **scope guard: no stdio, no legacy SSE (v1)**; Type dropdown becomes real (`http` transport; unknown legacy values → clear error, not silence). **Kill-switch: `MCP_LEGACY_TRANSPORT=1` reverts to the raw JSON-RPC client for one release (TD item on removal).** Contract tests against a local mock MCP HTTP server (reuse the G1-3 spike fixture pattern over HTTP). Pull Gate: G3-2 landed. Unblocks T2. Size L — split into ST-handshake / ST-tools-call if it crowds the budget.
+- **G3-3-T2** (FEATURE, Sonnet): auth headers from `config.headers` with **env-name indirection — reuse the `daemon-mcp-config.ts` template convention (abstraction check: extract the shared header-template validator), server-side expansion at request time, never logged, never exported**; `isSafeExternalUrl` on every MCP fetch (parity with adapters/webhook.ts — closes gap 2.3). Tests: auth-required mock (401 without/200 with), SSRF-blocked private-range cases, secret-absent-from-logs assertion. Pull Gate: T1 green. END OF STORY. Size M.
+
+**G3-4 — Cross-project Rollup KPIs.** (traces: 1.16) Priority **M** — help docs promise it; analytics is per-project only. AC (ASSUMED journey): a Rollup view aggregates cycle time, review wait, rejection rate, cost/task across projects the session can see; help text matches what's computed, nothing more.
+- **G3-4-T1** (FEATURE, Sonnet): `/api/analytics/rollup` — aggregate cycle time, review wait, rejection rate, cost/task across session-visible projects (session-auth; per-project rows + totals). **KPI definitions bind to the existing per-project analytics queries (observability dashboard) — same timestamps, same denominators; if a KPI has no per-project precedent, define it in the task with the exact fields (cycle time = task createdAt→DONE transition; review wait = REVIEW entry→sign-off; rejection rate = rejected/total sign-offs; cost/task = Σ StepExecution.cost / tasks completed) and mirror those definitions into help.** Unit tests on the aggregation math incl. empty/zero-task projects. Pull Gate: G3-3 landed. Unblocks T2. Size M.
+- **G3-4-T2** (FEATURE, Sonnet): Rollup view (observability area) + help-content rewritten to promise exactly the four computed KPIs, nothing more. Tests: render assertion + help-text-matches-computed-KPIs check. Pull Gate: T1 green. END OF STORY. Size S.
+
+**G3-5 — Reaction Outbox. HOLD (schema gate).** (traces: 1.18) Priority **M** — process death currently loses deliveries silently. AC: reactions enqueue Outbox rows; scheduler drains with retry/backoff; chain no longer stops at first failing reaction; board surfaces failed deliveries. Idempotency: delivery key per (reaction, event). Schema change (NEW TABLE) → BB rule 6 wants migration + rollback + flag; the migrate lane (G2-1) is A12-blocked indefinitely (owner 2026-07-13: no Linux/Docker host). **OWNER DECISION NEEDED to un-HOLD: either (a) accept the Outbox table via `db push` like all prior schema (waives rule 6 for this table, recorded as TD), or (b) do G2-1's SQLite-lane-only migrate adoption first (PG lane deferred with A12).** Expansion deferred until decided.
+
+**G3-6 — Doc-truth sweep.** (traces: Tier 3 bullets: live-cursors/queue-view de-claim, .env.example omissions, wizard prerequisite errors surfaced, export-scope honesty, help-content overclaims, stale TODO) Priority **L** — cheap, opportunistic per gap file; batch as one story so it actually happens.
+- **G3-6-T1** (FEATURE, Haiku — checklist): one sweep commit — README/help de-claims (live cursors, queue view, anything G3-1..4 did NOT make true), `.env.example` completed (ANTHROPIC_API_KEY, SMTP_*, NOTIFY_EMAIL_*, EMBEDDING_MODEL, OTEL_*), wizard prerequisite errors surfaced (real message, not generic 500), export-scope documented, stale TODO purge. Pull Gate: G3-4 landed (so de-claims reflect final state). END OF STORY. Size M.
+
+**G3-7 — EPIC smoke + close-out.** (EPIC hygiene per Core §4)
+- **G3-7-T0** (FEATURE, Sonnet): **G2-2 pulled forward** (the one Windows-runnable G2 item): SQLite WAL + busy_timeout pragmas; INSTALL.md describes the WAL files that now actually exist; test: doctor-against-live-server no longer hits SQLITE_BUSY. Pull Gate: G3-6 landed. Unblocks T1. Size XS. (Split from T1 per critic — infra config ≠ smoke deliverable.)
+- **G3-7-T1** (FEATURE, Sonnet): the EPIC smoke — one scripted pass: an HTTP-path agent run consumes an attached skill, calls an authed MCP tool (local mock server), and its project appears in the Rollup. Windows-runnable (`bun run dev` + script). Pull Gate: T0 green. Unblocks T2. Size M.
+- **G3-7-T2** (PREPARATORY, Haiku): README claim audit (EPIC DoD metric: 0 claims without a code path), phase summary, architecture-memory update, TD register service. END OF STORY / END OF EPIC → retro, then expand G4 (G3-5 decision revisited at retro).
 
 ---
 

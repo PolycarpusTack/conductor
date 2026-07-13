@@ -70,10 +70,13 @@ G1-4 (parity bundle), G1-5 (close-out: `phase-summary-epic-G1.md`,
 architecture-memory, runbook sweep) all done. Only the T5 e2e smoke is carried
 (pre-existing run-loop issue; needs a Linux host).
 
-Next per backlog order:
-- **Expand G3 "truth in features"** (no external dependency), or **G2 "proven
-  deploy"** when a Docker/Linux host is available (A12); G2-2 (WAL pragmas) is
-  runnable on Windows now.
+**G3 EXPANDED (2026-07-13, critic-reviewed)** — owner chose "truth in features";
+A12 FAILED (no Linux/Docker host, ever) so G2 is parked (G2-2 pulled into
+G3-7-T0) and G3-5 (Reaction Outbox) is HOLD on an owner schema-lane decision.
+Execution order: G3-1 → G3-2 → G3-3 → G3-4 → G3-6 → G3-7.
+
+Next: **G3-1-T0** — ADR-0010 "Skill consumption model", then G3-1-T1 (inject
+attached skills in buildResolvedPrompt).
 
 ## After G1
 
