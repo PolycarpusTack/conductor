@@ -61,12 +61,22 @@ Ran `bun run smoke:daemon` live. Findings:
 appends the same HUMAN-FEEDBACK block as the HTTP path. Unit-verified (daemon suites
 72/0 isolated). Independent of the smoke.
 
-**Recommended next (all unit-testable, no smoke/CLI dependency needed):**
-- **G1-4** — remaining parity bundle (gap 1.7 minus startedAt): (a) fallback-agent
-  escalation already flows through `finalizeStepFailure` for the daemon (T2) —
-  verify + test it; (b) enforce `agent.maxConcurrent` at daemon lease time in
-  `daemon-dispatch.ts` (HTTP does it in prepareDispatch); (c) add projectMode
-  `instructions`/`outputFormat` to the v2 payload composition. Same shape as G1-2.
+**G1-4 DONE (2026-07-13, commit 92ad233)** — remaining parity bundle (gap 1.7):
+(a) fallback escalation on the daemon fail path verified + tested, AND a real fix:
+both daemon routes now allocate StepExecution rows via
+`findOrCreateRunningExecution` (execution-log.ts) — only a still-`running` latest
+row is reused, terminal rows are allocated past — so a post-fallback re-run
+(attempts reset to 0) can no longer resurrect/overwrite the failed agent's
+recorded attempts; (b) `agent.maxConcurrent` enforced at daemon lease time in
+`dispatchStepToDaemon` (count other active steps, demote to pending at cap — HTTP
+parity); (c) optional top-level `modeInstructions` in the v2 payload carries the
+server-layered mode-instruction string (agent-mode override ||
+projectMode.instructions + outputFormat hint); the daemon `composeSystemPrompt`
+prefers it over its legacy agent-record parse (snapshot updated, no version bump).
+Unit-verified: 39/0 across the 4 touched server suites + runner suite green
+(one documented TD-014b spawn-timeout flake, passes isolated) + type-check clean.
+
+**Recommended next:**
 - **G1-3** — MCP tools for daemon agents (gap 1.6). Needs the **spike** first:
   validate `claude` CLI `--mcp-config` flags headlessly (needs the claude binary on
   the host — environmental/investigative). Then generate a secret-free MCP config in

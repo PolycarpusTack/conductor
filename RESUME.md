@@ -58,23 +58,18 @@ platform that runs GPM on itself. **Goal:** the review-driven road to a working 
 
 ---
 
-## The next task — G1-4 (remaining parity bundle)
+## The next task — G1-3 (MCP for daemon agents) or G1-5 (close-out)
 
-Unit-testable, no smoke/CLI dependency. Backlog: `backlog-2026-07-10-working-program.md`
-§ G1-4. Three independent blocks + tests:
-1. **Fallback-agent escalation** on daemon terminal failures — already flows through
-   `finalizeStepFailure` (T2). Verify it fires for the daemon path and add a test.
-2. **`agent.maxConcurrent`** enforced at daemon lease time (`src/lib/server/daemon-dispatch.ts`
-   `dispatchStepToDaemon`) — HTTP does this in `prepareDispatch` (count active steps for
-   the agent; skip/demote if at cap).
-3. **projectMode `instructions`/`outputFormat`** added to the v2 payload composition
-   (`src/app/api/daemon/steps/next/route.ts` — `buildResolvedPrompt` already loads
-   `projectMode`; thread its instructions/outputFormat into the payload; the daemon
-   `composeSystemPrompt`/`composeInstructions` consume them). Optional fields, no
-   version bump. Update the snapshot + `validateExecutionPayload`.
+**G1-4 DONE (2026-07-13, commit 92ad233)** — all three parity blocks landed +
+tested (fallback verified + post-fallback StepExecution allocation fixed via
+`findOrCreateRunningExecution`; `maxConcurrent` at daemon lease time; server-layered
+`modeInstructions` in the v2 payload, snapshot updated). See HANDOFF.md.
 
-Then: **G1-3** (MCP for daemon agents, gap 1.6 — needs a `claude` CLI `--mcp-config`
-spike first; HOLD impl until GO), **G1-5** close-out (phase summary + architecture-memory).
+Next per backlog order:
+- **G1-3** (MCP for daemon agents, gap 1.6) — needs the `claude` CLI `--mcp-config`
+  spike first (G1-3-T0, needs the claude binary on the host); HOLD impl until GO.
+- **G1-5** close-out (phase summary + architecture-memory + snapshot final) — can
+  run now if the spike isn't feasible this session.
 
 ## After G1
 
