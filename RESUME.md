@@ -10,16 +10,21 @@
 
 ```
 Resume the Conductor "road to 1.0" work. Read RESUME.md and docs/gpm/state/HANDOFF.md
-first. We are mid-EPIC-G1 "daemon parity": G1-1 (T1–T4) + G1-2 are done and
-unit-verified; the T5 smoke is skipped (blocked on a pre-existing daemon run-loop
-issue). Continue with G1-4 (the remaining-parity bundle) unless I say otherwise.
+first. EPIC G1 "daemon parity" is COMPLETE (T5 smoke carried — needs a Linux host,
+which doesn't exist: A12 failed, G2 parked). We are mid-EPIC-G3 "truth in features":
+G3-1 (agents consume skills, ADR-0010) and G3-2 (embed-on-save + skills CRUD) are
+done. Continue with G3-3-T1 — spec-MCP transport in mcp-resolver.ts (initialize
+handshake, Mcp-Session-Id, streamable-HTTP; kill-switch MCP_LEGACY_TRANSPORT=1;
+contract tests against a local mock MCP HTTP server; scope guard: no stdio, no
+legacy SSE) — unless I say otherwise. Also pending my decision: G3-5 schema lane
+(db-push waiver vs sqlite-lane migrate first — backlog G3-5 line).
 
 Discipline to keep: work one backlog task at a time; after each, run the affected
 tests + `bun run type-check` and only commit when green (one commit per task,
 conventional message ending `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`).
-Prefer running individual test files — the full 88-file suite has documented flaky
-spawn/git tests under host load (TD-014b) that pass in isolation; don't chase them.
-The app + tests run under NODE, not Bun (ADR-0007). Verify with a quiet host.
+Prefer running individual test files — spawn-heavy tests are flaky under host load
+(pass in isolation; don't chase them). The app + tests run under NODE, not Bun
+(ADR-0007). Verify with a quiet host.
 ```
 
 ---
