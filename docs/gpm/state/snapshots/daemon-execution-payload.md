@@ -24,6 +24,7 @@ interface ExecutionPayload {
   mode: string                 // step mode (develop|draft|analyze|verify|review|human|custom)
   instructions: string | null  // step instructions, SERVER-RESOLVED (v2) — stdin prose, NEVER shell/argv
   previousOutput: string | null// prior step's output (v2) — chain context, stdin prose
+  rejectionNote: string | null // reviewer feedback on a rewound re-run (v2, G1-2) — raw human text
   timeoutMs: number | null     // daemon kills the child after this (default 300000)
   retryDelayMs: number | null
   maxRetries: number | null

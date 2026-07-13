@@ -175,6 +175,18 @@ describe('GET /api/daemon/steps/next — execution payload contract', () => {
     expect(body.step.timeoutMs).toBe(60_000)
   })
 
+  // G1-2 (gap 1.3): a rewound daemon step must carry the reviewer's rejection
+  // note so the re-run can address it (else it re-runs the identical prompt).
+  test('carries the rejection note when the step has one, absent otherwise', async () => {
+    mockStepFindFirst.mockResolvedValue(leasedStep({ rejectionNote: 'Fix the off-by-one.', attempts: 1 }))
+    let body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.rejectionNote).toBe('Fix the off-by-one.')
+
+    mockStepFindFirst.mockResolvedValue(leasedStep({ rejectionNote: null }))
+    body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.rejectionNote).toBeNull()
+  })
+
   // G1-1-T3 (gap 1.1): prompt tokens are resolved server-side — the daemon must
   // never receive a literal {{task.title}} to hand to the CLI.
   test('resolves prompt tokens in systemPrompt and instructions', async () => {

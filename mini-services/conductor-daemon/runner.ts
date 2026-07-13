@@ -48,6 +48,10 @@ export interface ExecutionPayload {
   instructions: string | null
   /** Prior step's output (v2) — chain context for a mid-chain daemon step. */
   previousOutput?: string | null
+  /** Reviewer's rejection note (v2) — human feedback for a rewound re-run. */
+  rejectionNote?: string | null
+  /** 1-based attempt number (used to label the rejection feedback). */
+  attempt?: number
   timeoutMs: number | null
   session: SessionBlock
   agent: {
@@ -84,6 +88,9 @@ export function validateExecutionPayload(value: unknown): string[] {
   }
   if (p.previousOutput !== undefined && p.previousOutput !== null && typeof p.previousOutput !== 'string') {
     problems.push('previousOutput must be a string, null, or absent')
+  }
+  if (p.rejectionNote !== undefined && p.rejectionNote !== null && typeof p.rejectionNote !== 'string') {
+    problems.push('rejectionNote must be a string, null, or absent')
   }
   const session = p.session as Record<string, unknown> | null | undefined
   if (typeof session !== 'object' || session === null) {
@@ -184,14 +191,21 @@ export function composeSystemPrompt(payload: ExecutionPayload): string {
 }
 
 /** Task context + step instructions — the stdin body (spike §3 stdin protocol).
- *  v2: prepends the previous step's output as chain context (parity with the
- *  HTTP path, which passes previousOutput to the adapter). */
+ *  v2: prepends the previous step's output as chain context, and appends the
+ *  reviewer's rejection note as HUMAN FEEDBACK on a rewound re-run — both at
+ *  parity with the HTTP path (prepareDispatch). */
 export function composeInstructions(payload: ExecutionPayload): string {
+  const previousAttempt = (payload.attempt ?? 1) - 1
+  const rejection = payload.rejectionNote
+    ? `HUMAN FEEDBACK (from previous attempt #${previousAttempt}):\n` +
+      `${payload.rejectionNote}\n\nPlease address this feedback in your revised response.`
+    : ''
   return [
     `Task: ${payload.task.title}`,
     payload.task.description ? `Description: ${payload.task.description}` : '',
     payload.previousOutput ? `Previous Step Output:\n${payload.previousOutput}` : '',
     payload.instructions ? `Step Instructions: ${payload.instructions}` : '',
+    rejection,
   ]
     .filter(Boolean)
     .join('\n\n')

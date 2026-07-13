@@ -181,6 +181,22 @@ describe('composeSystemPrompt / composeInstructions', () => {
     expect(text).toContain('A month grid.')
     expect(text).toContain('Implement the calendar view.')
   })
+
+  test('instructions include previousOutput and the rejection feedback when present (v2)', () => {
+    const text = composeInstructions(payload({
+      previousOutput: 'output from step 1',
+      rejectionNote: 'Fix the off-by-one.',
+      attempt: 2,
+    }))
+    expect(text).toContain('Previous Step Output:\noutput from step 1')
+    expect(text).toContain('HUMAN FEEDBACK (from previous attempt #1):')
+    expect(text).toContain('Fix the off-by-one.')
+    expect(text).toContain('Please address this feedback')
+  })
+
+  test('no rejection block when there is no note', () => {
+    expect(composeInstructions(payload())).not.toContain('HUMAN FEEDBACK')
+  })
 })
 
 describe('resolveRunnerKind', () => {
@@ -235,6 +251,14 @@ describe('validateExecutionPayload', () => {
     expect(validateExecutionPayload(payload({ previousOutput: 'prior output' }))).toEqual([])
     expect(validateExecutionPayload(payload({ previousOutput: 42 as unknown as string })).join(' '))
       .toContain('previousOutput')
+  })
+
+  test('accepts an absent/null/string rejectionNote, rejects a non-string (G1-2)', () => {
+    expect(validateExecutionPayload(payload({ rejectionNote: undefined }))).toEqual([])
+    expect(validateExecutionPayload(payload({ rejectionNote: null }))).toEqual([])
+    expect(validateExecutionPayload(payload({ rejectionNote: 'address this' }))).toEqual([])
+    expect(validateExecutionPayload(payload({ rejectionNote: 7 as unknown as string })).join(' '))
+      .toContain('rejectionNote')
   })
 })
 

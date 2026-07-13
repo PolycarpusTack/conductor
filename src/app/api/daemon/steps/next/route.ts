@@ -63,6 +63,7 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         mode: true,
         instructions: true,
         prevSteps: true,
+        rejectionNote: true,
         timeoutMs: true,
         retryDelayMs: true,
         maxRetries: true,
@@ -189,6 +190,9 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         instructions: resolved ? resolved.resolvedInstructions : step.instructions,
         // Previous step's output — chain context, parity with the HTTP path.
         previousOutput: resolved?.previousStep?.output ?? null,
+        // G1-2: reviewer's rejection note (raw human text, like the HTTP path)
+        // so a rewound daemon step can actually address the feedback (gap 1.3).
+        rejectionNote: step.rejectionNote ?? null,
         timeoutMs: step.timeoutMs,
         retryDelayMs: step.retryDelayMs,
         maxRetries: step.maxRetries,
