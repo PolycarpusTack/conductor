@@ -65,13 +65,12 @@ tested (fallback verified + post-fallback StepExecution allocation fixed via
 `findOrCreateRunningExecution`; `maxConcurrent` at daemon lease time; server-layered
 `modeInstructions` in the v2 payload, snapshot updated). See HANDOFF.md.
 
-**G1-3-T0 spike DONE (2026-07-13) — GO** (`docs/gpm/state/spike-g1-3-mcp-config.md`;
-A13 confirmed, env indirection verified both positions, two silent-degradation traps
-promoted to T1 ACs).
+**G1-3 DONE (2026-07-13)** — spike T0 (GO, `docs/gpm/state/spike-g1-3-mcp-config.md`)
++ T1 implementation (commit cfc22d4): MCP for daemon agents via `--mcp-config`,
+secrets via `${ENV_VAR}` indirection, loud failure on unset vars / broken servers.
 
 Next per backlog order:
-- **G1-3-T1** (MCP for daemon agents, gap 1.6) — READY; implement per the spike §3.
-- **G1-5** close-out (phase summary + architecture-memory + snapshot final).
+- **G1-5** close-out (phase summary + architecture-memory) → retro → expand G2/G3.
 
 ## After G1
 

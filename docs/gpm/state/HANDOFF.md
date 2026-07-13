@@ -84,11 +84,20 @@ ACs: unset `${VAR}` passes through as a literal silently (daemon must pre-valida
 env vars), and broken MCP servers degrade silently (detect via stream-json
 `system:init` `mcp_servers[].status === "failed"`; `"pending"` at init is healthy).
 
+**G1-3-T1 DONE (2026-07-13, commit cfc22d4)** — MCP for daemon agents (gap 1.6):
+`src/lib/server/daemon-mcp-config.ts` builds a sanitized `mcpServers` fragment
+(project-scoped; auth headers must be `${ENV_VAR}` templates — a literal
+credential is refused via `configError`, which follows the commandError
+contract); payload gains the optional `mcp` field. Daemon: env vars validated
+pre-spawn, temp config + `--mcp-config --strict-mcp-config --allowedTools
+mcp__<name>__*`, init-status `"failed"` fails the step; template/echo runners
+documented unsupported (steps proceed without tools). Unit-verified both sides
++ type-check clean.
+
 **Recommended next:**
-- **G1-3-T1** — implement per the spike: server ships a sanitized `mcpServers`
-  fragment in the payload (optional field, no version bump); daemon validates env
-  vars, writes a temp config, passes `--mcp-config <file> --strict-mcp-config`;
-  generic runner documents MCP as unsupported.
+- **G1-5** — EPIC close-out: phase summary, architecture-memory update, runbook
+  caveat sweep (TD register already current). Then retro → expand G2 (needs A12
+  Docker host) and G3.
 - **G1-5** — close-out (phase summary + architecture-memory; register already updated).
 
 **T5 smoke (skipped for now) — when the loop is green, add these parity assertions**
