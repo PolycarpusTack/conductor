@@ -11,12 +11,21 @@ import { dbMock } from './db-mock'
 const mockProjectFindUnique = mock(() => Promise.resolve(null as unknown)) as any
 const mockSkillFindMany = mock(() => Promise.resolve([] as unknown[])) as any
 const mockSkillCreate = mock((args: any) => Promise.resolve({ id: 'skill-new', ...args.data })) as any
+const mockSkillFindUnique = mock(() => Promise.resolve(null as unknown)) as any
+const mockSkillUpdate = mock((args: any) => Promise.resolve({ id: 'skill-1', tags: null, ...args.data })) as any
+const mockSkillDelete = mock(() => Promise.resolve({ id: 'skill-1' })) as any
 const mockGenerateEmbedding = mock(() => Promise.resolve([0.1, 0.2, 0.3])) as any
 
 mock.module('@/lib/db', () => ({
   db: dbMock({
     project: { findUnique: mockProjectFindUnique },
-    skill: { findMany: mockSkillFindMany, create: mockSkillCreate },
+    skill: {
+      findMany: mockSkillFindMany,
+      create: mockSkillCreate,
+      findUnique: mockSkillFindUnique,
+      update: mockSkillUpdate,
+      delete: mockSkillDelete,
+    },
   }),
   isPostgresDb: false,
 }))
@@ -42,12 +51,30 @@ mock.module('@/lib/server/workspace', () => ({
 }))
 
 import { GET, POST } from '@/app/api/skills/route'
+import { GET as GET_ONE, PUT, DELETE } from '@/app/api/skills/[id]/route'
 
 beforeEach(() => {
   mockProjectFindUnique.mockReset()
   mockProjectFindUnique.mockResolvedValue({ workspaceId: 'ws-1' })
   mockSkillCreate.mockReset()
   mockSkillCreate.mockImplementation((args: any) => Promise.resolve({ id: 'skill-new', ...args.data }))
+  mockSkillFindUnique.mockReset()
+  mockSkillFindUnique.mockResolvedValue({
+    id: 'skill-1',
+    workspaceId: 'ws-1',
+    title: 'Old Title',
+    description: 'Old description',
+    body: 'Old body.',
+    tags: null,
+    sourceTaskId: null,
+    version: 1,
+    createdAt: new Date('2026-07-01'),
+    updatedAt: new Date('2026-07-01'),
+  })
+  mockSkillUpdate.mockReset()
+  mockSkillUpdate.mockImplementation((args: any) => Promise.resolve({ id: 'skill-1', tags: null, ...args.data }))
+  mockSkillDelete.mockReset()
+  mockSkillDelete.mockResolvedValue({ id: 'skill-1' })
   mockGenerateEmbedding.mockReset()
   mockGenerateEmbedding.mockResolvedValue([0.1, 0.2, 0.3])
   mockSkillFindMany.mockReset()
@@ -113,5 +140,52 @@ describe('POST /api/skills — embed on save', () => {
     const res = await POST(makePost({ title: 'T', body: 'B' }), params)
     expect(res.status).toBe(200)
     expect(mockSkillCreate.mock.calls[0][0].data.embedding).toBeNull()
+  })
+})
+
+// G3-2-T2 (gap 1.15): the missing CRUD — get one / update / delete.
+describe('skills [id] CRUD', () => {
+  const idParams = { params: Promise.resolve({ id: 'skill-1' }) }
+
+  function makeJson(method: string, body?: Record<string, unknown>): Request {
+    return new Request('http://localhost/api/skills/skill-1', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+  }
+
+  test('GET one returns the full skill incl. body; 404 when missing', async () => {
+    const res = await GET_ONE(makeJson('GET'), idParams)
+    const body = await res.json()
+    expect(body.body).toBe('Old body.')
+    expect(body.tags).toEqual([])
+
+    mockSkillFindUnique.mockResolvedValue(null)
+    expect((await GET_ONE(makeJson('GET'), idParams)).status).toBe(404)
+  })
+
+  test('PUT with content change re-embeds (search never ranks stale text)', async () => {
+    const res = await PUT(makeJson('PUT', { body: 'New body.' }), idParams)
+    expect(res.status).toBe(200)
+    expect(mockGenerateEmbedding.mock.calls[0][0]).toBe('Old Title\nOld description\nNew body.')
+    expect(mockSkillUpdate.mock.calls[0][0].data.embedding).toBe(JSON.stringify([0.1, 0.2, 0.3]))
+  })
+
+  test('PUT with tags-only change does NOT re-embed', async () => {
+    const res = await PUT(makeJson('PUT', { tags: ['deploy'] }), idParams)
+    expect(res.status).toBe(200)
+    expect(mockGenerateEmbedding).not.toHaveBeenCalled()
+    expect('embedding' in mockSkillUpdate.mock.calls[0][0].data).toBe(false)
+    expect(mockSkillUpdate.mock.calls[0][0].data.tags).toBe(JSON.stringify(['deploy']))
+  })
+
+  test('DELETE removes the skill; 404 when missing', async () => {
+    const res = await DELETE(makeJson('DELETE'), idParams)
+    expect(res.status).toBe(200)
+    expect(mockSkillDelete).toHaveBeenCalledTimes(1)
+
+    mockSkillFindUnique.mockResolvedValue(null)
+    expect((await DELETE(makeJson('DELETE'), idParams)).status).toBe(404)
   })
 })

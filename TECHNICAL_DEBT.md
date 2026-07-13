@@ -30,6 +30,7 @@
 | ID | Sev | Description | File(s) | Disposition |
 |----|-----|-------------|---------|-------------|
 | TD-024 | 🟠 | The Docker images + compose (F-1) were **never built** — Docker was absent from the dev host. Every non-Docker link is verified, but the container build (Debian better-sqlite3 compile, standalone tracing completeness, in-container `prisma db push`) is unproven. | Dockerfile, docker-compose.yml, mini-services/board-ws/Dockerfile | Run `docker compose up --build` on a Docker host before any production use; **EPIC G2**. |
+| TD-026 | ⚪ | `Skill.version`/`parentId` schema fields exist but nothing writes versions (always 1) — versioning was de-claimed from UI/help in G3-2 rather than implemented. | prisma/schema.prisma (Skill) | Implement version-on-update + history view, or drop the columns at the next schema consolidation |
 | TD-016 | ⚪ | commandTemplate tokens validated at poll/spawn time, not when `ProjectRuntime.config` is written — bad templates surface late. | src/app/api/daemon/steps/next/route.ts | Validate in the runtime-config settings API |
 | TD-015 | ⚪ | Workspace-less step retries every poll tick, writing a `daemon_dispatch_failed` activity entry each time — no dedupe. | src/lib/server/daemon-dispatch.ts | Dedupe or park after N identical failures |
 | TD-017 | ⚪ | Generic runner argv split is whitespace-based — no quoting for args with spaces (documented in the daemon README). | mini-services/conductor-daemon/runner.ts | Add quoted-arg parsing if a template needs it |

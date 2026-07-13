@@ -52,11 +52,14 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
   const [searchMethod, setSearchMethod] = useState<string | null>(null)
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  // G3-2-T2: the dialog doubles as the editor — editingId set = PUT mode.
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [newDescription, setNewDescription] = useState('')
   const [newBody, setNewBody] = useState('')
   const [newTags, setNewTags] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -81,37 +84,68 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
     }
   }
 
-  const handleCreate = async () => {
+  const resetDialog = () => {
+    setCreateOpen(false)
+    setEditingId(null)
+    setNewTitle('')
+    setNewDescription('')
+    setNewBody('')
+    setNewTags('')
+  }
+
+  const handleSave = async () => {
     if (!newTitle.trim() || !newBody.trim()) return
     setSaving(true)
-    const res = await fetch('/api/skills', {
-      method: 'POST',
+    const isEdit = editingId !== null
+    const res = await fetch(isEdit ? `/api/skills/${editingId}` : '/api/skills', {
+      method: isEdit ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: newTitle.trim(),
-        description: newDescription.trim() || undefined,
+        description: newDescription.trim() || (isEdit ? null : undefined),
         body: newBody,
-        tags: newTags ? newTags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-        workspaceId,
+        tags: newTags ? newTags.split(',').map((t) => t.trim()).filter(Boolean) : isEdit ? null : undefined,
+        ...(isEdit ? {} : { workspaceId }),
       }),
     })
     if (res.ok) {
-      setCreateOpen(false)
-      setNewTitle('')
-      setNewDescription('')
-      setNewBody('')
-      setNewTags('')
+      resetDialog()
+      setSelectedSkill(null)
+      setSearchResults(null)
       setSkills(await loadSkills(workspaceId))
     }
     setSaving(false)
   }
 
+  const startEdit = (skill: Skill) => {
+    setEditingId(skill.id)
+    setNewTitle(skill.title)
+    setNewDescription(skill.description || '')
+    setNewBody(skill.body || '')
+    setNewTags(skill.tags.join(', '))
+    setSelectedSkill(null)
+    setCreateOpen(true)
+  }
+
+  const handleDelete = async (skillId: string) => {
+    setDeleting(true)
+    const res = await fetch(`/api/skills/${skillId}`, { method: 'DELETE' })
+    if (res.ok) {
+      setSelectedSkill(null)
+      setSearchResults(null)
+      setSkills(await loadSkills(workspaceId))
+    }
+    setDeleting(false)
+  }
+
   const fetchSkillBody = async (skillId: string) => {
-    const existing = skills.find((s) => s.id === skillId)
-    if (existing?.body) { setSelectedSkill(existing); return }
-    // DEBT: Skills list endpoint doesn't return body — need GET /api/skills/:id detail endpoint
-    // When to pay: before skills feature is user-facing in production
-    setSelectedSkill(existing || null)
+    // G3-2-T2: full detail (incl. body) from the new GET /api/skills/:id.
+    const res = await fetch(`/api/skills/${skillId}`).catch(() => null)
+    if (res?.ok) {
+      setSelectedSkill(await res.json())
+      return
+    }
+    setSelectedSkill(skills.find((s) => s.id === skillId) || null)
   }
 
   const displaySkills = searchResults ?? skills
@@ -139,7 +173,7 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search skills (semantic when OpenAI key configured)..."
+            placeholder="Search skills (semantic on Postgres+pgvector, text match otherwise)..."
             className="pl-9"
           />
         </div>
@@ -180,10 +214,7 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
               onClick={() => fetchSkillBody(skill.id)}
             >
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-sm font-medium leading-tight">{skill.title}</CardTitle>
-                  <Badge variant="outline" className="text-[10px] shrink-0 ml-2">v{skill.version}</Badge>
-                </div>
+                <CardTitle className="text-sm font-medium leading-tight">{skill.title}</CardTitle>
                 {skill.description && (
                   <p className="text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
                 )}
@@ -221,25 +252,36 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
                   {selectedSkill.tags.map((tag) => (
                     <Badge key={tag} variant="secondary">{tag}</Badge>
                   ))}
-                  <Badge variant="outline">v{selectedSkill.version}</Badge>
                 </div>
                 <Separator />
                 <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
-                  {selectedSkill.body || 'Skill body not loaded (detail endpoint needed).'}
+                  {selectedSkill.body || ''}
                 </div>
               </div>
+              <DialogFooter>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDelete(selectedSkill.id)}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </Button>
+                <Button variant="outline" onClick={() => startEdit(selectedSkill)}>
+                  Edit
+                </Button>
+              </DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Create skill dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      {/* Create/edit skill dialog */}
+      <Dialog open={createOpen} onOpenChange={(open) => { if (!open) resetDialog() }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Create Skill</DialogTitle>
+            <DialogTitle>{editingId ? 'Edit Skill' : 'Create Skill'}</DialogTitle>
             <DialogDescription>
-              Skills are reusable playbooks that agents can reference when working on tasks.
+              Skills are reusable playbooks — attach them to agents and they ride the system prompt on every run.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -261,9 +303,9 @@ export function SkillsPage({ workspaceId }: SkillsPageProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={saving || !newTitle.trim() || !newBody.trim()}>
-              {saving ? 'Creating...' : 'Create Skill'}
+            <Button variant="outline" onClick={resetDialog}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving || !newTitle.trim() || !newBody.trim()}>
+              {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Create Skill'}
             </Button>
           </DialogFooter>
         </DialogContent>

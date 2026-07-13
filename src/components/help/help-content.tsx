@@ -1633,8 +1633,8 @@ export function HelpContent() {
               subtitle="Reusable prompt fragments and playbooks, shared across agents and projects."
             >
               <p>
-                A <strong>skill</strong> in Conductor is a named, versioned piece of knowledge an agent can pull in
-                when it needs it — a prompt fragment, a checklist, a code snippet, a company-specific playbook.
+                A <strong>skill</strong> in Conductor is a named piece of knowledge you attach to agents —
+                a prompt fragment, a checklist, a code snippet, a company-specific playbook.
                 The skills library is per-workspace, so every project in a workspace shares the same pool.
               </p>
 
