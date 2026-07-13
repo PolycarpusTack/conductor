@@ -494,12 +494,9 @@ async function runDaemonE2E() {
         platform: process.platform === 'win32' || process.platform === 'darwin' ? process.platform : 'linux',
         version: '0.0.0-smoke',
         // Registers exactly like the reference daemon does (one capability —
-        // mini-services/conductor-daemon/index.ts). KNOWN BUG: this currently
-        // 400s because registerDaemonSchema's `capabilities` uses zod-v4
-        // z.record(z.enum(...)), which requires ALL enum keys; it needs
-        // z.partialRecord (src/lib/server/daemon-contracts.ts). The smoke
-        // fails here by design until that one-line fix lands — padding the
-        // payload with fake codex/copilot capabilities would mask the bug.
+        // mini-services/conductor-daemon/index.ts). The earlier z.record-over-enum
+        // bug is fixed (registerDaemonSchema now uses z.partialRecord,
+        // src/lib/server/daemon-contracts.ts), so registration passes.
         capabilities: { 'claude-code': { version: 'smoke' } },
         workspaceId: workspace!.id,
       },

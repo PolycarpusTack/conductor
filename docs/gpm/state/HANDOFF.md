@@ -36,10 +36,28 @@ correctness gaps are closed and unit-verified** — only the e2e smoke (T5) rema
   (source-agnostic `StepExecution.cost` sum) now binds daemon spend. **Closes
   TD-018b.** (TD-018b + TD-025 marked Resolved in TECHNICAL_DEBT.md.)
 
-**RESUME AT G1-1-T5** — extend `bun run smoke:daemon` (the `--daemon-e2e` path in
-`scripts/doctor.ts` `runDaemonE2E`; runs under **Bun** via `Bun.spawn`, ADR-0007)
-with parity assertions. **Do this with the live harness** (run the smoke and
-iterate — don't write assertions blind). Needed:
+**G1-1-T5 — STARTED, BLOCKED on a pre-existing daemon-run-loop issue (2026-07-13).**
+Ran `bun run smoke:daemon` live. Findings:
+- The smoke now progresses far past its old documented "red at register" state —
+  app-boot ✓, login ✓, setup ✓, workspace ✓, **daemon-register + start ✓** (the
+  `z.record`→`z.partialRecord` fix is in; the stale doctor comment is corrected).
+- **FAILS at `e2e-step-completed`**: the step stays `active` past the timeout. The
+  daemon polls and the server serves the step (`GET /api/daemon/steps/next 200` —
+  so the v2 payload route is fine, NOT a G1 regression), but the step is never
+  completed. This is the daemon **execution loop** (spawn the generic-template
+  fixture `bun scripts/daemon-e2e-fixture.ts` on stdin → run → POST completion),
+  not the payload. Very likely **pre-existing** (the smoke has been red at register,
+  so this last mile hasn't been exercised recently); needs debugging with the FULL
+  daemon tail (the smoke truncates it to 400 chars — raise that or run the daemon
+  standalone). Odd observation to chase: `Agent/Task/ProjectRuntime WHERE id IN
+  (NULL)` queries right after the poll's step query (harmless to serving, but worth
+  understanding). Each smoke iteration ≈ 3.5 min on this Windows host (71s boot) —
+  a faster/Linux host is strongly preferred for this loop.
+- **All G1-1 correctness work (T1–T4) is done and unit-verified (847/0)** — T5 is the
+  e2e proof + new assertions, gated on getting the run loop green first.
+
+**When the loop is green, add these parity assertions** (run the live harness, don't
+write blind):
 - resolved-token: assert the payload/prompt the fixture receives has no `{{ }}`.
 - forced-fail → retry → dead-letter: extend the daemon fixture
   (`scripts/daemon-e2e-fixture.ts`) to fail on a signal; assert a dead-letter row
