@@ -65,11 +65,13 @@ tested (fallback verified + post-fallback StepExecution allocation fixed via
 `findOrCreateRunningExecution`; `maxConcurrent` at daemon lease time; server-layered
 `modeInstructions` in the v2 payload, snapshot updated). See HANDOFF.md.
 
+**G1-3-T0 spike DONE (2026-07-13) — GO** (`docs/gpm/state/spike-g1-3-mcp-config.md`;
+A13 confirmed, env indirection verified both positions, two silent-degradation traps
+promoted to T1 ACs).
+
 Next per backlog order:
-- **G1-3** (MCP for daemon agents, gap 1.6) — needs the `claude` CLI `--mcp-config`
-  spike first (G1-3-T0, needs the claude binary on the host); HOLD impl until GO.
-- **G1-5** close-out (phase summary + architecture-memory + snapshot final) — can
-  run now if the spike isn't feasible this session.
+- **G1-3-T1** (MCP for daemon agents, gap 1.6) — READY; implement per the spike §3.
+- **G1-5** close-out (phase summary + architecture-memory + snapshot final).
 
 ## After G1
 

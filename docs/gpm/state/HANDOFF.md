@@ -76,11 +76,19 @@ prefers it over its legacy agent-record parse (snapshot updated, no version bump
 Unit-verified: 39/0 across the 4 touched server suites + runner suite green
 (one documented TD-014b spawn-timeout flake, passes isolated) + type-check clean.
 
+**G1-3-T0 SPIKE DONE (2026-07-13) — GO.** `state/spike-g1-3-mcp-config.md`: claude
+2.1.207 `--mcp-config`/`--strict-mcp-config` verified headlessly with a live stdio
+MCP fixture; `${VAR}` env indirection works in stdio `env` AND http `headers`
+(secrets never in payload/argv/config values); A13 CONFIRMED. Two traps became T1
+ACs: unset `${VAR}` passes through as a literal silently (daemon must pre-validate
+env vars), and broken MCP servers degrade silently (detect via stream-json
+`system:init` `mcp_servers[].status === "failed"`; `"pending"` at init is healthy).
+
 **Recommended next:**
-- **G1-3** — MCP tools for daemon agents (gap 1.6). Needs the **spike** first:
-  validate `claude` CLI `--mcp-config` flags headlessly (needs the claude binary on
-  the host — environmental/investigative). Then generate a secret-free MCP config in
-  the payload. HOLD the impl until the spike says GO.
+- **G1-3-T1** — implement per the spike: server ships a sanitized `mcpServers`
+  fragment in the payload (optional field, no version bump); daemon validates env
+  vars, writes a temp config, passes `--mcp-config <file> --strict-mcp-config`;
+  generic runner documents MCP as unsupported.
 - **G1-5** — close-out (phase summary + architecture-memory; register already updated).
 
 **T5 smoke (skipped for now) — when the loop is green, add these parity assertions**

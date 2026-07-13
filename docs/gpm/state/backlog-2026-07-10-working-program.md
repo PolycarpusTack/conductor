@@ -108,7 +108,8 @@ completion path calls the **Finalizer**, not a "handler"/"reporter" synonym.
   is blocked EXCEPT G2-2 (WAL pragmas run fine on Windows). ASSUMED.
 - **A13** MCP tools for daemon agents target the **claude runner only** via
   generated `--mcp-config`; the generic runner documents MCP as unsupported.
-  ASSUMED — confirm (G1-3 SPIKE validates mechanics first).
+  **CONFIRMED 2026-07-13** — spike G1-3-T0 verified all mechanics on the dev
+  host (`state/spike-g1-3-mcp-config.md`): GO for T1.
 
 ---
 
@@ -212,8 +213,8 @@ Size: S (one task). INVEST ✓. DoR: READY (after G1-1).
 AC (per A13, ASSUMED — confirm): Given an agent with `mcpConnectionIds` and the claude runner, When the step spawns, Then a generated MCP config (from the server-side MCP connection defs, secrets via env indirection — never in the payload or argv) is passed via `--mcp-config`; Given the generic runner, Then MCP is documented unsupported and the step proceeds without it (no silent pretend).
 Test expectations: config-generation unit tests (secret-free payload assertion), spike findings note.
 Size: S (spike + one task). INVEST: ✓ with a note — value hinges on A13; the spike de-risks it. DoR: READY for the spike; T1 HOLD until spike GO + A13 confirmed.
-- **G1-3-T0** (Hat: PREPARATORY (SPIKE, timebox S), Opus — judgment): validate claude CLI MCP flags/config format headlessly on the dev host; deliverable: findings + go/no-go for T1. Pull Gate: G1-2-T1 landed + suite green. Unblocks G1-3-T1.
-- **G1-3-T1** (FEATURE, Sonnet): implement per spike; docs for generic runner. Pull Gate: spike GO. Unblocks G1-4. END OF STORY.
+- **G1-3-T0** (Hat: PREPARATORY (SPIKE, timebox S), Opus — judgment): validate claude CLI MCP flags/config format headlessly on the dev host; deliverable: findings + go/no-go for T1. Pull Gate: G1-2-T1 landed + suite green. Unblocks G1-3-T1. **DONE 2026-07-13 — GO** (`state/spike-g1-3-mcp-config.md`, ~$0.08 spend; A13 confirmed; the two silent-degradation traps found — unset `${VAR}` passthrough, broken-server silent no-tools — are promoted to T1 ACs).
+- **G1-3-T1** (FEATURE, Sonnet): implement per spike; docs for generic runner. Pull Gate: spike GO ✓ (READY). Unblocks G1-4 (already done 2026-07-13). END OF STORY.
 
 **G1-4 — Remaining parity bundle.** (traces: 1.7 minus startedAt (done in G1-1-T4); Priority **M** — gap file itself rates these "polish (bundle with above)")
 AC (three independent blocks): fallback-agent escalation applies to daemon terminal failures via the Finalizer (same rules as HTTP, dispatch.ts:537-558 per gap — ASSUMED refs); `agent.maxConcurrent` enforced at daemon lease time; projectMode instructions/outputFormat included in payload composition (payload addition — optional fields, no version bump).
