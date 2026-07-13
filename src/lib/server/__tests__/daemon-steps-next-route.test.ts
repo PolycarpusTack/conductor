@@ -18,6 +18,7 @@ const mockStepFindFirst = mock(() => Promise.resolve(null)) as any
 const mockTaskFindUnique = mock(() => Promise.resolve(null)) as any
 const mockStepEventFindFirst = mock(() => Promise.resolve(null)) as any
 const mockStepEventCreate = mock(() => Promise.resolve({ id: 'evt-1' })) as any
+const mockProjectModeFindFirst = mock(() => Promise.resolve(null)) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -32,7 +33,7 @@ mock.module('@/lib/db', () => ({
       findUnique: mockTaskFindUnique,
     },
     // G1-1-T3: buildResolvedPrompt reads the project mode for label/instructions.
-    projectMode: { findFirst: () => Promise.resolve(null) },
+    projectMode: { findFirst: mockProjectModeFindFirst },
     // G1-1-T4: the poll route creates the StepExecution row for the attempt.
     stepExecution: {
       findFirst: () => Promise.resolve(null),
@@ -128,6 +129,8 @@ beforeEach(() => {
   mockStepEventFindFirst.mockResolvedValue(null)
   mockStepEventCreate.mockReset()
   mockStepEventCreate.mockResolvedValue({ id: 'evt-1' })
+  mockProjectModeFindFirst.mockReset()
+  mockProjectModeFindFirst.mockResolvedValue(null)
   mockResolveDaemonByToken.mockReset()
   mockResolveDaemonByToken.mockResolvedValue(DAEMON)
   mockExtractDaemonToken.mockReset()
@@ -185,6 +188,48 @@ describe('GET /api/daemon/steps/next — execution payload contract', () => {
     mockStepFindFirst.mockResolvedValue(leasedStep({ rejectionNote: null }))
     body = await (await GET(makeRequest(), params)).json()
     expect(body.step.rejectionNote).toBeNull()
+  })
+
+  // G1-4 (gap 1.7): the payload carries the SERVER-LAYERED mode instructions —
+  // agent-mode override || projectMode.instructions, plus the output-format
+  // hint — the same layer the HTTP path computes in buildResolvedPrompt.
+  test('carries layered modeInstructions: agent-mode override wins, format hint appended', async () => {
+    mockProjectModeFindFirst.mockResolvedValue({
+      label: 'Develop',
+      instructions: 'Follow the project dev guide.',
+      outputFormat: 'markdown',
+      toolAllowlist: null,
+    })
+    const body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.modeInstructions).toBe(
+      'Write production-grade code.\nRespond in markdown format.',
+    )
+    expect(validateExecutionPayload(body.step)).toEqual([])
+  })
+
+  test('projectMode instructions reach the daemon when the agent has no mode override', async () => {
+    const step = leasedStep()
+    step.agent.modeInstructions = null as unknown as string
+    mockStepFindFirst.mockResolvedValue(step)
+    mockProjectModeFindFirst.mockResolvedValue({
+      label: 'Develop',
+      instructions: 'Follow the project dev guide.',
+      outputFormat: 'json',
+      toolAllowlist: null,
+    })
+    const body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.modeInstructions).toBe(
+      'Follow the project dev guide.\nRespond in json format.',
+    )
+  })
+
+  test('modeInstructions is null when neither layer exists', async () => {
+    const step = leasedStep()
+    step.agent.modeInstructions = null as unknown as string
+    mockStepFindFirst.mockResolvedValue(step)
+    const body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.modeInstructions).toBeNull()
+    expect(validateExecutionPayload(body.step)).toEqual([])
   })
 
   // G1-1-T3 (gap 1.1): prompt tokens are resolved server-side — the daemon must

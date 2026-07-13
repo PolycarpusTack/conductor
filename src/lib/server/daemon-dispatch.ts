@@ -129,6 +129,7 @@ export async function dispatchStepToDaemon(
       leasedAt: true,
       agent: {
         select: {
+          maxConcurrent: true,
           runtime: { select: { adapter: true } },
         },
       },
@@ -171,6 +172,22 @@ export async function dispatchStepToDaemon(
       },
     })
     return { dispatched: false, error }
+  }
+
+  // G1-4: enforce agent.maxConcurrent at lease time — HTTP parity with
+  // prepareDispatch (dispatch.ts), which runs the same count and demotes when
+  // the agent is at cap. Other active steps of this agent include those
+  // currently executing on daemons; demoting this one to pending (lease
+  // cleared) lets the activation query re-offer it once a slot frees.
+  const activeCount = await db.taskStep.count({
+    where: { agentId: step.agentId, status: 'active', id: { not: stepId } },
+  })
+  if (activeCount >= (step.agent?.maxConcurrent ?? 1)) {
+    await db.taskStep.update({
+      where: { id: stepId },
+      data: { status: 'pending', leasedBy: null, leasedAt: null },
+    })
+    return { dispatched: false, error: 'Agent is at max concurrency' }
   }
 
   const runtime = await resolveRuntime(step.taskId, step.agent?.runtime?.adapter)

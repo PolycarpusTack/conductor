@@ -91,12 +91,22 @@ mock.module('@/lib/db', () => ({
     taskStep: {
       findMany: mockTaskStepFindMany,
       updateMany: mockTaskStepUpdateMany,
+      // G1-4: dispatchStepToDaemon counts the agent's other active steps for
+      // the maxConcurrent gate before leasing.
+      count: mock(async ({ where }: any) =>
+        steps.filter(
+          (s) =>
+            (where.agentId === undefined || s.agentId === where.agentId) &&
+            (where.status === undefined || s.status === where.status) &&
+            (where.id?.not === undefined || s.id !== where.id.not),
+        ).length,
+      ) as any,
       findUnique: mock(async ({ where }: any) => {
         const s = steps.find((x) => x.id === where.id)
         if (!s) return null
         return {
           ...s,
-          agent: { runtime: { adapter: 'anthropic' } },
+          agent: { maxConcurrent: 1, runtime: { adapter: 'anthropic' } },
           task: { projectId: 'proj-1', project: { workspaceId: 'ws-1' } },
         }
       }) as any,

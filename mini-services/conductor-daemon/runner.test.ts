@@ -197,6 +197,30 @@ describe('composeSystemPrompt / composeInstructions', () => {
   test('no rejection block when there is no note', () => {
     expect(composeInstructions(payload())).not.toContain('HUMAN FEEDBACK')
   })
+
+  // G1-4: a present top-level modeInstructions field is the server-layered
+  // string (agent-mode override || projectMode.instructions, + format hint)
+  // and is authoritative — the legacy agent-record parse must not run.
+  test('server-layered modeInstructions win over the agent record when present', () => {
+    const text = composeSystemPrompt(payload({
+      modeInstructions: 'Follow the project dev guide.\nRespond in markdown format.',
+    }))
+    expect(text).toContain('You are Builder')
+    expect(text).toContain('Follow the project dev guide.')
+    expect(text).toContain('Respond in markdown format.')
+    // The agent-record value for this mode must NOT be duplicated in.
+    expect(text).not.toContain('Write production-grade code.')
+  })
+
+  test('a present-but-null modeInstructions means "none" — legacy parse is skipped', () => {
+    const text = composeSystemPrompt(payload({ modeInstructions: null }))
+    expect(text).toBe('You are Builder, a careful engineer.')
+  })
+
+  test('an absent modeInstructions field falls back to the legacy agent-record parse', () => {
+    const text = composeSystemPrompt(payload()) // helper has no top-level field
+    expect(text).toContain('Write production-grade code.')
+  })
 })
 
 describe('resolveRunnerKind', () => {
@@ -259,6 +283,14 @@ describe('validateExecutionPayload', () => {
     expect(validateExecutionPayload(payload({ rejectionNote: 'address this' }))).toEqual([])
     expect(validateExecutionPayload(payload({ rejectionNote: 7 as unknown as string })).join(' '))
       .toContain('rejectionNote')
+  })
+
+  test('accepts an absent/null/string modeInstructions, rejects a non-string (G1-4)', () => {
+    expect(validateExecutionPayload(payload({ modeInstructions: undefined }))).toEqual([])
+    expect(validateExecutionPayload(payload({ modeInstructions: null }))).toEqual([])
+    expect(validateExecutionPayload(payload({ modeInstructions: 'Respond in json format.' }))).toEqual([])
+    expect(validateExecutionPayload(payload({ modeInstructions: 7 as unknown as string })).join(' '))
+      .toContain('modeInstructions')
   })
 })
 

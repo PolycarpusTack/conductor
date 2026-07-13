@@ -11,6 +11,28 @@ export async function createExecution(stepId: string, attempt: number) {
   })
 }
 
+/**
+ * Find the StepExecution row for the CURRENT run of a step, or create one.
+ *
+ * The daemon path derives attempt numbers from `step.attempts + 1`, which
+ * restarts at 1 after a fallback-agent escalation resets `attempts` — but the
+ * failed agent's terminal rows survive under those same attempt numbers.
+ * Looking a row up by attempt number would resurrect a terminal row and
+ * overwrite its recorded outcome (a failed attempt silently becoming a
+ * success), so only a still-`running` latest row is ever reused; anything
+ * else allocates a fresh row past the highest existing attempt (mirrors the
+ * HTTP path's allocateExecution, which never reuses rows either).
+ */
+export async function findOrCreateRunningExecution(stepId: string, minAttempt: number) {
+  const latest = await db.stepExecution.findFirst({
+    where: { stepId },
+    orderBy: { attempt: 'desc' },
+    select: { id: true, attempt: true, status: true },
+  })
+  if (latest?.status === 'running') return latest
+  return createExecution(stepId, Math.max((latest?.attempt ?? 0) + 1, minAttempt))
+}
+
 export async function succeedExecution(
   executionId: string,
   output: string,

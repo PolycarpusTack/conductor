@@ -5,7 +5,7 @@ import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { resolveRuntime } from '@/lib/server/daemon-dispatch'
 import { buildResolvedPrompt } from '@/lib/server/dispatch'
-import { createExecution } from '@/lib/server/execution-log'
+import { findOrCreateRunningExecution } from '@/lib/server/execution-log'
 import { parseSessionPolicy, sessionKeyForStep, resolveCommandTemplate } from '@/lib/server/session-policy'
 import { appendStepEvent } from '@/lib/server/step-events'
 
@@ -161,15 +161,13 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
 
       // G1-1-T4: create the StepExecution row for this attempt so the daemon
       // path records cost and binds budgets like the HTTP path (closes TD-018b).
-      // Deduped by the same started-once-per-lease guard, with a belt-and-braces
-      // (stepId, attempt) check. startedAt on the first attempt = parity with
+      // Deduped by the same started-once-per-lease guard plus a belt-and-braces
+      // still-running check. G1-4: allocated past the highest existing attempt,
+      // never looked up by attempt number — after a fallback escalation resets
+      // `attempts`, the failed agent's terminal rows occupy the low numbers and
+      // must not be resurrected. startedAt on the first attempt = parity with
       // executeDispatch (closes the startedAt part of gap 1.7).
-      const attempt = step.attempts + 1
-      const existingExecution = await db.stepExecution.findFirst({
-        where: { stepId: step.id, attempt },
-        select: { id: true },
-      })
-      if (!existingExecution) await createExecution(step.id, attempt)
+      await findOrCreateRunningExecution(step.id, step.attempts + 1)
       if (step.attempts === 0) {
         await db.taskStep.updateMany({
           where: { id: step.id, status: 'active' },
@@ -193,6 +191,12 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         // G1-2: reviewer's rejection note (raw human text, like the HTTP path)
         // so a rewound daemon step can actually address the feedback (gap 1.3).
         rejectionNote: step.rejectionNote ?? null,
+        // G1-4 (gap 1.7): the SERVER-LAYERED mode instructions for this step's
+        // mode — agent-mode override || projectMode.instructions, plus the
+        // output-format hint — exactly the layer buildResolvedPrompt computes
+        // for the HTTP path. The daemon prefers this over its legacy parse of
+        // agent.modeInstructions (which never carried the projectMode layer).
+        modeInstructions: resolved?.modeInstructions || null,
         timeoutMs: step.timeoutMs,
         retryDelayMs: step.retryDelayMs,
         maxRetries: step.maxRetries,

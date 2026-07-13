@@ -8,7 +8,7 @@ import { MAX_OUTPUT_CHARS } from '@/lib/server/constants'
 import { stepArtifactSchema } from '@/lib/server/contracts'
 import { extractDaemonToken, resolveDaemonByToken } from '@/lib/server/daemon-auth'
 import { advanceChain, finalizeStepFailure } from '@/lib/server/dispatch'
-import { createExecution, succeedExecution } from '@/lib/server/execution-log'
+import { findOrCreateRunningExecution, succeedExecution } from '@/lib/server/execution-log'
 import { getLogger } from '@/lib/server/logger'
 import { broadcastProjectEvent } from '@/lib/server/realtime'
 import { appendStepEvent } from '@/lib/server/step-events'
@@ -120,14 +120,12 @@ export const POST = withErrorHandling('api/daemon/steps', async (request: Reques
     // G1-1-T4: the StepExecution row for this attempt is created at poll time
     // (steps/next). Find it — or create it defensively — so both completion paths
     // finalize a real execution row and daemon spend binds budgets (TD-018b).
+    // G1-4: looked up as "the latest row iff still running", never by attempt
+    // number — after a fallback escalation resets `attempts`, the failed
+    // agent's terminal rows occupy the low attempt numbers and must not be
+    // resurrected.
     const attemptNumber = step.attempts + 1
-    const findOrCreateExecution = async () => {
-      const existing = await db.stepExecution.findFirst({
-        where: { stepId, attempt: attemptNumber },
-        select: { id: true },
-      })
-      return existing ?? (await createExecution(stepId, attemptNumber))
-    }
+    const findOrCreateExecution = () => findOrCreateRunningExecution(stepId, attemptNumber)
 
     // Cost/turns ride the daemon's 'claude run metadata' json artifact
     // (mini-services/conductor-daemon/evidence.ts). Lift total_cost_usd into

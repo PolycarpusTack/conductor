@@ -295,6 +295,76 @@ describe('POST /api/daemon/steps — step events', () => {
   })
 })
 
+// G1-4 block 1: fallback-agent escalation fires for daemon terminal failures
+// via the same Finalizer branch the HTTP path uses (dispatch.ts fallback rules).
+describe('POST /api/daemon/steps — fallback escalation (G1-4)', () => {
+  test('exhausted retries with a fallback agent reassign the step instead of dead-lettering', async () => {
+    mockStepFindUnique.mockResolvedValue({
+      ...LEASED_STEP,
+      attempts: 2, // next attempt = 3 = maxRetries+1 → terminal
+      fallbackAgentId: 'agent-fb',
+    })
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom', willRetry: false }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(mockDeadLetterCreate).not.toHaveBeenCalled()
+    expect(mockNotificationCreate).not.toHaveBeenCalled()
+    const reassignment = mockStepUpdate.mock.calls.find(
+      (c: any[]) => c[0].data.agentId === 'agent-fb',
+    )
+    expect(reassignment).toBeDefined()
+    expect(reassignment[0].data.status).toBe('active')
+    expect(reassignment[0].data.attempts).toBe(0)
+    expect(reassignment[0].data.leasedBy).toBeNull()
+  })
+
+  test('exhausted retries with fallback === current agent still dead-letter (no self-fallback loop)', async () => {
+    mockStepFindUnique.mockResolvedValue({
+      ...LEASED_STEP,
+      attempts: 2,
+      fallbackAgentId: 'agent-1', // same as step.agentId
+    })
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'fail', error: 'boom' }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(mockDeadLetterCreate).toHaveBeenCalledTimes(1)
+  })
+})
+
+// G1-4 block 1: after a fallback escalation resets step.attempts, the failed
+// agent's terminal StepExecution rows occupy the low attempt numbers — the
+// completion path must allocate PAST them, never resurrect one.
+describe('POST /api/daemon/steps — execution-row allocation (G1-4)', () => {
+  test('a terminal latest row is never reused: a fresh row past it is allocated', async () => {
+    // Post-fallback state: attempts reset to 0, but attempt-3 row (failed) survives.
+    mockExecFindFirst.mockResolvedValue({ id: 'exec-old', attempt: 3, status: 'failed' })
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done' }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(mockExecCreate).toHaveBeenCalledTimes(1)
+    expect(mockExecCreate.mock.calls[0][0].data.attempt).toBe(4)
+    // The finalized row is the new one, not the resurrected terminal row.
+    expect(mockExecUpdate.mock.calls[0][0].where.id).toBe('exec-1')
+  })
+
+  test('a still-running latest row is reused (the row created at poll time)', async () => {
+    mockExecFindFirst.mockResolvedValue({ id: 'exec-run', attempt: 2, status: 'running' })
+    const res = await POST(
+      makeRequest({ stepId: 'step-1', action: 'complete', output: 'done' }),
+      params,
+    )
+    expect(res.status).toBe(200)
+    expect(mockExecCreate).not.toHaveBeenCalled()
+    expect(mockExecUpdate.mock.calls[0][0].where.id).toBe('exec-run')
+  })
+})
+
 describe('POST /api/daemon/steps — evidence artifacts (A-3)', () => {
   const gitArtifact = {
     type: 'diff',

@@ -1,13 +1,21 @@
 # CONTRACT SNAPSHOT: Daemon Execution Payload
 
 Version: 2 (`payloadVersion: 2`)
-Date: 2026-07-11 (G1-1-T3)
+Date: 2026-07-13 (G1-4)
 History: v1 2026-07-03 (A-1; cwd/policy A-2; streaming + evidence artifacts A-3).
 **v2 (G1-1-T3):** `instructions` and `agent.systemPrompt` now arrive **server-
 resolved** — `resolvePrompt` runs on the server (via `dispatch.buildResolvedPrompt`,
 the same resolver the HTTP path uses), so the daemon never receives a literal
 `{{task.title}}`/`{{memory.recent}}` token (gap 1.1). New field **`previousOutput:
 string | null`** carries the prior step's output for chain context (gap 1.2).
+**G1-4 (optional field, no version bump):** top-level **`modeInstructions:
+string | null`** — the SERVER-LAYERED mode-instruction string for this step's
+mode (agent-mode override `||` projectMode.instructions, plus the projectMode
+output-format hint), i.e. exactly the layer `buildResolvedPrompt` computes for
+the HTTP path. When the field is present it is authoritative — the daemon's
+`composeSystemPrompt` uses it and skips its legacy client-side parse of
+`agent.modeInstructions` (which never carried the projectMode layer); the field
+absent means an older server, and the legacy parse still applies.
 
 ## Public Interface
 
@@ -25,6 +33,7 @@ interface ExecutionPayload {
   instructions: string | null  // step instructions, SERVER-RESOLVED (v2) — stdin prose, NEVER shell/argv
   previousOutput: string | null// prior step's output (v2) — chain context, stdin prose
   rejectionNote: string | null // reviewer feedback on a rewound re-run (v2, G1-2) — raw human text
+  modeInstructions: string | null // SERVER-LAYERED mode instructions (G1-4) — see header note
   timeoutMs: number | null     // daemon kills the child after this (default 300000)
   retryDelayMs: number | null
   maxRetries: number | null

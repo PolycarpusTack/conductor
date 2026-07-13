@@ -50,6 +50,11 @@ export interface ExecutionPayload {
   previousOutput?: string | null
   /** Reviewer's rejection note (v2) — human feedback for a rewound re-run. */
   rejectionNote?: string | null
+  /** SERVER-LAYERED mode instructions (G1-4): agent-mode override ||
+   *  projectMode.instructions, plus the output-format hint — the same layer
+   *  the HTTP path computes. When the field is present it is authoritative;
+   *  absent (older server) → legacy client-side agent.modeInstructions parse. */
+  modeInstructions?: string | null
   /** 1-based attempt number (used to label the rejection feedback). */
   attempt?: number
   timeoutMs: number | null
@@ -91,6 +96,9 @@ export function validateExecutionPayload(value: unknown): string[] {
   }
   if (p.rejectionNote !== undefined && p.rejectionNote !== null && typeof p.rejectionNote !== 'string') {
     problems.push('rejectionNote must be a string, null, or absent')
+  }
+  if (p.modeInstructions !== undefined && p.modeInstructions !== null && typeof p.modeInstructions !== 'string') {
+    problems.push('modeInstructions must be a string, null, or absent')
   }
   const session = p.session as Record<string, unknown> | null | undefined
   if (typeof session !== 'object' || session === null) {
@@ -173,11 +181,19 @@ export function commandToArgv(command: string): string[] {
 // Payload composition
 // ---------------------------------------------------------------------------
 
-/** agent.systemPrompt + modeInstructions[step.mode] (matches HTTP dispatch layering). */
+/** agent.systemPrompt + the mode-instruction layer (matches HTTP dispatch layering). */
 export function composeSystemPrompt(payload: ExecutionPayload): string {
   const parts: string[] = []
   if (payload.agent?.systemPrompt) parts.push(payload.agent.systemPrompt)
-  if (payload.agent?.modeInstructions) {
+  if (payload.modeInstructions !== undefined) {
+    // G1-4: the server ships the layered mode instructions for THIS step's
+    // mode (agent-mode override || projectMode.instructions, + output-format
+    // hint). A present field is authoritative — even when null/empty, which
+    // means "this step has no mode instructions".
+    if (payload.modeInstructions?.trim()) parts.push(payload.modeInstructions)
+  } else if (payload.agent?.modeInstructions) {
+    // Older server (field absent): legacy client-side parse of the raw
+    // agent-level record — projectMode instructions are unavailable here.
     try {
       const byMode = JSON.parse(payload.agent.modeInstructions) as Record<string, string>
       const forMode = byMode?.[payload.mode]
