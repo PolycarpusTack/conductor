@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { requireAdminSession } from '@/lib/server/admin-session'
 import { badRequest, withErrorHandling } from '@/lib/server/api-errors'
 import { createSkillSchema } from '@/lib/server/contracts'
+import { embedSkillForStorage } from '@/lib/server/skill-embedding'
 import { requireWorkspaceId } from '@/lib/server/workspace'
 
 export const GET = withErrorHandling('api/skills', async (request: Request) => {
@@ -74,6 +75,10 @@ export const POST = withErrorHandling('api/skills', async (request: Request) => 
   const { title, description, body, tags, sourceTaskId, workspaceId: reqWsId } = parsed.data
   const workspaceId = await requireWorkspaceId(reqWsId)
 
+  // G3-2 (gap 1.14): embed on save so semantic search has rows to search.
+  // Best-effort — a missing key or API error stores null and text search covers.
+  const embedding = await embedSkillForStorage({ title, description, body })
+
   const skill = await db.skill.create({
     data: {
       id: randomUUID(),
@@ -84,6 +89,7 @@ export const POST = withErrorHandling('api/skills', async (request: Request) => 
       tags: tags ? JSON.stringify(tags) : null,
       sourceTaskId,
       version: 1,
+      embedding,
     },
   })
 
