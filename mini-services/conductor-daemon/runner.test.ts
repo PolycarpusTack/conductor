@@ -8,11 +8,13 @@ import {
   buildClaudeSpawnSpec,
   buildEchoSpawnSpec,
   buildTemplateSpawnSpec,
+  collectMcpEnvRefs,
   commandToArgv,
   composeInstructions,
   composeSystemPrompt,
   interpretResult,
   mapStepModeToPermissionMode,
+  parseClaudeInitMcpServers,
   parseClaudeResultLine,
   resolveRunnerKind,
   runSpawnSpec,
@@ -291,6 +293,101 @@ describe('validateExecutionPayload', () => {
     expect(validateExecutionPayload(payload({ modeInstructions: 'Respond in json format.' }))).toEqual([])
     expect(validateExecutionPayload(payload({ modeInstructions: 7 as unknown as string })).join(' '))
       .toContain('modeInstructions')
+  })
+
+  test('accepts an absent/null/well-formed mcp block, rejects malformed ones (G1-3)', () => {
+    expect(validateExecutionPayload(payload({ mcp: undefined }))).toEqual([])
+    expect(validateExecutionPayload(payload({ mcp: null }))).toEqual([])
+    expect(validateExecutionPayload(payload({ mcp: { servers: {}, configError: null } }))).toEqual([])
+    expect(validateExecutionPayload(payload({ mcp: { servers: { gh: { type: 'http', url: 'https://x/mcp' } }, configError: 'boom' } }))).toEqual([])
+    expect(validateExecutionPayload(payload({ mcp: { servers: 'nope' } as unknown as ExecutionPayload['mcp'] })).join(' '))
+      .toContain('mcp.servers')
+    expect(validateExecutionPayload(payload({ mcp: { servers: {}, configError: 7 } as unknown as ExecutionPayload['mcp'] })).join(' '))
+      .toContain('mcp.configError')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// MCP config delivery (G1-3, claude runner only)
+// ---------------------------------------------------------------------------
+
+describe('MCP via --mcp-config (G1-3)', () => {
+  const MCP_SERVERS = {
+    gh: { type: 'http', url: 'https://mcp.example.com/mcp', headers: { Authorization: 'Bearer ${RUNNER_TEST_MCP_TOKEN}' } },
+  }
+
+  test('collectMcpEnvRefs finds every ${VAR} across urls and headers', () => {
+    expect(collectMcpEnvRefs({
+      a: { url: 'https://x/${PATH_VAR}/mcp', headers: { Authorization: 'Bearer ${TOK_A}', 'X-Two': '${TOK_A}+${TOK_B}' } },
+      b: { url: 'https://y/mcp' },
+    }).sort()).toEqual(['PATH_VAR', 'TOK_A', 'TOK_B'])
+  })
+
+  test('spawn spec writes the mcpServers temp file and passes the flags', () => {
+    process.env.RUNNER_TEST_MCP_TOKEN = 'set-for-test'
+    try {
+      const spec = buildClaudeSpawnSpec(payload({ mcp: { servers: MCP_SERVERS, configError: null } }), { tempDir: TEST_WORKSPACE })
+      const file = argAfter(spec, '--mcp-config')
+      expect(file).toBeDefined()
+      expect(spec.argv).toContain('--strict-mcp-config')
+      // The agent must be able to CALL the promised tools in -p mode.
+      const allowedIdx = spec.argv.indexOf('--allowedTools')
+      expect(spec.argv[allowedIdx + 1]).toBe('mcp__gh__*')
+      // The file is the exact fragment under the standard mcpServers key —
+      // env references verbatim (expansion is the CLI's job, on ITS env).
+      expect(JSON.parse(readFileSync(file!, 'utf8'))).toEqual({ mcpServers: MCP_SERVERS })
+      spec.cleanup()
+      expect(existsSync(file!)).toBe(false)
+    } finally {
+      delete process.env.RUNNER_TEST_MCP_TOKEN
+    }
+  })
+
+  test('an unset referenced env var fails loudly BEFORE anything spawns', () => {
+    delete process.env.RUNNER_TEST_MCP_TOKEN
+    expect(() =>
+      buildClaudeSpawnSpec(payload({ mcp: { servers: MCP_SERVERS, configError: null } }), { tempDir: TEST_WORKSPACE }),
+    ).toThrow(/RUNNER_TEST_MCP_TOKEN/)
+  })
+
+  test('no mcp block → no mcp flags (unchanged invocation)', () => {
+    const spec = buildClaudeSpawnSpec(payload(), { tempDir: TEST_WORKSPACE })
+    expect(spec.argv).not.toContain('--mcp-config')
+    expect(spec.argv).not.toContain('--strict-mcp-config')
+  })
+
+  test('parseClaudeInitMcpServers reads the init event statuses', () => {
+    const stdout = [
+      JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'gh', status: 'failed' }, { name: 'ok', status: 'pending' }] }),
+      JSON.stringify({ type: 'result', is_error: false, result: 'done' }),
+    ].join('\n')
+    expect(parseClaudeInitMcpServers(stdout)).toEqual([
+      { name: 'gh', status: 'failed' },
+      { name: 'ok', status: 'pending' },
+    ])
+    expect(parseClaudeInitMcpServers('no init here')).toBeNull()
+  })
+
+  test('an expected server with init status "failed" fails the step even on a clean exit', () => {
+    const stdout = [
+      JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'gh', status: 'failed' }] }),
+      JSON.stringify({ type: 'result', is_error: false, result: 'looks fine' }),
+    ].join('\n')
+    const outcome = interpretResult('claude', { exitCode: 0, stdout, stderr: '', timedOut: false }, { expectedMcpServers: ['gh'] })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.error).toContain('gh')
+    expect(outcome.error).toContain('promised')
+  })
+
+  test('"pending" at init is healthy; missing init line is tolerated', () => {
+    const pending = [
+      JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: [{ name: 'gh', status: 'pending' }] }),
+      JSON.stringify({ type: 'result', is_error: false, result: 'done' }),
+    ].join('\n')
+    expect(interpretResult('claude', { exitCode: 0, stdout: pending, stderr: '', timedOut: false }, { expectedMcpServers: ['gh'] }).ok).toBe(true)
+
+    const noInit = JSON.stringify({ type: 'result', is_error: false, result: 'done' })
+    expect(interpretResult('claude', { exitCode: 0, stdout: noInit, stderr: '', timedOut: false }, { expectedMcpServers: ['gh'] }).ok).toBe(true)
   })
 })
 

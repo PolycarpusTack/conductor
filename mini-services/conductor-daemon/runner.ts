@@ -55,6 +55,15 @@ export interface ExecutionPayload {
    *  the HTTP path computes. When the field is present it is authoritative;
    *  absent (older server) → legacy client-side agent.modeInstructions parse. */
   modeInstructions?: string | null
+  /** MCP servers for the spawned CLI (G1-3, claude runner only). `servers` is
+   *  a claude `mcpServers` config fragment: URLs + header templates whose
+   *  secrets are `${ENV_VAR}` references expanded by the CLI from THIS
+   *  daemon's environment — values never ride the payload. `configError` set
+   *  → fail the step, never spawn (same contract as session.commandError). */
+  mcp?: {
+    servers: Record<string, { type: string; url: string; headers?: Record<string, string> }>
+    configError?: string | null
+  } | null
   /** 1-based attempt number (used to label the rejection feedback). */
   attempt?: number
   timeoutMs: number | null
@@ -99,6 +108,19 @@ export function validateExecutionPayload(value: unknown): string[] {
   }
   if (p.modeInstructions !== undefined && p.modeInstructions !== null && typeof p.modeInstructions !== 'string') {
     problems.push('modeInstructions must be a string, null, or absent')
+  }
+  if (p.mcp !== undefined && p.mcp !== null) {
+    const mcp = p.mcp as Record<string, unknown>
+    if (typeof mcp !== 'object' || Array.isArray(mcp)) {
+      problems.push('mcp must be an object, null, or absent')
+    } else {
+      if (typeof mcp.servers !== 'object' || mcp.servers === null || Array.isArray(mcp.servers)) {
+        problems.push('mcp.servers must be an object')
+      }
+      if (mcp.configError !== undefined && mcp.configError !== null && typeof mcp.configError !== 'string') {
+        problems.push('mcp.configError must be a string, null, or absent')
+      }
+    }
   }
   const session = p.session as Record<string, unknown> | null | undefined
   if (typeof session !== 'object' || session === null) {
@@ -286,6 +308,19 @@ export interface ClaudeRunnerOptions {
 
 const SYSTEM_PROMPT_ARG_LIMIT_BYTES = 8 * 1024
 
+const ENV_REF_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g
+
+/** Every `${ENV_VAR}` name referenced anywhere in the MCP server fragment. */
+export function collectMcpEnvRefs(servers: Record<string, { url: string; headers?: Record<string, string> }>): string[] {
+  const refs = new Set<string>()
+  for (const server of Object.values(servers)) {
+    for (const value of [server.url, ...Object.values(server.headers ?? {})]) {
+      for (const match of value.matchAll(ENV_REF_PATTERN)) refs.add(match[1])
+    }
+  }
+  return [...refs]
+}
+
 export function buildClaudeSpawnSpec(payload: ExecutionPayload, opts: ClaudeRunnerOptions = {}): SpawnSpec {
   const binArgv = opts.binArgv ?? ['claude']
   const maxTurns = opts.maxTurns ?? 30
@@ -313,6 +348,32 @@ export function buildClaudeSpawnSpec(payload: ExecutionPayload, opts: ClaudeRunn
       tempFiles.push(file)
       args.push('--append-system-prompt-file', file)
     }
+  }
+
+  // G1-3 (gap 1.6): MCP servers → temp config file + --mcp-config. Two loud
+  // guards from spike G1-3-T0 §2.4: (1) the CLI passes an UNSET ${VAR} through
+  // as a literal silently, so every referenced env var must exist in this
+  // daemon's environment BEFORE anything spawns; (2) --strict-mcp-config is
+  // mandatory so a step never silently inherits the daemon host user's own
+  // MCP servers.
+  const mcpServers = payload.mcp?.servers ?? null
+  if (mcpServers && Object.keys(mcpServers).length > 0) {
+    const missing = collectMcpEnvRefs(mcpServers).filter(name => !process.env[name])
+    if (missing.length > 0) {
+      throw new Error(
+        `mcp env vars not set on this daemon host: ${missing.join(', ')} — ` +
+          'set them in the daemon environment (secrets ride env indirection, never the payload)',
+      )
+    }
+    const dir = opts.tempDir ?? tmpdir()
+    mkdirSync(dir, { recursive: true })
+    const mcpFile = join(dir, `conductor-mcp-${payload.id}-${randomUUID()}.json`)
+    writeFileSync(mcpFile, JSON.stringify({ mcpServers }), 'utf8')
+    tempFiles.push(mcpFile)
+    args.push('--mcp-config', mcpFile, '--strict-mcp-config')
+    // In -p mode an unlisted tool is silently denied — allowlist each shipped
+    // server's tools or the agent is promised tools it can never call.
+    args.push('--allowedTools', ...Object.keys(mcpServers).map(name => `mcp__${name}__*`))
   }
 
   if (payload.agent?.runtimeModel) args.push('--model', payload.agent.runtimeModel)
@@ -508,6 +569,28 @@ export interface ClaudeResultLine {
   numTurns?: number
 }
 
+/**
+ * MCP server statuses from the first `system:init` NDJSON line (G1-3).
+ * Returns null when no init line is found — enrichment, not a contract.
+ */
+export function parseClaudeInitMcpServers(stdout: string): Array<{ name: string; status: string }> | null {
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line.startsWith('{')) continue
+    try {
+      const obj = JSON.parse(line) as Record<string, unknown>
+      if (obj.type !== 'system' || obj.subtype !== 'init') continue
+      if (!Array.isArray(obj.mcp_servers)) return []
+      return (obj.mcp_servers as Array<Record<string, unknown>>)
+        .filter(s => typeof s?.name === 'string' && typeof s?.status === 'string')
+        .map(s => ({ name: s.name as string, status: s.status as string }))
+    } catch {
+      continue
+    }
+  }
+  return null
+}
+
 /** Last `"type":"result"` NDJSON line on stdout — the authoritative outcome. */
 export function parseClaudeResultLine(stdout: string): ClaudeResultLine | null {
   const lines = stdout.split(/\r?\n/)
@@ -545,13 +628,27 @@ export interface StepRunOutcome {
 
 const TAIL_CHARS = 500
 
+export interface InterpretOptions {
+  /**
+   * MCP server names the payload promised the step (G1-3). A broken server
+   * does NOT fail the claude run (spike §2.4 — it silently proceeds with no
+   * tools), so the init event's per-server status is checked here: any
+   * expected server reporting "failed" fails the step. "pending" at init is
+   * healthy (init fires before slow handshakes finish); a missing init line
+   * is tolerated (enrichment, not a contract).
+   */
+  expectedMcpServers?: string[]
+}
+
 /**
  * Failure semantics:
  *   - non-zero exit (incl. 124 timeout, 127 spawn error) → failure with stderr tail
  *   - claude runner: no final result line → failure; `is_error: true` → failure
  *     even on exit 0 (spike finding — exit code alone is not authoritative)
+ *   - claude runner: an expected MCP server with init status "failed" → failure
+ *     even on a successful run (the agent was promised those tools)
  */
-export function interpretResult(kind: RunnerKind, proc: ProcessResult): StepRunOutcome {
+export function interpretResult(kind: RunnerKind, proc: ProcessResult, opts: InterpretOptions = {}): StepRunOutcome {
   const tail = (proc.stderr.trim() || proc.stdout.trim()).slice(-TAIL_CHARS)
 
   if (proc.exitCode !== 0) {
@@ -584,6 +681,21 @@ export function interpretResult(kind: RunnerKind, proc: ProcessResult): StepRunO
         output: proc.stdout,
         error: `claude reported is_error=true (${line.subtype ?? 'error'}): ${detail}`,
         claude: line,
+      }
+    }
+    if (opts.expectedMcpServers && opts.expectedMcpServers.length > 0) {
+      const statuses = parseClaudeInitMcpServers(proc.stdout)
+      const failed = (statuses ?? [])
+        .filter(s => opts.expectedMcpServers!.includes(s.name) && s.status === 'failed')
+        .map(s => s.name)
+      if (failed.length > 0) {
+        return {
+          ok: false,
+          exitCode: proc.exitCode,
+          output: proc.stdout,
+          error: `mcp server(s) failed to start: ${failed.join(', ')} — the step was promised these tools`,
+          claude: line,
+        }
       }
     }
     return { ok: true, exitCode: proc.exitCode, output: line.result ?? '', error: null, claude: line }

@@ -16,6 +16,18 @@ the HTTP path. When the field is present it is authoritative — the daemon's
 `composeSystemPrompt` uses it and skips its legacy client-side parse of
 `agent.modeInstructions` (which never carried the projectMode layer); the field
 absent means an older server, and the legacy parse still applies.
+**G1-3 (optional field, no version bump):** top-level **`mcp: { servers,
+configError } | null`** — sanitized MCP servers for the claude runner
+(`src/lib/server/daemon-mcp-config.ts`, per spike `spike-g1-3-mcp-config.md`).
+`servers` is a claude `mcpServers` config fragment (http URLs + header
+templates; secrets are `${ENV_VAR}` references the CLI expands from the DAEMON
+host env — values never ride the payload). `configError` follows the
+`session.commandError` contract: set → the daemon fails the step and never
+spawns. Daemon side: env refs are validated pre-spawn (unset var = loud step
+failure), config rides a runner-owned temp file via `--mcp-config` +
+`--strict-mcp-config` + `--allowedTools mcp__<name>__*`, and an expected server
+reporting init status `"failed"` fails the step. Template/echo runners: MCP
+unsupported (documented; step proceeds without tools).
 
 ## Public Interface
 
@@ -34,6 +46,10 @@ interface ExecutionPayload {
   previousOutput: string | null// prior step's output (v2) — chain context, stdin prose
   rejectionNote: string | null // reviewer feedback on a rewound re-run (v2, G1-2) — raw human text
   modeInstructions: string | null // SERVER-LAYERED mode instructions (G1-4) — see header note
+  mcp: {                       // MCP servers for the claude runner (G1-3) — see header note
+    servers: Record<string, { type: 'http'; url: string; headers?: Record<string, string> }>
+    configError: string | null // set → daemon fails the step, never spawns
+  } | null
   timeoutMs: number | null     // daemon kills the child after this (default 300000)
   retryDelayMs: number | null
   maxRetries: number | null

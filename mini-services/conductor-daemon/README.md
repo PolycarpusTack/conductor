@@ -40,6 +40,28 @@ config, e.g.:
 Template tokens (whitelist — anything else fails the step):
 `{{agent.runtimeModel}}`, `{{task.id}}`, `{{step.id}}`, `{{step.mode}}`.
 
+## MCP tools (G1-3 — claude runner ONLY)
+
+When the agent has MCP connections, the Execution Payload carries a sanitized
+`mcp.servers` fragment (URLs + header templates; per spike G1-3-T0). The claude
+runner writes it to a temp config file and passes
+`--mcp-config <file> --strict-mcp-config --allowedTools mcp__<name>__*` — the
+spawned CLI is itself a spec-MCP client and talks to the servers directly.
+
+Secrets ride **env indirection**: header values reference `${ENV_VAR}` and the
+CLI expands them from THIS daemon's environment. Provision the referenced vars
+in the daemon env (like `DAEMON_TOKEN`); a referenced-but-unset var **fails the
+step before anything spawns** — the CLI would otherwise pass the literal
+`${NAME}` through silently. An MCP server that fails to start also fails the
+step (detected via the stream-json init event) — the agent was promised those
+tools.
+
+**The template and echo runners do not support MCP.** A step whose payload
+carries MCP servers still executes on them, but without tools — there is no
+generic-CLI channel to deliver MCP config. If your custom CLI supports MCP,
+wire it via the runtime `commandTemplate` yourself; the daemon does not
+pretend.
+
 ## Workspace directory (cwd) — SECURITY
 
 Headless `claude -p` **skips the interactive workspace-trust dialog**

@@ -265,6 +265,17 @@ async function executeStep(step: ExecutionPayload): Promise<void> {
     }
 
     const kind: RunnerKind = resolveRunnerKind(RUNNER_ENV, Boolean(step.session.command))
+
+    // G1-3: server-side MCP config rejection (missing endpoint, literal
+    // secret in an auth header, unknown connection) — same contract as
+    // commandError on the CLAUDE runner: the agent was promised these tools,
+    // fail loudly, never spawn with a partial toolset. Template/echo runners
+    // don't support MCP at all (documented), so they proceed regardless.
+    if (kind === 'claude' && step.mcp?.configError) {
+      await reportStep(step, { ok: false, output: '', error: `mcp config rejected: ${step.mcp.configError}` }, sessionId)
+      return
+    }
+
     let spec
     try {
       spec = buildSpawnSpec(kind, step, CLAUDE_OPTS)
@@ -297,7 +308,11 @@ async function executeStep(step: ExecutionPayload): Promise<void> {
       // before the completion report, so events never arrive after 'done'.
       await batcher?.close()
     }
-    const outcome = interpretResult(spec.kind, proc)
+    // G1-3: a broken MCP server does not fail the claude run by itself —
+    // check the init event's per-server status against what was promised.
+    const outcome = interpretResult(spec.kind, proc, {
+      expectedMcpServers: Object.keys(step.mcp?.servers ?? {}),
+    })
 
     // Evidence (A-3): git diff --stat + dirty count when the cwd is a repo
     // (success OR failure); claude cost metadata rides a json artifact.

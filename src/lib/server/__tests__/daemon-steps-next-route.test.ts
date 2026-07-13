@@ -19,6 +19,7 @@ const mockTaskFindUnique = mock(() => Promise.resolve(null)) as any
 const mockStepEventFindFirst = mock(() => Promise.resolve(null)) as any
 const mockStepEventCreate = mock(() => Promise.resolve({ id: 'evt-1' })) as any
 const mockProjectModeFindFirst = mock(() => Promise.resolve(null)) as any
+const mockMcpConnFindMany = mock(() => Promise.resolve([] as unknown[])) as any
 
 mock.module('@/lib/db', () => ({
   db: {
@@ -34,6 +35,8 @@ mock.module('@/lib/db', () => ({
     },
     // G1-1-T3: buildResolvedPrompt reads the project mode for label/instructions.
     projectMode: { findFirst: mockProjectModeFindFirst },
+    // G1-3: buildDaemonMcpServers loads the agent's MCP connection defs.
+    projectMcpConnection: { findMany: mockMcpConnFindMany },
     // G1-1-T4: the poll route creates the StepExecution row for the attempt.
     stepExecution: {
       findFirst: () => Promise.resolve(null),
@@ -131,6 +134,8 @@ beforeEach(() => {
   mockStepEventCreate.mockResolvedValue({ id: 'evt-1' })
   mockProjectModeFindFirst.mockReset()
   mockProjectModeFindFirst.mockResolvedValue(null)
+  mockMcpConnFindMany.mockReset()
+  mockMcpConnFindMany.mockResolvedValue([])
   mockResolveDaemonByToken.mockReset()
   mockResolveDaemonByToken.mockResolvedValue(DAEMON)
   mockExtractDaemonToken.mockReset()
@@ -267,6 +272,40 @@ describe('GET /api/daemon/steps/next — execution payload contract', () => {
     expect(body.step.session.commandError).toContain('evil.injection')
     expect(body.step.session.commandError).toContain('another.bad')
     // Still a valid payload — the daemon fails the step with the loud error.
+    expect(validateExecutionPayload(body.step)).toEqual([])
+  })
+
+  // G1-3 (gap 1.6): agents with MCP connections get a sanitized mcp block —
+  // URLs + ${ENV_VAR} header templates, never secret values.
+  test('carries the mcp servers fragment for an agent with connections', async () => {
+    const step = leasedStep()
+    step.agent.mcpConnectionIds = JSON.stringify(['mcp-1']) as unknown as null
+    mockStepFindFirst.mockResolvedValue(step)
+    mockMcpConnFindMany.mockResolvedValue([
+      {
+        id: 'mcp-1',
+        name: 'GitHub Tools',
+        endpoint: 'https://mcp.example.com/mcp',
+        config: JSON.stringify({ headers: { Authorization: 'Bearer ${GH_TOKEN}' } }),
+      },
+    ])
+    const body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.mcp).toEqual({
+      servers: {
+        'GitHub-Tools': {
+          type: 'http',
+          url: 'https://mcp.example.com/mcp',
+          headers: { Authorization: 'Bearer ${GH_TOKEN}' },
+        },
+      },
+      configError: null,
+    })
+    expect(validateExecutionPayload(body.step)).toEqual([])
+  })
+
+  test('mcp is null when the agent has no connections', async () => {
+    const body = await (await GET(makeRequest(), params)).json()
+    expect(body.step.mcp).toBeNull()
     expect(validateExecutionPayload(body.step)).toEqual([])
   })
 

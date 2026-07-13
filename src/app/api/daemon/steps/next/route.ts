@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { unauthorized, withErrorHandling } from '@/lib/server/api-errors'
 import { extractDaemonToken, resolveDaemonByToken, updateDaemonHeartbeat } from '@/lib/server/daemon-auth'
 import { resolveRuntime } from '@/lib/server/daemon-dispatch'
+import { buildDaemonMcpServers } from '@/lib/server/daemon-mcp-config'
 import { buildResolvedPrompt } from '@/lib/server/dispatch'
 import { findOrCreateRunningExecution } from '@/lib/server/execution-log'
 import { parseSessionPolicy, sessionKeyForStep, resolveCommandTemplate } from '@/lib/server/session-policy'
@@ -107,6 +108,11 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
     // buildResolvedPrompt the HTTP path uses — identical resolution.
     const resolved = step.agent ? await buildResolvedPrompt(step, step.agent) : null
 
+    // G1-3 (gap 1.6): sanitized MCP servers for the claude runner — URLs +
+    // header templates with ${ENV_VAR} references only, never secret values
+    // (env indirection, spike G1-3-T0). Project-scoped lookup.
+    const mcp = await buildDaemonMcpServers(step.agent?.mcpConnectionIds, step.task.projectId)
+
     const runtime = await resolveRuntime(step.taskId, step.agent?.runtime?.adapter)
 
     // Session policy from the agent's runtime config; the sessionKey is
@@ -197,6 +203,10 @@ export const GET = withErrorHandling('api/daemon/steps/next', async (request: Re
         // for the HTTP path. The daemon prefers this over its legacy parse of
         // agent.modeInstructions (which never carried the projectMode layer).
         modeInstructions: resolved?.modeInstructions || null,
+        // G1-3 (gap 1.6): MCP servers for the spawned CLI (claude runner).
+        // `mcp.configError` set → the daemon fails the step, never spawns
+        // (same contract as session.commandError — no silent pretend).
+        mcp,
         timeoutMs: step.timeoutMs,
         retryDelayMs: step.retryDelayMs,
         maxRetries: step.maxRetries,
