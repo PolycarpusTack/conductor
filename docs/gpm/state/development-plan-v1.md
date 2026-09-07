@@ -1,5 +1,10 @@
 # Development Plan v1 — Conductor → A+ State
 
+> Historical plan. Completed work and original assumptions are retained here.
+> The remaining-work order was replanned on 2026-09-07 in
+> [the current GPM program](working-program-2026-09-07.md) and
+> [root backlog](../../../backlog.md); use those to select the next task.
+
 Generated: 2026-07-03 per `docs/gpm/backlog-builder-v5.1.md`.
 Input design: `current-state-evaluation.md` (brownfield report substitutes for a Solution Design per deployment-kit rule).
 Target: every evaluation dimension ≥ 8/10 **and** daemon mode executing real work (Assumption A2).

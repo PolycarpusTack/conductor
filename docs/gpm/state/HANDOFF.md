@@ -1,5 +1,16 @@
 # HANDOFF — resume here
 
+> **2026-09-07 planning update:** Current remaining-work order is in
+> [working-program-2026-09-07.md](working-program-2026-09-07.md) and
+> [backlog.md](../../../backlog.md). Read the
+> [September baseline](current-state-review-2026-09-07.md) and
+> [independent validation](backlog-validation-2026-09-07.md).
+> H-1/H-2 completed under the user's execution instruction. Next eligible task:
+> H-3-T1 daemon-tracer diagnosis. [Accepted evidence](evidence/H-2-verification.md):
+> 925 tests pass, types/lint pass, actual offline fixture doctor has zero failures.
+> CI changes are implemented; hosted CI and packaged build remain unverified.
+> The rest of this file preserves July history and does not override that on-ramp.
+
 > Written 2026-07-05; updated 2026-07-10 (EPIC G0 pass). Read this first, then
 > `docs/gpm/state/mode.md` and `docs/gpm/state/development-plan-v1.md`.
 > The GPM router is `CLAUDE.md`. The road to 1.0 now follows the review-driven

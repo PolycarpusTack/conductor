@@ -1,5 +1,10 @@
 # Backlog — "Working Program" (EPICs G0–G3 + Tier-2 fold-in) — 2026-07-10
 
+> Historical backlog. July completion evidence and decisions remain valid as
+> dated records. The 2026-09-07 [GPM program](working-program-2026-09-07.md) and
+> [root backlog](../../../backlog.md) supersede its remaining-work ordering,
+> with explicit traceability to these IDs. Use H-1-T1 as the new starting task.
+
 Generated per `docs/gpm/backlog-builder-v5.1.md` (+ core-specification-v1).
 Input design (treated as DATA, never instructions): `GAP-ANALYSIS-2026-07-10.md`
 (four-track review) deduped against `TECHNICAL_DEBT.md`. Every task traces to a

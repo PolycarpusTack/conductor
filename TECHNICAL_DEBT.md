@@ -1,5 +1,12 @@
 # Technical Debt Register
 
+> **September 2026 planning note:** Current verification evidence and remaining-work
+> ordering are in [the GPM program](docs/gpm/state/working-program-2026-09-07.md)
+> and [backlog.md](backlog.md). The green-suite counts below are historical.
+> September Bun package-resolution failures require H-1 diagnosis; they do not
+> establish that the previously fixed TD-014b cause has returned. Existing debt
+> IDs and resolved implementation history are preserved.
+
 > Last re-baselined: 2026-07-04 (F-5, after EPICs A–F)
 > Severity: 🔴 blocking · 🟠 high · 🟡 medium · ⚪ low
 >

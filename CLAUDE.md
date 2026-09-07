@@ -6,6 +6,9 @@ NEVER load them all — read the file for your current stage only.
 ## Always
 - Read docs/gpm/state/mode.md first. Mode governs everything (ceremony,
   TDD, gates). If missing or stale (>1 EPIC old), ask before proceeding.
+- Current remaining-work plan: docs/gpm/state/working-program-2026-09-07.md
+  + backlog.md; current findings and validation are linked there. Older July
+  plans preserve completion history but no longer select the next task.
 - Working context per task = architecture-memory.md + the relevant
   snapshots/ files + the task spec. Budget ≤3k tokens of project context;
   if exceeded, the memory needs updating or the task is too broad — say so.
@@ -21,9 +24,9 @@ NEVER load them all — read the file for your current stage only.
   the matching template (zap/cip/gen-tests-template)
 - Anything about principles, DoD, modes, economics →
   docs/gpm/core-specification-v1.md — the single home of the rules
-- Brownfield baseline → docs/gpm/state/current-state-evaluation.md
+- Brownfield baseline → docs/gpm/state/current-state-review-2026-09-07.md
   (evaluator report — substitutes for the evaluator agent)
-- The active development plan → docs/gpm/state/development-plan-v1.md
+- The active development plan → docs/gpm/state/working-program-2026-09-07.md
 
 ## Model routing
 Follow the Delegation Charter in docs/gpm/gpm-deployment-kit-v1.md §6.
@@ -35,6 +38,7 @@ Write/update the Contract Snapshot in docs/gpm/state/snapshots/.
 After each EPIC: update architecture-memory.md + write a phase summary.
 
 ## Project conventions (Conductor)
-- Runtime: Bun. Tests: `bun test` (bun:test + mock.module). Types: `bun run type-check`.
+- Runtime: Node for app/doctor; Bun for tooling/tests (ADR-0007).
+  Tests: `bun run test` (includes timeout/path filters). Types: `bun run type-check`.
 - DB: Prisma — SQLite default, Postgres+pgvector optional (docker compose).
 - Verify then commit on main (no PR flow for solo work) — see memory.

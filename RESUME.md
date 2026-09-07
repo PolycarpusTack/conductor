@@ -1,5 +1,19 @@
 # RESUME — pick up here after reboot
 
+> **Current on-ramp — 2026-09-07:** Start with
+> [the September GPM program](docs/gpm/state/working-program-2026-09-07.md),
+> [the root backlog](backlog.md), and
+> [its independent validation](docs/gpm/state/backlog-validation-2026-09-07.md).
+> The user authorized execution. **H-1 and H-2 are complete locally**; next is
+> **H-3-T1**, isolated daemon-tracer diagnosis. Read
+> [H-2 evidence and contracts](docs/gpm/state/evidence/H-2-verification.md).
+> Final suite: 925 pass/0 fail; types/lint and offline fixture doctor passed with
+> documented warnings. Hosted CI/build remains unverified. July completion remains
+> historical evidence; the July next-step
+> prompt and green-suite claims below are superseded by the September baseline.
+
+## Archived July on-ramp
+
 > Written 2026-07-13, end of a long session. This is the fast on-ramp. The
 > authoritative detail is in `docs/gpm/state/HANDOFF.md` (read it second).
 > Tree is clean; all work below is committed on `main`.

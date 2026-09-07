@@ -1,5 +1,9 @@
 # Assumptions Ledger — Conductor
 
+> July ledger retained for history. Current September assumptions and unresolved
+> decisions are in [the working program, section 5](working-program-2026-09-07.md#5-decisions-and-assumptions-ledger).
+> Old ASSUMED entries are not implicitly promoted to accepted requirements.
+
 Updated: 2026-07-03. High-impact items flagged ⚑. Mark (verified) when confirmed with the owner.
 
 | # | Assumption | Impact if wrong | Status |
